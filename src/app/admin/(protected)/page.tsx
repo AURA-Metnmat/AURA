@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
+import NeuralBackground from "@/components/ui/flow-field-background";
 import { PLATFORM_NAME, DEFAULT_GAPS } from "@/lib/aura/config";
 import { COMPANY_CATEGORIES } from "@/lib/aura/company-utils";
 import ConfirmDeleteModal from "@/components/admin/ConfirmDeleteModal";
@@ -70,6 +72,11 @@ type DeleteSummary = {
   referenceFiles: number;
   storageFiles: number;
 };
+
+const glassPanel = "bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-lg shadow-black/20";
+const glassCard = "bg-slate-900/50 backdrop-blur-md border border-white/10 hover:border-amber-500/30 transition-colors";
+const glassInput =
+  "bg-slate-950/60 backdrop-blur-sm border border-white/10 rounded-xl focus:outline-none focus:border-amber-500/60";
 
 export default function AdminPage() {
   const [view, setView] = useState<AdminView>("dashboard");
@@ -396,13 +403,23 @@ export default function AdminPage() {
   }, {});
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between flex-wrap gap-4">
+    <div className="relative min-h-screen text-slate-100 overflow-x-hidden">
+      <div className="fixed inset-0 z-0">
+        <NeuralBackground color="#818cf8" trailOpacity={0.1} speed={0.8} particleCount={500} />
+      </div>
+
+      <div className="relative z-10 min-h-screen">
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-slate-950/40 backdrop-blur-xl px-6 py-4 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-slate-400 hover:text-white text-sm">← {PLATFORM_NAME}</Link>
+          <Link href="/" className="text-slate-400 hover:text-white text-sm transition-colors">← {PLATFORM_NAME}</Link>
           <div>
-            <p className="text-xs uppercase tracking-widest text-amber-400">METNMAT Admin</p>
-            <h1 className="text-xl font-semibold">Company & Interview Management</h1>
+            <p className="text-xs uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              METNMAT Admin
+            </p>
+            <h1 className="text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+              Company & Interview Management
+            </h1>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -411,13 +428,13 @@ export default function AdminPage() {
               await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
               window.location.href = "/admin/login";
             }}
-            className="text-sm text-slate-400 hover:text-white border border-slate-700 px-3 py-2 rounded-lg"
+            className="text-sm text-slate-400 hover:text-white border border-white/10 bg-slate-900/40 backdrop-blur-sm px-3 py-2 rounded-lg transition-colors"
           >
             Sign out
           </button>
           <button
             onClick={() => { setView("onboard"); setOnboardStep(0); setCreatedLink(null); }}
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm"
+            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm shadow-lg shadow-amber-500/20 transition-colors"
           >
             + Onboard New Company
           </button>
@@ -462,7 +479,7 @@ export default function AdminPage() {
           </div>
 
           {onboardStep === 0 && (
-            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-4">
+            <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 border border-white/10 space-y-4">
               <h2 className="text-lg font-semibold">Step 1 — Company Information</h2>
               <p className="text-sm text-slate-400">Enter client company details. METNMAT admin uses this to configure the interview.</p>
               <input placeholder="Company name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm" />
@@ -486,7 +503,7 @@ export default function AdminPage() {
           )}
 
           {onboardStep === 1 && (
-            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 space-y-4">
+            <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 border border-white/10 space-y-4">
               <h2 className="text-lg font-semibold">Step 2 — Business Context for AI</h2>
               <p className="text-sm text-slate-400">Help AURA understand this company&apos;s operations. This improves interview quality.</p>
               <textarea placeholder="Company description — what they do, key operations..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm h-28" />
@@ -507,7 +524,7 @@ export default function AdminPage() {
           )}
 
           {onboardStep === 2 && createdLink && (
-            <div className="bg-slate-900 rounded-2xl p-6 border border-amber-500/30 space-y-6 text-center">
+            <div className="bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 border border-amber-500/30 space-y-6 text-center">
               <div className="text-4xl">✓</div>
               <h2 className="text-xl font-semibold text-amber-400">{form.name} is ready!</h2>
               <p className="text-sm text-slate-400">Share this link with {form.name} employees. They will enter their details and complete the AI interview.</p>
@@ -546,23 +563,27 @@ export default function AdminPage() {
               { label: "Completed", value: totalCompleted },
               { label: "Categories", value: categories.length },
             ].map((stat) => (
-              <div key={stat.label} className="bg-slate-900 rounded-xl p-4 border border-slate-800">
+              <div key={stat.label} className={`${glassPanel} rounded-xl p-4`}>
                 <p className="text-2xl font-bold text-amber-400">{stat.value}</p>
                 <p className="text-xs text-slate-500 mt-1">{stat.label}</p>
               </div>
             ))}
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
+          <div className={`flex items-center gap-4 flex-wrap ${glassPanel} rounded-xl p-4`}>
             <input
               type="search"
               placeholder="Search companies..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-amber-500"
+              className={`flex-1 min-w-[200px] ${glassInput} px-4 py-2 text-sm`}
             />
             <label className="text-sm text-slate-400">Filter by category:</label>
-            <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+            <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className={`${glassInput} px-3 py-2 text-sm`}
+            >
               <option value="all">All Categories ({companies.length})</option>
               {categories.map((c) => (
                 <option key={c} value={c}>{c} ({companies.filter((x) => x.category === c).length})</option>
@@ -590,7 +611,7 @@ export default function AdminPage() {
                 <h2 className="text-sm uppercase tracking-widest text-amber-400/80 mb-3">{category}</h2>
                 <div className="grid md:grid-cols-2 gap-4">
                   {list.map((c) => (
-                    <div key={c.id} className="bg-slate-900 rounded-xl p-5 border border-slate-800 hover:border-slate-700 transition-colors">
+                    <div key={c.id} className={`${glassCard} rounded-xl p-5`}>
                       <div className="flex justify-between items-start gap-3">
                         <div>
                           <h3 className="font-semibold text-lg">{c.name}</h3>
@@ -603,7 +624,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <button onClick={() => copyLink(c.interviewLink)} className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg">Copy Link</button>
+                        <button onClick={() => copyLink(c.interviewLink)} className="text-xs bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border border-indigo-500/30 px-3 py-1.5 rounded-lg transition-colors">Copy Link</button>
                         <a
                           href={c.interviewLink}
                           target="_blank"
@@ -826,6 +847,7 @@ export default function AdminPage() {
           </section>
         </main>
       )}
+      </div>
     </div>
   );
 }
