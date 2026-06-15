@@ -1,17 +1,22 @@
 import { randomBytes } from "crypto";
+import { getInterviewLink as buildInterviewLink } from "@/lib/app-url";
 
 export function generateInviteToken(): string {
   return randomBytes(16).toString("hex");
 }
 
+export function slugifyCompanyName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export function getInterviewLink(token: string, request?: Request): string {
-  const base =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    (request ? new URL(request.url).origin : "");
-  if (!base) {
-    throw new Error("NEXT_PUBLIC_APP_URL is not configured");
-  }
-  return `${base}/interview/c/${token}`;
+  return buildInterviewLink(token, request);
 }
 
 export const COMPANY_CATEGORIES = [

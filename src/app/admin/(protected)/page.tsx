@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { PLATFORM_NAME, DEFAULT_GAPS } from "@/lib/aura/config";
 import { COMPANY_CATEGORIES } from "@/lib/aura/company-utils";
+import ConfirmDeleteModal from "@/components/admin/ConfirmDeleteModal";
 
 interface CompanyRow {
   id: string;
@@ -61,6 +62,15 @@ interface SessionDetail {
 
 const ONBOARD_STEPS = ["Company Info", "Business Context", "Interview Link"] as const;
 
+type Notice = { type: "success" | "error"; message: string };
+
+type DeleteSummary = {
+  companyName: string;
+  sessions: number;
+  referenceFiles: number;
+  storageFiles: number;
+};
+
 export default function AdminPage() {
   const [view, setView] = useState<AdminView>("dashboard");
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
@@ -69,10 +79,31 @@ export default function AdminPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [companyDetail, setCompanyDetail] = useState<{ company: CompanyRow; sessions: SessionRow[] } | null>(null);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteSummary, setDeleteSummary] = useState<DeleteSummary | null>(null);
+  const [loadingDeleteSummary, setLoadingDeleteSummary] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    category: "Other",
+    industry: "",
+    location: "",
+    contactName: "",
+    contactEmail: "",
+    contactPhone: "",
+    description: "",
+    aiContext: "",
+  });
 
   const [onboardStep, setOnboardStep] = useState(0);
   const [creating, setCreating] = useState(false);
@@ -89,13 +120,27 @@ export default function AdminPage() {
     aiContext: "",
   });
 
+  function showNotice(message: string, type: Notice["type"] = "success") {
+    setNotice({ type, message });
+    window.setTimeout(() => setNotice(null), 5000);
+  }
+
   const loadCompanies = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await fetch("/api/companies?admin=true", { credentials: "include" });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load companies");
+      }
       setCompanies(data.companies ?? []);
       setCategories(data.categories ?? []);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to load companies";
+      setLoadError(message);
+      setCompanies([]);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -110,9 +155,14 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/companies/${id}`, { credentials: "include" });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load company");
+      }
       setCompanyDetail(data);
       setSelectedCompanyId(id);
       setView("company-detail");
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to load company", "error");
     } finally {
       setLoading(false);
     }
@@ -129,33 +179,15 @@ export default function AdminPage() {
         body: JSON.stringify(form),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error ?? "Failed to create company");
       setCreatedLink(data.interviewLink);
       setOnboardStep(2);
       await loadCompanies();
-    } catch {
-      alert("Failed to create company");
+      showNotice("Interview link generated successfully");
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to create company", "error");
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function importReference(slug: string) {
-    setImporting(true);
-    try {
-      const res = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ companySlug: slug }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.details ?? data.error);
-      alert(`Import complete: ${JSON.stringify(data.stats)}`);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Import failed");
-    } finally {
-      setImporting(false);
     }
   }
 
@@ -174,10 +206,10 @@ export default function AdminPage() {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.details ?? data.error);
-      alert(`Uploaded ${files.length} file(s). Stats: ${JSON.stringify(data.stats)}`);
+      if (!res.ok) throw new Error(data.details ?? data.error ?? "Upload failed");
+      showNotice(`Uploaded ${files.length} file(s) successfully`);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Upload failed");
+      showNotice(e instanceof Error ? e.message : "Upload failed", "error");
     } finally {
       setUploading(false);
     }
@@ -188,9 +220,11 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/interview?sessionId=${sessionId}`, { credentials: "include" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error ?? "Failed to load interview");
       setSessionDetail(data.session);
       setView("session-detail");
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to load interview", "error");
     } finally {
       setLoading(false);
     }
@@ -199,7 +233,122 @@ export default function AdminPage() {
   function copyLink(link: string) {
     navigator.clipboard.writeText(link);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    showNotice("Interview link copied to clipboard");
+    window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function openDeleteModal(company: { id: string; name: string }) {
+    setDeleteTarget(company);
+    setDeleteSummary(null);
+    setLoadingDeleteSummary(true);
+    try {
+      const res = await fetch(`/api/companies/${company.id}?deletePreview=true`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to load delete preview");
+      setDeleteSummary(data.summary);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to load delete preview", "error");
+      setDeleteTarget(null);
+    } finally {
+      setLoadingDeleteSummary(false);
+    }
+  }
+
+  function closeDeleteModal() {
+    if (deleting) return;
+    setDeleteTarget(null);
+    setDeleteSummary(null);
+  }
+
+  async function confirmDeleteCompany() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/companies/${deleteTarget.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ confirmName: deleteTarget.name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete company");
+
+      closeDeleteModal();
+      setCompanyDetail(null);
+      setSelectedCompanyId(null);
+      setView("dashboard");
+      await loadCompanies();
+      showNotice(data.message ?? "Company deleted successfully");
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to delete company", "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function startEditingCompany() {
+    if (!companyDetail) return;
+    const c = companyDetail.company;
+    setEditForm({
+      name: c.name,
+      category: c.category ?? "Other",
+      industry: c.industry ?? "",
+      location: c.location ?? "",
+      contactName: c.contactName ?? "",
+      contactEmail: c.contactEmail ?? "",
+      contactPhone: c.contactPhone ?? "",
+      description: c.description ?? "",
+      aiContext: c.aiContext ?? "",
+    });
+    setEditing(true);
+  }
+
+  async function saveCompanyEdits() {
+    if (!companyDetail) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/companies/${companyDetail.company.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(editForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save changes");
+      await loadCompanyDetail(companyDetail.company.id);
+      await loadCompanies();
+      setEditing(false);
+      showNotice("Company updated successfully");
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to save changes", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function regenerateInterviewLink() {
+    if (!companyDetail) return;
+    setRegenerating(true);
+    try {
+      const res = await fetch(`/api/companies/${companyDetail.company.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ regenerateInviteToken: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to regenerate link");
+      await loadCompanyDetail(companyDetail.company.id);
+      await loadCompanies();
+      setShowRegenerateConfirm(false);
+      showNotice("New interview link generated. Old links no longer work.");
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to regenerate link", "error");
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   function resetOnboard() {
@@ -224,7 +373,22 @@ export default function AdminPage() {
       ? companies
       : companies.filter((c) => c.category === filterCategory);
 
-  const grouped = filtered.reduce<Record<string, CompanyRow[]>>((acc, c) => {
+  const searched = searchQuery.trim()
+    ? filtered.filter((c) => {
+        const q = searchQuery.trim().toLowerCase();
+        return (
+          c.name.toLowerCase().includes(q) ||
+          c.slug.toLowerCase().includes(q) ||
+          (c.industry?.toLowerCase().includes(q) ?? false) ||
+          (c.location?.toLowerCase().includes(q) ?? false)
+        );
+      })
+    : filtered;
+
+  const totalInterviews = companies.reduce((sum, c) => sum + c.sessionCount, 0);
+  const totalCompleted = companies.reduce((sum, c) => sum + c.completedCount, 0);
+
+  const grouped = searched.reduce<Record<string, CompanyRow[]>>((acc, c) => {
     const cat = c.category || "Uncategorized";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(c);
@@ -259,6 +423,29 @@ export default function AdminPage() {
           </button>
         </div>
       </header>
+
+      {notice && (
+        <div
+          className={`mx-6 mt-4 rounded-xl border px-4 py-3 text-sm ${
+            notice.type === "success"
+              ? "border-green-800 bg-green-950/50 text-green-300"
+              : "border-red-800 bg-red-950/50 text-red-300"
+          }`}
+        >
+          {notice.message}
+        </div>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          company={deleteTarget}
+          summary={deleteSummary}
+          loadingSummary={loadingDeleteSummary}
+          deleting={deleting}
+          onConfirm={confirmDeleteCompany}
+          onClose={closeDeleteModal}
+        />
+      )}
 
       {view === "onboard" && (
         <main className="max-w-2xl mx-auto px-6 py-10">
@@ -324,11 +511,21 @@ export default function AdminPage() {
               <div className="text-4xl">✓</div>
               <h2 className="text-xl font-semibold text-amber-400">{form.name} is ready!</h2>
               <p className="text-sm text-slate-400">Share this link with {form.name} employees. They will enter their details and complete the AI interview.</p>
-              <div className="bg-slate-950 rounded-xl p-4 border border-slate-700 flex items-center gap-3">
+              <div className="bg-slate-950 rounded-xl p-4 border border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <input readOnly value={createdLink} className="flex-1 bg-transparent text-sm text-amber-400 truncate outline-none" />
-                <button onClick={() => copyLink(createdLink)} className="shrink-0 bg-amber-500 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm">
-                  {copied ? "Copied!" : "Copy Link"}
-                </button>
+                <div className="flex gap-2 shrink-0">
+                  <a
+                    href={createdLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="border border-slate-600 text-slate-200 font-semibold px-4 py-2 rounded-lg text-sm text-center"
+                  >
+                    Open Link
+                  </a>
+                  <button onClick={() => copyLink(createdLink)} className="bg-amber-500 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm">
+                    {copied ? "Copied!" : "Copy Link"}
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-slate-500">Category: {form.category} · All interview data will appear in Admin under this company.</p>
               <div className="flex gap-3">
@@ -342,7 +539,28 @@ export default function AdminPage() {
 
       {view === "dashboard" && (
         <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "Companies", value: companies.length },
+              { label: "Interviews", value: totalInterviews },
+              { label: "Completed", value: totalCompleted },
+              { label: "Categories", value: categories.length },
+            ].map((stat) => (
+              <div key={stat.label} className="bg-slate-900 rounded-xl p-4 border border-slate-800">
+                <p className="text-2xl font-bold text-amber-400">{stat.value}</p>
+                <p className="text-xs text-slate-500 mt-1">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
           <div className="flex items-center gap-4 flex-wrap">
+            <input
+              type="search"
+              placeholder="Search companies..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 min-w-[200px] bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-amber-500"
+            />
             <label className="text-sm text-slate-400">Filter by category:</label>
             <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm">
               <option value="all">All Categories ({companies.length})</option>
@@ -352,12 +570,19 @@ export default function AdminPage() {
             </select>
           </div>
 
-          {loading ? (
+          {loadError ? (
+            <div className="text-center py-16 text-red-300 bg-red-950/30 border border-red-900 rounded-xl">
+              <p>{loadError}</p>
+              <button onClick={() => loadCompanies()} className="mt-4 text-amber-400 underline text-sm">Retry</button>
+            </div>
+          ) : loading ? (
             <p className="text-slate-400">Loading...</p>
           ) : Object.keys(grouped).length === 0 ? (
             <div className="text-center py-16 text-slate-500">
-              <p>No companies yet.</p>
-              <button onClick={() => setView("onboard")} className="mt-4 text-amber-400 underline text-sm">Onboard your first company</button>
+              <p>{searchQuery.trim() ? "No companies match your search." : "No companies yet."}</p>
+              {!searchQuery.trim() && (
+                <button onClick={() => setView("onboard")} className="mt-4 text-amber-400 underline text-sm">Onboard your first company</button>
+              )}
             </div>
           ) : (
             Object.entries(grouped).map(([category, list]) => (
@@ -379,8 +604,21 @@ export default function AdminPage() {
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
                         <button onClick={() => copyLink(c.interviewLink)} className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg">Copy Link</button>
+                        <a
+                          href={c.interviewLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs border border-slate-700 hover:bg-slate-800 px-3 py-1.5 rounded-lg"
+                        >
+                          Open
+                        </a>
                         <button onClick={() => loadCompanyDetail(c.id)} className="text-xs bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 px-3 py-1.5 rounded-lg">View Details</button>
-                        <button onClick={() => importReference(c.slug)} disabled={importing} className="text-xs border border-slate-700 px-3 py-1.5 rounded-lg disabled:opacity-50">Import Data</button>
+                        <button
+                          onClick={() => openDeleteModal({ id: c.id, name: c.name })}
+                          className="text-xs text-red-400 border border-red-900/50 hover:bg-red-950/40 px-3 py-1.5 rounded-lg ml-auto"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -393,8 +631,44 @@ export default function AdminPage() {
 
       {view === "company-detail" && companyDetail && (
         <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-          <button onClick={() => { setView("dashboard"); setCompanyDetail(null); }} className="text-sm text-slate-400 hover:text-white">← Back to dashboard</button>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <button onClick={() => { setView("dashboard"); setCompanyDetail(null); setEditing(false); }} className="text-sm text-slate-400 hover:text-white">← Back to dashboard</button>
+            <div className="flex gap-2">
+              {!editing && (
+                <button onClick={startEditingCompany} className="text-sm border border-slate-700 px-3 py-2 rounded-lg hover:bg-slate-800">
+                  Edit Company
+                </button>
+              )}
+              <button
+                onClick={() => openDeleteModal({ id: companyDetail.company.id, name: companyDetail.company.name })}
+                className="text-sm text-red-400 border border-red-900/50 px-3 py-2 rounded-lg hover:bg-red-950/40"
+              >
+                Delete Company
+              </button>
+            </div>
+          </div>
 
+          {editing ? (
+            <div className="bg-slate-900 rounded-2xl p-6 border border-amber-500/30 space-y-4">
+              <h2 className="text-lg font-semibold">Edit Company</h2>
+              <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Company name" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm" />
+              <div className="grid grid-cols-2 gap-3">
+                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm">
+                  {COMPANY_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+                <input value={editForm.industry} onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })} placeholder="Industry" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm" />
+              </div>
+              <input value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} placeholder="Location" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm" />
+              <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm h-24" />
+              <textarea value={editForm.aiContext} onChange={(e) => setEditForm({ ...editForm, aiContext: e.target.value })} placeholder="AI context" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm h-28" />
+              <div className="flex gap-3">
+                <button onClick={() => setEditing(false)} className="flex-1 border border-slate-700 rounded-xl py-3 text-sm">Cancel</button>
+                <button onClick={saveCompanyEdits} disabled={saving || !editForm.name.trim()} className="flex-[2] bg-amber-500 disabled:opacity-50 text-slate-950 font-semibold rounded-xl py-3 text-sm">
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
             <div className="flex justify-between items-start">
               <div>
@@ -412,7 +686,34 @@ export default function AdminPage() {
               <p className="text-xs text-slate-500 mb-2">Employee Interview Link</p>
               <div className="flex gap-2">
                 <input readOnly value={companyDetail.company.interviewLink} className="flex-1 bg-transparent text-sm text-amber-400 truncate" />
+                <a
+                  href={companyDetail.company.interviewLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="border border-slate-600 text-slate-200 font-semibold px-4 py-2 rounded-lg text-sm"
+                >
+                  Open
+                </a>
                 <button onClick={() => copyLink(companyDetail.company.interviewLink)} className="bg-amber-500 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm">{copied ? "Copied!" : "Copy"}</button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {!showRegenerateConfirm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowRegenerateConfirm(true)}
+                    className="text-xs text-slate-400 hover:text-amber-400 underline"
+                  >
+                    Regenerate link (invalidates old URLs)
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs bg-amber-950/30 border border-amber-900/40 rounded-lg px-3 py-2">
+                    <span className="text-amber-200">Old interview links will stop working.</span>
+                    <button onClick={regenerateInterviewLink} disabled={regenerating} className="text-amber-400 font-semibold hover:underline disabled:opacity-50">
+                      {regenerating ? "..." : "Confirm"}
+                    </button>
+                    <button onClick={() => setShowRegenerateConfirm(false)} className="text-slate-400 hover:text-white">Cancel</button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -433,6 +734,7 @@ export default function AdminPage() {
               />
             </div>
           </div>
+          )}
 
           <section>
             <h3 className="text-lg font-semibold mb-4">Employee Interviews</h3>

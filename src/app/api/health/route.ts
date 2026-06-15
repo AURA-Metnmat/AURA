@@ -12,7 +12,7 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ status: "error", error: message }, { status: 503 });
+    console.error("Health check failed:", error);
+    return NextResponse.json({ status: "error" }, { status: 503 });
   }
 }

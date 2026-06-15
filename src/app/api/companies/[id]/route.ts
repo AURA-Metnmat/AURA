@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
-import { getInterviewLink } from "@/lib/aura/company-utils";
+import { generateInviteToken, getInterviewLink } from "@/lib/aura/company-utils";
+import {
+  deleteCompanyCompletely,
+  getDeleteCompanySummary,
+} from "@/lib/companies/delete-company";
 
 export async function GET(
   request: Request,
@@ -11,6 +15,15 @@ export async function GET(
   if (denied) return denied;
 
   const { id } = await params;
+  const { searchParams } = new URL(request.url);
+
+  if (searchParams.get("deletePreview") === "true") {
+    const summary = await getDeleteCompanySummary(id);
+    if (!summary) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+    return NextResponse.json({ summary });
+  }
 
   const company = await db.company.findUnique({
     where: { id },
@@ -76,8 +89,18 @@ export async function PATCH(
     industry?: string;
     description?: string;
     aiContext?: string;
+    contactName?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    location?: string;
     isActive?: boolean;
+    regenerateInviteToken?: boolean;
   };
+
+  const existing = await db.company.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Company not found" }, { status: 404 });
+  }
 
   const company = await db.company.update({
     where: { id },
@@ -87,7 +110,12 @@ export async function PATCH(
       ...(body.industry !== undefined && { industry: body.industry }),
       ...(body.description !== undefined && { description: body.description }),
       ...(body.aiContext !== undefined && { aiContext: body.aiContext }),
+      ...(body.contactName !== undefined && { contactName: body.contactName }),
+      ...(body.contactEmail !== undefined && { contactEmail: body.contactEmail }),
+      ...(body.contactPhone !== undefined && { contactPhone: body.contactPhone }),
+      ...(body.location !== undefined && { location: body.location }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
+      ...(body.regenerateInviteToken && { inviteToken: generateInviteToken() }),
     },
   });
 
@@ -96,5 +124,48 @@ export async function PATCH(
       ...company,
       interviewLink: getInterviewLink(company.inviteToken, request),
     },
+    ...(body.regenerateInviteToken
+      ? { message: "Interview link regenerated. Previous links are now invalid." }
+      : {}),
   });
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
+  const { id } = await params;
+
+  try {
+    const body = (await request.json().catch(() => ({}))) as { confirmName?: string };
+    const summary = await getDeleteCompanySummary(id);
+
+    if (!summary) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    if (body.confirmName?.trim() !== summary.companyName.trim()) {
+      return NextResponse.json(
+        { error: "Confirmation name does not match company name" },
+        { status: 400 }
+      );
+    }
+
+    const deleted = await deleteCompanyCompletely(id);
+
+    return NextResponse.json({
+      success: true,
+      message: `${deleted.companyName} and all related data were permanently deleted.`,
+      deleted,
+    });
+  } catch (error) {
+    console.error("Delete company error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete company. Please try again." },
+      { status: 500 }
+    );
+  }
 }

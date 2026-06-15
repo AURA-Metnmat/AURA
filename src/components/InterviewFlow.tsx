@@ -57,6 +57,7 @@ export default function InterviewFlow({
   const [currentSection, setCurrentSection] = useState("B");
   const [completionPct, setCompletionPct] = useState(0);
   const [report, setReport] = useState<Record<string, string> | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,7 +109,7 @@ export default function InterviewFlow({
       setCompletionPct(data.completionPct);
       setStep("chat");
     } catch {
-      alert("Failed to start interview. Please try again.");
+      setChatError("Failed to start interview. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -127,6 +128,8 @@ export default function InterviewFlow({
         const data = await res.json();
         if (res.ok && data.attachment) {
           setPendingFiles((prev) => [...prev, data.attachment]);
+        } else {
+          setChatError(data.error ?? "Failed to upload file. Please try again.");
         }
       }
     } finally {
@@ -147,6 +150,7 @@ export default function InterviewFlow({
       { role: "user", content: userMsg, attachments: msgAttachments.length ? msgAttachments : undefined },
     ]);
     setLoading(true);
+    setChatError(null);
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
@@ -158,10 +162,15 @@ export default function InterviewFlow({
         }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to send message");
+      }
       setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
       setCurrentSection(data.currentSection);
       setCompletionPct(data.completionPct);
       if (data.shouldComplete) await completeInterview();
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : "Failed to send message. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -170,6 +179,7 @@ export default function InterviewFlow({
   async function completeInterview() {
     if (!sessionId) return;
     setLoading(true);
+    setChatError(null);
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
@@ -177,7 +187,12 @@ export default function InterviewFlow({
         body: JSON.stringify({ sessionId, message: "confirmed", action: "complete" }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to complete interview");
+      }
       if (data.report) setReport(data.report);
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : "Failed to complete interview. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -321,6 +336,9 @@ export default function InterviewFlow({
                   {formErrors[field.key] && <p className="text-xs text-red-400 mt-1">{formErrors[field.key]}</p>}
                 </div>
               ))}
+              {chatError && (
+                <p className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-xl px-4 py-3">{chatError}</p>
+              )}
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setStep("language")} className="flex-1 border border-slate-700 rounded-xl py-3 text-sm hover:bg-slate-800">←</button>
                 <button type="submit" disabled={loading} className="flex-[3] bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-semibold rounded-xl py-3 text-sm">
@@ -363,6 +381,9 @@ export default function InterviewFlow({
                   </div>
                 ))}
               </div>
+            )}
+            {chatError && (
+              <p className="max-w-3xl mx-auto mb-3 text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-xl px-4 py-3">{chatError}</p>
             )}
             <form onSubmit={sendMessage} className="max-w-3xl mx-auto flex gap-2">
               <input ref={fileInputRef} type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx,.txt,.csv" multiple className="hidden" onChange={handleFileSelect} />

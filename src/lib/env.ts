@@ -1,3 +1,5 @@
+import { resolveAppUrl } from "./app-url";
+
 /**
  * Production environment — Supabase Postgres + Supabase Storage + Vercel.
  */
@@ -51,11 +53,12 @@ export function getAppEnv(): AppEnv {
     throw new Error("SESSION_SECRET must be at least 32 characters");
   }
 
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? missing("NEXT_PUBLIC_APP_URL");
+  const appUrl = resolveAppUrl();
 
-  if (isProduction && appUrl.includes("localhost")) {
-    console.warn("[env] NEXT_PUBLIC_APP_URL points to localhost in production");
+  if (isProduction && (appUrl.includes("localhost") || appUrl.includes("127.0.0.1"))) {
+    throw new Error(
+      "Production requires a public app URL. Set NEXT_PUBLIC_APP_URL to your Vercel domain."
+    );
   }
 
   return {

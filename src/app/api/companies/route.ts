@@ -1,7 +1,22 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
-import { generateInviteToken, getInterviewLink } from "@/lib/aura/company-utils";
+import { generateInviteToken, getInterviewLink, slugifyCompanyName } from "@/lib/aura/company-utils";
+
+async function resolveUniqueSlug(baseSlug: string): Promise<string> {
+  if (!baseSlug) return baseSlug;
+
+  let slug = baseSlug;
+  let suffix = 2;
+
+  while (await db.company.findUnique({ where: { slug }, select: { id: true } })) {
+    slug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return slug;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -92,9 +107,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Company name required" }, { status: 400 });
     }
 
-    const slug =
+    const baseSlug =
       body.slug?.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-") ||
-      body.name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      slugifyCompanyName(body.name);
+
+    if (!baseSlug) {
+      return NextResponse.json({ error: "Company name must contain letters or numbers" }, { status: 400 });
+    }
+
+    const slug = await resolveUniqueSlug(baseSlug);
 
     const inviteToken = generateInviteToken();
 
@@ -126,6 +147,14 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Create company error:", error);
-    return NextResponse.json({ error: "Failed to create company" }, { status: 500 });
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        { error: "A company with this identifier already exists. Try a different name." },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json({ error: "Failed to create company. Please try again." }, { status: 500 });
   }
 }
