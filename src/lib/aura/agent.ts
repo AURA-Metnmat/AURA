@@ -8,7 +8,6 @@ import {
 } from "./config";
 import {
   type Language,
-  type PreferredLanguage,
   SECTION_QUESTIONS_I18N,
   getAcknowledgments,
   getFollowUps,
@@ -168,8 +167,12 @@ function buildFallbackBilingual(ctx: SessionContext, userMessage: string): AuraR
 
 export async function normalizeUserMessage(
   text: string,
-  preferredLang: PreferredLanguage
+  preferredLang: Language
 ): Promise<BilingualText> {
+  if (preferredLang === "en") {
+    return { en: text, locale: text };
+  }
+
   const openai = getOpenAIClient();
   if (!openai) {
     return { en: text, locale: text };

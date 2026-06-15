@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { VoiceInputButton } from "@/components/interview/VoiceInputButton";
-import type { PreferredLanguage, UiStrings } from "@/lib/aura/i18n";
+import type { Language, UiStrings } from "@/lib/aura/i18n";
 import type { EngagementStrings } from "@/lib/aura/engagement";
 import { PREFERRED_LANGUAGES } from "@/lib/aura/i18n";
 import { cn } from "@/lib/utils";
@@ -32,11 +32,11 @@ interface InterviewChatComposerProps {
   loading: boolean;
   uploading: boolean;
   sessionReady: boolean;
-  language: PreferredLanguage;
+  language: Language;
   t: UiStrings;
   engagement: EngagementStrings;
   onQuickPrompt: (text: string) => void;
-  onVoiceTranscript: (text: string) => void;
+  onVoiceTextChange: (text: string) => void;
 }
 
 const QUICK_PROMPT_KEYS = [
@@ -60,7 +60,7 @@ export function InterviewChatComposer({
   t,
   engagement,
   onQuickPrompt,
-  onVoiceTranscript,
+  onVoiceTextChange,
 }: InterviewChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prefLabel = PREFERRED_LANGUAGES.find((l) => l.id === language)?.native ?? language;
@@ -161,7 +161,8 @@ export function InterviewChatComposer({
 
             <VoiceInputButton
               language={language}
-              onTranscript={onVoiceTranscript}
+              baseText={input}
+              onTextChange={onVoiceTextChange}
               disabled={loading || !sessionReady}
               labels={{
                 speakAnswer: engagement.speakAnswer,

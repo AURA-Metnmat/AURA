@@ -1,19 +1,18 @@
 import type { SectionId } from "./config";
 
 export type Language = "en" | "hi" | "or" | "bn";
-export type PreferredLanguage = Exclude<Language, "en">;
+/** Employee-selected interaction language (includes English) */
+export type PreferredLanguage = Language;
 
-/** Languages employees can choose as their preferred interaction language */
-export const PREFERRED_LANGUAGES: { id: PreferredLanguage; label: string; native: string }[] = [
+/** Languages employees can choose — English + regional languages */
+export const PREFERRED_LANGUAGES: { id: Language; label: string; native: string }[] = [
+  { id: "en", label: "English", native: "English" },
   { id: "hi", label: "Hindi", native: "हिन्दी" },
   { id: "or", label: "Odia", native: "ଓଡ଼ିଆ" },
   { id: "bn", label: "Bangla", native: "বাংলা" },
 ];
 
-export const LANGUAGES: { id: Language; label: string; native: string }[] = [
-  { id: "en", label: "English", native: "English" },
-  ...PREFERRED_LANGUAGES,
-];
+export const LANGUAGES = PREFERRED_LANGUAGES;
 
 export interface UiStrings {
   welcome: string;
@@ -438,13 +437,16 @@ export function getWelcomeMessage(
 }
 
 export function getWelcomeMessageBilingual(
-  lang: PreferredLanguage,
+  lang: Language,
   name: string,
   designation: string,
   companyName: string
 ): { en: string; locale: string } {
   const en = `Thank you, ${name}. I've recorded your details as ${designation} at ${companyName}.\n\nLet's begin our conversation about your operations and processes. I'll ask one question at a time.\n\n${SECTION_QUESTIONS_I18N.en.B[0]}`;
-  const localeTemplates: Record<PreferredLanguage, string> = {
+  if (lang === "en") {
+    return { en, locale: en };
+  }
+  const localeTemplates: Record<Exclude<Language, "en">, string> = {
     hi: `धन्यवाद, ${name}। मैंने ${companyName} में आपका विवरण ${designation} के रूप में दर्ज कर लिया है।\n\nआइए आपके संचालन और प्रक्रियाओं के बारे में बातचीत शुरू करें। मैं एक समय में एक प्रश्न पूछूँगा।\n\n${SECTION_QUESTIONS_I18N.hi.B[0]}`,
     or: `ଧନ୍ୟବାଦ, ${name}। ମୁଁ ${companyName} ରେ ${designation} ଭାବରେ ଆପଣଙ୍କ ବିବରଣୀ ରେକର୍ଡ କରିଛି।\n\nଆପଣଙ୍କ operations ଏବଂ processes ବିଷୟରେ ଆମ କଥୋପକଥନ ଆରମ୍ଭ କରିବା। ମୁଁ ଏକ ସମୟରେ ଗୋଟିଏ ପ୍ରଶ୍ନ ପଚରିବି।\n\n${SECTION_QUESTIONS_I18N.or.B[0]}`,
     bn: `ধন্যবাদ, ${name}। আমি ${companyName}-এ ${designation} হিসেবে আপনার বিবরণ রেকর্ড করেছি।\n\nআপনার অপারেশন ও প্রক্রিয়া নিয়ে আমাদের কথোপকথন শুরু করি। আমি একবারে একটি প্রশ্ন করব।\n\n${SECTION_QUESTIONS_I18N.bn.B[0]}`,

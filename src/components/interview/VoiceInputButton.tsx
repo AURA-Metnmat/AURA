@@ -3,16 +3,27 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Mic, Square } from "lucide-react";
 import { SPEECH_LANG_MAP } from "@/lib/aura/bilingual";
-import type { PreferredLanguage } from "@/lib/aura/i18n";
+import type { Language } from "@/lib/aura/i18n";
 import { cn } from "@/lib/utils";
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+}
 
 interface SpeechRecognitionResult {
   readonly isFinal: boolean;
-  readonly [index: number]: { transcript: string };
+  readonly length: number;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  [index: number]: SpeechRecognitionResult;
 }
 
 interface SpeechRecognitionEvent {
-  readonly results: Iterable<SpeechRecognitionResult>;
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
 }
 
 interface SpeechRecognitionInstance extends EventTarget {
@@ -21,8 +32,9 @@ interface SpeechRecognitionInstance extends EventTarget {
   lang: string;
   start: () => void;
   stop: () => void;
+  abort: () => void;
   onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
 }
 
@@ -38,8 +50,9 @@ function getSpeechRecognition(): SpeechRecognitionCtor | null {
 }
 
 interface VoiceInputButtonProps {
-  language: PreferredLanguage;
-  onTranscript: (text: string) => void;
+  language: Language;
+  baseText: string;
+  onTextChange: (text: string) => void;
   disabled?: boolean;
   labels: {
     speakAnswer: string;
@@ -51,13 +64,16 @@ interface VoiceInputButtonProps {
 
 export function VoiceInputButton({
   language,
-  onTranscript,
+  baseText,
+  onTextChange,
   disabled,
   labels,
 }: VoiceInputButtonProps) {
   const [listening, setListening] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const baseTextRef = useRef("");
+  const finalTranscriptRef = useRef("");
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop();
@@ -71,47 +87,72 @@ export function VoiceInputButton({
       return;
     }
 
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+    }
+
+    baseTextRef.current = baseText.trim();
+    finalTranscriptRef.current = "";
+
     const recognition = new Ctor();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = SPEECH_LANG_MAP[language];
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = "";
-      for (const result of event.results) {
-        transcript += result[0]?.transcript ?? "";
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const chunk = result[0]?.transcript ?? "";
+        if (result.isFinal) {
+          finalTranscriptRef.current += chunk;
+        } else {
+          interim += chunk;
+        }
       }
-      if (transcript.trim()) {
-        onTranscript(transcript.trim());
+
+      const spoken = `${finalTranscriptRef.current}${interim}`.trim();
+      const prefix = baseTextRef.current;
+      onTextChange(prefix ? `${prefix} ${spoken}`.trim() : spoken);
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error !== "aborted" && event.error !== "no-speech") {
+        setListening(false);
       }
     };
 
-    recognition.onerror = () => setListening(false);
-    recognition.onend = () => setListening(false);
+    recognition.onend = () => {
+      setListening(false);
+    };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setListening(true);
-  }, [language, onTranscript]);
+    try {
+      recognition.start();
+      setListening(true);
+      setUnsupported(false);
+    } catch {
+      setUnsupported(true);
+      setListening(false);
+    }
+  }, [baseText, language, onTextChange]);
 
-  useEffect(() => () => recognitionRef.current?.stop(), []);
+  const toggle = useCallback(() => {
+    if (listening) {
+      stop();
+    } else {
+      start();
+    }
+  }, [listening, start, stop]);
+
+  useEffect(() => () => recognitionRef.current?.abort(), []);
 
   return (
     <div className="flex flex-col items-center gap-1">
       <button
         type="button"
         disabled={disabled}
-        onMouseDown={start}
-        onMouseUp={stop}
-        onMouseLeave={listening ? stop : undefined}
-        onTouchStart={(e) => {
-          e.preventDefault();
-          start();
-        }}
-        onTouchEnd={(e) => {
-          e.preventDefault();
-          stop();
-        }}
+        onClick={toggle}
         className={cn(
           "shrink-0 w-12 h-12 flex items-center justify-center rounded-xl border transition-all",
           listening
@@ -120,10 +161,11 @@ export function VoiceInputButton({
           disabled && "opacity-40 cursor-not-allowed"
         )}
         title={listening ? labels.stopListening : labels.speakAnswer}
+        aria-pressed={listening}
       >
         {listening ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
       </button>
-      <span className="text-[9px] text-slate-500 max-w-[4rem] text-center leading-tight">
+      <span className="text-[9px] text-slate-500 max-w-[4.5rem] text-center leading-tight">
         {listening ? labels.listening : labels.speakAnswer}
       </span>
       {unsupported && (

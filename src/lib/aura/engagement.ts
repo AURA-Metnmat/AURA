@@ -1,4 +1,4 @@
-import type { Language, PreferredLanguage } from "./i18n";
+import type { Language } from "./i18n";
 
 export interface EngagementStrings {
   detailsDesc: string;
@@ -24,7 +24,7 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     detailsDesc: "Just a few details so we can personalize your conversation. Takes under a minute.",
     stepLabel: "Step 2 of 3 — Your profile",
     secureNote: "Your data stays private and is only shared with your company admin.",
-    speakAnswer: "Hold to speak",
+    speakAnswer: "Tap to speak",
     listening: "Listening…",
     stopListening: "Stop",
     micUnsupported: "Voice input is not supported in this browser. Please type your answer.",
@@ -42,7 +42,7 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     detailsDesc: "बातचीत शुरू करने के लिए कुछ बुनियादी जानकारी। एक मिनट से कम समय लगेगा।",
     stepLabel: "चरण 2 / 3 — आपकी प्रोफ़ाइल",
     secureNote: "आपका डेटा निजी रहता है और केवल कंपनी एडमिन के साथ साझा होता है।",
-    speakAnswer: "बोलने के लिए दबाए रखें",
+    speakAnswer: "बोलने के लिए टैप करें",
     listening: "सुन रहा है…",
     stopListening: "रोकें",
     micUnsupported: "इस ब्राउज़र में वॉइस इनपुट उपलब्ध नहीं है। कृपया टाइप करें।",
@@ -60,7 +60,7 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     detailsDesc: "କଥୋପକଥନ ଆରମ୍ଭ କରିବା ପାଇଁ କିଛି ମୂଳ ତଥ୍ୟ। ଏକ ମିନିଟରୁ କମ ସମୟ।",
     stepLabel: "ପଦକ୍ଷେପ 2 / 3 — ଆପଣଙ୍କ ପ୍ରୋଫାଇଲ୍",
     secureNote: "ଆପଣଙ୍କ ତଥ୍ୟ ଗୋପନୀୟ ରହେ ଏବଂ କେବଳ କମ୍ପାନୀ ଆଡମିନ୍ ସହ ସାଝା ହୁଏ।",
-    speakAnswer: "କହିବା ପାଇଁ ଦବାଇ ରଖନ୍ତୁ",
+    speakAnswer: "କହିବା ପାଇଁ ଟ୍ୟାପ୍ କରନ୍ତୁ",
     listening: "ଶୁଣୁଛି…",
     stopListening: "ବନ୍ଦ",
     micUnsupported: "ଏହି ବ୍ରାଉଜରରେ ଭଏସ୍ ଉପଲବ୍ଧ ନାହିଁ। ଦୟାକରି ଟାଇପ୍ କରନ୍ତୁ।",
@@ -78,7 +78,7 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     detailsDesc: "কথোপকথন শুরু করতে কয়েকটি মৌলিক তথ্য। এক মিনিটেরও কম সময় লাগবে।",
     stepLabel: "ধাপ ২ / ৩ — আপনার প্রোফাইল",
     secureNote: "আপনার তথ্য গোপন থাকে এবং শুধু কোম্পানি অ্যাডমিনের সাথে শেয়ার হয়।",
-    speakAnswer: "বলতে ধরে রাখুন",
+    speakAnswer: "বলতে ট্যাপ করুন",
     listening: "শুনছি…",
     stopListening: "বন্ধ",
     micUnsupported: "এই ব্রাউজারে ভয়েস ইনপুট নেই। টাইপ করুন।",
@@ -94,6 +94,6 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
   },
 };
 
-export function getEngagement(lang: PreferredLanguage): EngagementStrings {
+export function getEngagement(lang: Language): EngagementStrings {
   return ENGAGEMENT[lang];
 }

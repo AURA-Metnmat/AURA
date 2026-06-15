@@ -4,12 +4,12 @@ import { SplineScene } from "@/components/ui/splite";
 import { Card } from "@/components/ui/card";
 import { Spotlight } from "@/components/ui/spotlight";
 import { cn } from "@/lib/utils";
-import type { PreferredLanguage } from "@/lib/aura/i18n";
+import type { Language } from "@/lib/aura/i18n";
 
 const SPLINE_SCENE = "https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode";
 
 interface LanguageOption {
-  id: PreferredLanguage;
+  id: Language;
   label: string;
   native: string;
 }
@@ -20,7 +20,7 @@ interface InterviewWelcomeProps {
   welcomeDesc: string;
   selectLanguage: string;
   languages: LanguageOption[];
-  onSelectLanguage: (language: PreferredLanguage) => void;
+  onSelectLanguage: (language: Language) => void;
 }
 
 export function InterviewWelcome({
@@ -48,7 +48,7 @@ export function InterviewWelcome({
 
             <div className="mt-8">
               <p className="text-sm text-muted-foreground mb-4">{selectLanguage}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {languages.map((lang) => (
                   <button
                     key={lang.id}

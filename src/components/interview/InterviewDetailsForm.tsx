@@ -11,7 +11,7 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
-import type { PreferredLanguage, UiStrings } from "@/lib/aura/i18n";
+import type { Language, UiStrings } from "@/lib/aura/i18n";
 import type { EngagementStrings } from "@/lib/aura/engagement";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ interface ParticipantForm {
 
 interface InterviewDetailsFormProps {
   companyName: string;
-  language: PreferredLanguage;
+  language: Language;
   form: ParticipantForm;
   formErrors: Partial<Record<keyof ParticipantForm, string>>;
   loading: boolean;

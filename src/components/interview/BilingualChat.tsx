@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Bot, User, Sparkles } from "lucide-react";
 import { AudioPlayButton } from "@/components/interview/AudioPlayButton";
-import type { Language, PreferredLanguage } from "@/lib/aura/i18n";
+import type { Language } from "@/lib/aura/i18n";
 import { PREFERRED_LANGUAGES } from "@/lib/aura/i18n";
 import { localeDisplayName } from "@/lib/aura/bilingual";
 import type { EngagementStrings } from "@/lib/aura/engagement";
@@ -18,7 +18,7 @@ export interface BilingualMessage {
 
 interface BilingualChatProps {
   messages: BilingualMessage[];
-  preferredLanguage: PreferredLanguage;
+  preferredLanguage: Language;
   thinking?: boolean;
   thinkingEn?: string;
   thinkingLocale?: string;
@@ -88,6 +88,7 @@ export function BilingualChat({
 }: BilingualChatProps) {
   const prefMeta = PREFERRED_LANGUAGES.find((l) => l.id === preferredLanguage);
   const prefLabel = prefMeta?.native ?? localeDisplayName(preferredLanguage);
+  const englishOnly = preferredLanguage === "en";
 
   return (
     <div className="space-y-8">
@@ -99,7 +100,9 @@ export function BilingualChat({
           <div>
             <p className="text-sm font-medium text-amber-200">Let&apos;s make this easy</p>
             <p className="text-xs text-slate-400">
-              Answer naturally — type, speak, or upload files. AURA will ask friendly follow-ups.
+              {englishOnly
+                ? "Answer naturally — type, speak, or upload files. AURA will ask friendly follow-ups in English."
+                : "Answer naturally — type, speak, or upload files. AURA will ask friendly follow-ups."}
             </p>
           </div>
         </div>
@@ -132,31 +135,41 @@ export function BilingualChat({
             </span>
           </div>
 
-          <div
-            className={cn(
-              "grid grid-cols-1 md:grid-cols-2 gap-3",
-              msg.role === "user" && "md:[direction:rtl]"
-            )}
-          >
-            <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
-              <MessageColumn
-                label="English"
-                lang="en"
-                text={msg.contentEn}
-                isUser={msg.role === "user"}
-                attachments={msg.role === "user" ? msg.attachments : undefined}
-              />
+          {englishOnly ? (
+            <MessageColumn
+              label="English"
+              lang="en"
+              text={msg.contentEn}
+              isUser={msg.role === "user"}
+              attachments={msg.role === "user" ? msg.attachments : undefined}
+            />
+          ) : (
+            <div
+              className={cn(
+                "grid grid-cols-1 md:grid-cols-2 gap-3",
+                msg.role === "user" && "md:[direction:rtl]"
+              )}
+            >
+              <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
+                <MessageColumn
+                  label="English"
+                  lang="en"
+                  text={msg.contentEn}
+                  isUser={msg.role === "user"}
+                  attachments={msg.role === "user" ? msg.attachments : undefined}
+                />
+              </div>
+              <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
+                <MessageColumn
+                  label={prefLabel}
+                  lang={preferredLanguage}
+                  text={msg.contentLocale}
+                  isUser={msg.role === "user"}
+                  attachments={undefined}
+                />
+              </div>
             </div>
-            <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
-              <MessageColumn
-                label={prefLabel}
-                lang={preferredLanguage}
-                text={msg.contentLocale}
-                isUser={msg.role === "user"}
-                attachments={undefined}
-              />
-            </div>
-          </div>
+          )}
         </div>
       ))}
 
@@ -171,14 +184,20 @@ export function BilingualChat({
               <TypingDots />
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {englishOnly ? (
             <div className="rounded-2xl px-4 py-3 text-sm text-slate-500 bg-slate-800/40 border border-white/5">
               {thinkingEn}
             </div>
-            <div className="rounded-2xl px-4 py-3 text-sm text-slate-500 bg-slate-800/40 border border-white/5">
-              {thinkingLocale}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-2xl px-4 py-3 text-sm text-slate-500 bg-slate-800/40 border border-white/5">
+                {thinkingEn}
+              </div>
+              <div className="rounded-2xl px-4 py-3 text-sm text-slate-500 bg-slate-800/40 border border-white/5">
+                {thinkingLocale}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </div>

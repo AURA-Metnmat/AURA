@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { PREFERRED_LANGUAGES, UI, SECTION_NAMES, type PreferredLanguage } from "@/lib/aura/i18n";
+import { PREFERRED_LANGUAGES, UI, SECTION_NAMES, type Language } from "@/lib/aura/i18n";
 import { getEngagement } from "@/lib/aura/engagement";
 import { InterviewWelcome } from "@/components/interview/InterviewWelcome";
 import { InterviewDetailsForm } from "@/components/interview/InterviewDetailsForm";
 import { InterviewShell } from "@/components/interview/InterviewShell";
+import { LanguageBar } from "@/components/interview/LanguageBar";
 import { BilingualChat, type BilingualMessage } from "@/components/interview/BilingualChat";
 import { InterviewChatComposer } from "@/components/interview/InterviewChatComposer";
 
@@ -45,7 +46,7 @@ export default function InterviewFlow({
   showCompanyBadge = true,
 }: InterviewFlowProps) {
   const [step, setStep] = useState<"language" | "details" | "chat">("language");
-  const [language, setLanguage] = useState<PreferredLanguage>("hi");
+  const [language, setLanguage] = useState<Language>("en");
   const [form, setForm] = useState<ParticipantForm>({
     fullName: "",
     designation: "",
@@ -86,6 +87,26 @@ export default function InterviewFlow({
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
+  }
+
+  async function changeLanguage(newLang: Language) {
+    if (newLang === language) return;
+    setLanguage(newLang);
+    setChatError(null);
+    if (!sessionId) return;
+    try {
+      const res = await fetch("/api/interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateLanguage", sessionId, language: newLang }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Failed to switch language");
+      }
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : "Failed to switch language. Please try again.");
+    }
   }
 
   async function startInterview() {
@@ -307,12 +328,7 @@ export default function InterviewFlow({
           )}
           {step === "chat" && (
             <>
-              <div className="hidden sm:flex items-center gap-1 text-[10px] uppercase tracking-wider bg-slate-800/80 rounded-lg px-2 py-1 border border-white/10">
-                <span className="text-slate-400">EN</span>
-                <span className="text-slate-600">|</span>
-                <span className="text-amber-400">{PREFERRED_LANGUAGES.find((l) => l.id === language)?.native}</span>
-              </div>
-              <span className="text-xs bg-slate-800/80 px-3 py-1 rounded-full hidden md:inline border border-white/10">
+              <span className="text-xs bg-slate-800/80 px-3 py-1 rounded-full hidden lg:inline border border-white/10">
                 {t.section} {currentSection}: {sections[currentSection]}
               </span>
               <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden border border-white/5">
@@ -359,6 +375,17 @@ export default function InterviewFlow({
 
       {step === "chat" && (
         <>
+          <div className="border-b border-white/10 px-4 sm:px-6 py-3 bg-slate-950/70 backdrop-blur-sm shrink-0">
+            <div className="max-w-6xl mx-auto">
+              <LanguageBar
+                selected={language}
+                onSelect={changeLanguage}
+                disabled={loading}
+                compact
+                label="Switch your language anytime"
+              />
+            </div>
+          </div>
           <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 max-w-6xl mx-auto w-full">
             {chatError && (
               <p className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3">
@@ -397,7 +424,7 @@ export default function InterviewFlow({
             t={t}
             engagement={engagement}
             onQuickPrompt={setInput}
-            onVoiceTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
+            onVoiceTextChange={setInput}
           />
 
           {completionPct >= 85 && (

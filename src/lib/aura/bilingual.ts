@@ -1,19 +1,23 @@
-import type { Language, PreferredLanguage } from "./i18n";
+import type { Language } from "./i18n";
 
 export interface BilingualText {
   en: string;
   locale: string;
 }
 
-const LOCALE_NAMES: Record<PreferredLanguage, string> = {
+const LOCALE_NAMES: Record<Language, string> = {
+  en: "English",
   hi: "Hindi (हिन्दी)",
   or: "Odia (ଓଡ଼ିଆ)",
   bn: "Bengali (বাংলা)",
 };
 
-export function localeDisplayName(lang: PreferredLanguage): string {
+export function localeDisplayName(lang: Language): string {
   return LOCALE_NAMES[lang];
 }
+
+/** Regional languages that use bilingual EN + locale AI responses */
+export type RegionalLanguage = Exclude<Language, "en">;
 
 export function parseBilingualJson(raw: string, fallbackLocale: string): BilingualText {
   try {
@@ -30,7 +34,7 @@ export function parseBilingualJson(raw: string, fallbackLocale: string): Bilingu
   return { en: raw.trim(), locale: fallbackLocale || raw.trim() };
 }
 
-export function bilingualInstruction(lang: PreferredLanguage): string {
+export function bilingualInstruction(lang: RegionalLanguage): string {
   const name = LOCALE_NAMES[lang];
   return `IMPORTANT: Respond ONLY with valid JSON (no markdown fences):
 {"en":"...","locale":"..."}
@@ -43,7 +47,8 @@ export function bilingualInstruction(lang: PreferredLanguage): string {
 - The employee may reply in ${name}; understand their intent.`;
 }
 
-export function isPreferredLanguage(lang: Language): lang is PreferredLanguage {
+/** True when AI should return bilingual JSON (EN + regional locale) */
+export function isPreferredLanguage(lang: Language): lang is RegionalLanguage {
   return lang === "hi" || lang === "or" || lang === "bn";
 }
 

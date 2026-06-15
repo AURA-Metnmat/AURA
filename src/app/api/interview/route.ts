@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
-import { getWelcomeMessageBilingual, type Language, type PreferredLanguage } from "@/lib/aura/i18n";
-import { isPreferredLanguage } from "@/lib/aura/bilingual";
+import { getWelcomeMessageBilingual, type Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
 interface StartPayload {
@@ -25,17 +24,40 @@ interface MessagePayload {
   attachmentIds?: string[];
 }
 
+interface UpdateLanguagePayload {
+  action: "updateLanguage";
+  sessionId: string;
+  language: Language;
+}
+
 interface CompletePayload {
   action: "complete";
   sessionId: string;
   message?: string;
 }
 
-type InterviewBody = StartPayload | MessagePayload | CompletePayload;
+type InterviewBody = StartPayload | MessagePayload | CompletePayload | UpdateLanguagePayload;
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as InterviewBody;
+
+    if ("action" in body && body.action === "updateLanguage") {
+      const { sessionId, language } = body;
+      const valid: Language[] = ["en", "hi", "or", "bn"];
+      if (!sessionId || !valid.includes(language)) {
+        return NextResponse.json({ error: "Invalid language update" }, { status: 400 });
+      }
+      const session = await db.interviewSession.findUnique({ where: { id: sessionId } });
+      if (!session) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+      await db.interviewSession.update({
+        where: { id: sessionId },
+        data: { language },
+      });
+      return NextResponse.json({ ok: true, language });
+    }
 
     if ("action" in body && body.action === "start") {
       const { participant, language, companyId } = body;
@@ -67,9 +89,8 @@ export async function POST(request: Request) {
         include: { participant: true },
       });
 
-      const welcomeLang = isPreferredLanguage(language) ? language : ("hi" as PreferredLanguage);
       const welcome = getWelcomeMessageBilingual(
-        welcomeLang,
+        language,
         participant.fullName,
         participant.designation,
         company.name
@@ -209,10 +230,9 @@ export async function POST(request: Request) {
       messageContent = `${userMessage}\n\n📎 ${fileList}`;
     }
 
-    const lang = (session.language as Language) || "hi";
-    const preferredLang = isPreferredLanguage(lang) ? lang : ("hi" as PreferredLanguage);
+    const lang = (session.language as Language) || "en";
 
-    const userBilingual = await normalizeUserMessage(messageContent, preferredLang);
+    const userBilingual = await normalizeUserMessage(messageContent, lang);
 
     const userMsg = await db.message.create({
       data: {
