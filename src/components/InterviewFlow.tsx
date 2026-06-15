@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { LANGUAGES, UI, SECTION_NAMES, type Language } from "@/lib/aura/i18n";
+import { InterviewWelcome } from "@/components/interview/InterviewWelcome";
 
 interface Attachment {
   id: string;
@@ -280,30 +281,17 @@ export default function InterviewFlow({
       </header>
 
       {step === "language" && (
-        <main className="flex-1 flex items-center justify-center px-6">
-          <div className="max-w-lg w-full text-center space-y-8">
-            <div>
-              <p className="text-amber-400/80 text-sm mb-2">{companyName}</p>
-              <h2 className="text-3xl font-bold mb-3">{t.welcome}</h2>
-              <p className="text-slate-400 leading-relaxed">{t.welcomeDesc}</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500 mb-4">{t.selectLanguage}</p>
-              <div className="grid grid-cols-3 gap-3">
-                {LANGUAGES.map((l) => (
-                  <button
-                    key={l.id}
-                    onClick={() => { setLanguage(l.id); setStep("details"); }}
-                    className="p-4 rounded-xl border border-slate-700 hover:border-amber-500 hover:bg-slate-900 transition-all"
-                  >
-                    <p className="font-semibold text-lg">{l.native}</p>
-                    <p className="text-xs text-slate-400 mt-1">{l.label}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </main>
+        <InterviewWelcome
+          companyName={companyName}
+          welcome={t.welcome}
+          welcomeDesc={t.welcomeDesc}
+          selectLanguage={t.selectLanguage}
+          languages={LANGUAGES}
+          onSelectLanguage={(lang) => {
+            setLanguage(lang);
+            setStep("details");
+          }}
+        />
       )}
 
       {step === "details" && (

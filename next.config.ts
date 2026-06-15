@@ -13,6 +13,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  transpilePackages: ["@splinetool/react-spline", "@splinetool/runtime"],
   async headers() {
     return [
       {
