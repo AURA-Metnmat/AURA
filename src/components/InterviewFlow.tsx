@@ -37,12 +37,20 @@ interface ParticipantForm {
 interface InterviewFlowProps {
   companyId: string;
   companyName: string;
+  interviewDurationMinutes?: number;
   showCompanyBadge?: boolean;
+}
+
+function formatRemaining(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 export default function InterviewFlow({
   companyId,
   companyName,
+  interviewDurationMinutes: initialDurationMinutes = 45,
   showCompanyBadge = true,
 }: InterviewFlowProps) {
   const [step, setStep] = useState<"language" | "details" | "chat">("language");
@@ -65,6 +73,9 @@ export default function InterviewFlow({
   const [completionPct, setCompletionPct] = useState(0);
   const [report, setReport] = useState<Record<string, string> | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [sessionDurationMinutes, setSessionDurationMinutes] = useState(initialDurationMinutes);
+  const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const t = UI[language];
@@ -75,6 +86,18 @@ export default function InterviewFlow({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingFiles]);
+
+  useEffect(() => {
+    if (!sessionStartedAt || step !== "chat") return;
+    const totalSeconds = sessionDurationMinutes * 60;
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - sessionStartedAt) / 1000);
+      setRemainingSeconds(Math.max(0, totalSeconds - elapsed));
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [sessionStartedAt, sessionDurationMinutes, step]);
 
   function validateForm(): boolean {
     const errors: Partial<Record<keyof ParticipantForm, string>> = {};
@@ -142,6 +165,10 @@ export default function InterviewFlow({
       ]);
       setCurrentSection(data.currentSection);
       setCompletionPct(data.completionPct);
+      if (typeof data.interviewDurationMinutes === "number") {
+        setSessionDurationMinutes(data.interviewDurationMinutes);
+      }
+      setSessionStartedAt(Date.now());
       setStep("chat");
     } catch {
       setChatError("Failed to start interview. Please try again.");
@@ -338,6 +365,17 @@ export default function InterviewFlow({
                 />
               </div>
               <span className="text-xs text-slate-400 tabular-nums">{completionPct}%</span>
+              {remainingSeconds !== null && (
+                <span
+                  className={`text-xs tabular-nums px-2 py-1 rounded-lg border ${
+                    remainingSeconds <= 300
+                      ? "border-red-500/50 text-red-300 bg-red-950/30"
+                      : "border-white/10 text-slate-400 bg-slate-800/80"
+                  }`}
+                >
+                  {formatRemaining(remainingSeconds)} left
+                </span>
+              )}
             </>
           )}
         </div>
@@ -426,6 +464,14 @@ export default function InterviewFlow({
             onQuickPrompt={setInput}
             onVoiceTextChange={setInput}
           />
+
+          {remainingSeconds === 0 && (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-2">
+              <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2 text-center">
+                Your allotted session time has ended. You may finish your current answer and complete the interview.
+              </p>
+            </div>
+          )}
 
           {completionPct >= 85 && (
             <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-4 text-center">

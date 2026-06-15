@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
-import { getWelcomeMessageBilingual, type Language } from "@/lib/aura/i18n";
+import { getOpeningQuestion1, getOpeningQuestion2 } from "@/lib/aura/opening-questions";
+import { loadFullCompanyContext } from "@/lib/companies/company-knowledge";
+import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
 interface StartPayload {
@@ -73,8 +75,9 @@ export async function POST(request: Request) {
         data: {
           companyId: company.id,
           language,
-          currentSection: "B",
-          completionPct: 10,
+          currentSection: "A",
+          introStep: 1,
+          completionPct: 5,
           participant: {
             create: {
               fullName: participant.fullName,
@@ -89,29 +92,25 @@ export async function POST(request: Request) {
         include: { participant: true },
       });
 
-      const welcome = getWelcomeMessageBilingual(
-        language,
-        participant.fullName,
-        participant.designation,
-        company.name
-      );
+      const opening = getOpeningQuestion1(language, participant.fullName);
 
       await db.message.create({
         data: {
           sessionId: session.id,
           role: "assistant",
-          content: welcome.en,
-          contentLocale: welcome.locale,
-          section: "B",
+          content: opening.en,
+          contentLocale: opening.locale,
+          section: "A",
         },
       });
 
       return NextResponse.json({
         sessionId: session.id,
-        message: welcome.en,
-        messageLocale: welcome.locale,
-        currentSection: "B",
-        completionPct: 10,
+        message: opening.en,
+        messageLocale: opening.locale,
+        currentSection: "A",
+        completionPct: 5,
+        interviewDurationMinutes: company.interviewDurationMinutes ?? 45,
         company: { id: company.id, name: company.name },
       });
     }
@@ -265,21 +264,57 @@ export async function POST(request: Request) {
       { role: "user" as const, content: userBilingual.en },
     ];
 
+    const introStep = session.introStep ?? 1;
+
+    if (introStep === 1) {
+      const opening2 = getOpeningQuestion2(lang, session.company.name);
+      await db.message.create({
+        data: {
+          sessionId: session.id,
+          role: "assistant",
+          content: opening2.en,
+          contentLocale: opening2.locale,
+          section: "A",
+        },
+      });
+      await db.interviewSession.update({
+        where: { id: session.id },
+        data: { introStep: 2, completionPct: 10 },
+      });
+      return NextResponse.json({
+        sessionId: session.id,
+        message: opening2.en,
+        messageLocale: opening2.locale,
+        userMessageEn: userBilingual.en,
+        userMessageLocale: userBilingual.locale,
+        currentSection: "A",
+        completionPct: 10,
+        shouldComplete: false,
+      });
+    }
+
+    const companyCtx = await loadFullCompanyContext({
+      name: session.company.name,
+      industry: session.company.industry,
+      description: session.company.description,
+      aiContext: session.company.aiContext,
+      slug: session.company.slug,
+    });
+
+    const postIntro = introStep === 2;
+    const activeSection = postIntro ? ("B" as SectionId) : (session.currentSection as SectionId);
+
     const response = await generateAuraResponse(
       {
         sessionId: session.id,
         language: lang,
-        company: {
-          name: session.company.name,
-          industry: session.company.industry,
-          description: session.company.description,
-          aiContext: session.company.aiContext,
-        },
-        currentSection: session.currentSection as SectionId,
+        company: companyCtx,
+        currentSection: activeSection,
         stakeholderType: session.stakeholderType,
         participant: session.participant,
         messageHistory: updatedHistory,
         questionIndex: 0,
+        postIntro,
       },
       userBilingual.en
     );
@@ -297,6 +332,7 @@ export async function POST(request: Request) {
     await db.interviewSession.update({
       where: { id: session.id },
       data: {
+        introStep: Math.max(introStep, 3),
         currentSection: response.nextSection,
         completionPct: response.completionPct,
       },

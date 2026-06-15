@@ -17,6 +17,7 @@ interface CompanyRow {
   industry: string | null;
   description: string | null;
   aiContext: string | null;
+  interviewDurationMinutes: number;
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -111,6 +112,7 @@ export default function AdminPage() {
     contactPhone: "",
     description: "",
     aiContext: "",
+    interviewDurationMinutes: 45,
   });
 
   const [onboardStep, setOnboardStep] = useState(0);
@@ -126,7 +128,10 @@ export default function AdminPage() {
     contactPhone: "",
     description: "",
     aiContext: "",
+    interviewDurationMinutes: 45,
   });
+
+  const [knowledgeFiles, setKnowledgeFiles] = useState<File[]>([]);
 
   function showNotice(message: string, type: Notice["type"] = "success") {
     setNotice({ type, message });
@@ -188,7 +193,26 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create company");
+
+      if (knowledgeFiles.length > 0 && data.company?.slug) {
+        const formData = new FormData();
+        formData.set("companySlug", data.company.slug);
+        for (const file of knowledgeFiles) {
+          formData.append("files", file);
+        }
+        const importRes = await fetch("/api/import", {
+          method: "POST",
+          credentials: "include",
+          body: formData,
+        });
+        const importData = await importRes.json();
+        if (!importRes.ok) {
+          throw new Error(importData.details ?? importData.error ?? "Knowledge file upload failed");
+        }
+      }
+
       setCreatedLink(data.interviewLink);
+      setKnowledgeFiles([]);
       setOnboardStep(2);
       await loadCompanies();
       showNotice("Interview link generated successfully");
@@ -309,6 +333,7 @@ export default function AdminPage() {
       contactPhone: c.contactPhone ?? "",
       description: c.description ?? "",
       aiContext: c.aiContext ?? "",
+      interviewDurationMinutes: c.interviewDurationMinutes ?? 45,
     });
     setEditing(true);
   }
@@ -370,7 +395,9 @@ export default function AdminPage() {
       contactPhone: "",
       description: "",
       aiContext: "",
+      interviewDurationMinutes: 45,
     });
+    setKnowledgeFiles([]);
     setOnboardStep(0);
     setCreatedLink(null);
     setView("dashboard");
@@ -509,6 +536,40 @@ export default function AdminPage() {
               <p className="text-sm text-slate-400">Help AURA understand this company&apos;s operations. This improves interview quality.</p>
               <textarea placeholder="Company description — what they do, key operations..." value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm h-28" />
               <textarea placeholder="AI context — processes, systems, known data, industry specifics (optional but recommended)..." value={form.aiContext} onChange={(e) => setForm({ ...form, aiContext: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm h-36" />
+
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Company knowledge files (PDF / TXT)</label>
+                <p className="text-xs text-slate-500">Upload brochures, process docs, or org charts — AURA uses these with description &amp; AI context to ask better questions.</p>
+                <input
+                  type="file"
+                  accept=".pdf,.txt,application/pdf,text/plain"
+                  multiple
+                  onChange={(e) => setKnowledgeFiles(e.target.files ? Array.from(e.target.files) : [])}
+                  className="w-full text-sm text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-amber-500/20 file:text-amber-300"
+                />
+                {knowledgeFiles.length > 0 && (
+                  <p className="text-xs text-emerald-400">{knowledgeFiles.length} file(s) ready to upload</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Interview session duration (minutes)</label>
+                <input
+                  type="number"
+                  min={15}
+                  max={180}
+                  value={form.interviewDurationMinutes}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      interviewDurationMinutes: Math.min(180, Math.max(15, Number(e.target.value) || 45)),
+                    })
+                  }
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm"
+                />
+                <p className="text-xs text-slate-500">Employees see a timer during the chat. You can edit this later in company settings.</p>
+              </div>
+
               <div className="bg-slate-950 rounded-xl p-4 border border-slate-800">
                 <p className="text-xs text-slate-500 mb-2">Common gaps AURA will explore:</p>
                 <ul className="text-xs text-slate-400 space-y-1">
@@ -667,6 +728,22 @@ export default function AdminPage() {
               <input value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} placeholder="Location" className={`w-full ${glassInput} px-4 py-2.5 text-sm`} />
               <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className={`w-full ${glassInput} px-4 py-2.5 text-sm h-24`} />
               <textarea value={editForm.aiContext} onChange={(e) => setEditForm({ ...editForm, aiContext: e.target.value })} placeholder="AI context" className={`w-full ${glassInput} px-4 py-2.5 text-sm h-28`} />
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Interview session duration (minutes)</label>
+                <input
+                  type="number"
+                  min={15}
+                  max={180}
+                  value={editForm.interviewDurationMinutes}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      interviewDurationMinutes: Math.min(180, Math.max(15, Number(e.target.value) || 45)),
+                    })
+                  }
+                  className={`w-full ${glassInput} px-4 py-2.5 text-sm`}
+                />
+              </div>
               <div className="flex gap-3">
                 <button onClick={() => setEditing(false)} className="flex-1 border border-white/10 rounded-xl py-3 text-sm hover:bg-slate-800/60">Cancel</button>
                 <button onClick={saveCompanyEdits} disabled={saving || !editForm.name.trim()} className="flex-[2] bg-amber-500 disabled:opacity-50 text-slate-950 font-semibold rounded-xl py-3 text-sm">

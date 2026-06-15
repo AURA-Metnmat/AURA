@@ -52,6 +52,7 @@ export async function GET(
       industry: company.industry,
       description: company.description,
       aiContext: company.aiContext,
+      interviewDurationMinutes: company.interviewDurationMinutes,
       contactName: company.contactName,
       contactEmail: company.contactEmail,
       contactPhone: company.contactPhone,
@@ -89,6 +90,7 @@ export async function PATCH(
     industry?: string;
     description?: string;
     aiContext?: string;
+    interviewDurationMinutes?: number;
     contactName?: string;
     contactEmail?: string;
     contactPhone?: string;
@@ -110,6 +112,12 @@ export async function PATCH(
       ...(body.industry !== undefined && { industry: body.industry }),
       ...(body.description !== undefined && { description: body.description }),
       ...(body.aiContext !== undefined && { aiContext: body.aiContext }),
+      ...(body.interviewDurationMinutes !== undefined && {
+        interviewDurationMinutes: Math.min(
+          180,
+          Math.max(15, Math.round(body.interviewDurationMinutes))
+        ),
+      }),
       ...(body.contactName !== undefined && { contactName: body.contactName }),
       ...(body.contactEmail !== undefined && { contactEmail: body.contactEmail }),
       ...(body.contactPhone !== undefined && { contactPhone: body.contactPhone }),

@@ -9,7 +9,11 @@ export default function CompanyInterviewPage({
   params: Promise<{ token: string }>;
 }) {
   const [token, setToken] = useState<string | null>(null);
-  const [company, setCompany] = useState<{ id: string; name: string } | null>(null);
+  const [company, setCompany] = useState<{
+    id: string;
+    name: string;
+    interviewDurationMinutes?: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,5 +52,11 @@ export default function CompanyInterviewPage({
     );
   }
 
-  return <InterviewFlow companyId={company.id} companyName={company.name} />;
+  return (
+    <InterviewFlow
+      companyId={company.id}
+      companyName={company.name}
+      interviewDurationMinutes={company.interviewDurationMinutes ?? 45}
+    />
+  );
 }

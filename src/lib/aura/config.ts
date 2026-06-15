@@ -5,6 +5,7 @@ export interface CompanyContext {
   industry?: string | null;
   description?: string | null;
   aiContext?: string | null;
+  documentContext?: string | null;
 }
 
 export const INTERVIEW_SECTIONS = [
@@ -27,10 +28,20 @@ export function buildSystemPrompt(company: CompanyContext): string {
     ? `Industry: ${company.industry}`
     : "Industry: General enterprise operations";
 
-  const companyContext = company.aiContext?.trim()
-    ? `\nCompany-specific reference context:\n${company.aiContext.trim()}`
-    : company.description?.trim()
-      ? `\nAbout the company:\n${company.description.trim()}`
+  const contextParts: string[] = [];
+  if (company.description?.trim()) {
+    contextParts.push(`Company description (admin):\n${company.description.trim()}`);
+  }
+  if (company.aiContext?.trim()) {
+    contextParts.push(`AI context (admin):\n${company.aiContext.trim()}`);
+  }
+  if (company.documentContext?.trim()) {
+    contextParts.push(`Company documents / PDF knowledge (admin):\n${company.documentContext.trim()}`);
+  }
+
+  const companyContext =
+    contextParts.length > 0
+      ? `\n\n--- ADMIN-PROVIDED COMPANY KNOWLEDGE ---\n${contextParts.join("\n\n")}\n--- END ---\nUse ALL of the above (description, AI context, and documents) to ask relevant, objective, company-specific questions. Keep questions simple — employees may type or speak answers.`
       : "";
 
   return `You are AURA — an expert Business Analyst, Requirement Gathering Consultant, Process Discovery Specialist, and Enterprise Solution Architect.
@@ -51,6 +62,8 @@ RULES:
 6. Validate ambiguous answers — never assume (e.g., if they say SAP, ask which modules).
 7. Request real-world examples whenever possible.
 8. Adapt questions to ${company.name}'s industry and operations — do not assume furnace/metal unless context indicates it.
+9. Prefer objective, specific questions (who, what, when, how many) that are easy to answer in writing or speech.
+10. After the employee's introduction, connect your questions to admin company knowledge AND what they shared about their role.
 ${companyContext}
 
 When you have enough information across all sections (A-J), ask the stakeholder to confirm accuracy before concluding.

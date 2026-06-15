@@ -139,6 +139,24 @@ async function importExcelFromBuffer(
   });
 }
 
+async function importTextKnowledge(
+  fileName: string,
+  companySlug: string,
+  buffer: Buffer
+): Promise<void> {
+  const text = buffer.toString("utf-8").trim();
+  await db.pdfDocument.deleteMany({ where: { fileName, companySlug } });
+  await db.pdfDocument.create({
+    data: {
+      companySlug,
+      fileName,
+      pageCount: 1,
+      content: text,
+      summary: text.slice(0, 500).replace(/\s+/g, " ").trim(),
+    },
+  });
+}
+
 async function importPdfFromBuffer(
   fileName: string,
   companySlug: string,
@@ -197,6 +215,8 @@ export async function runReferenceImportFromUploads(
       await importExcelFromBuffer(file.fileName, companySlug, file.buffer);
     } else if (lower.endsWith(".pdf")) {
       await importPdfFromBuffer(file.fileName, companySlug, file.buffer);
+    } else if (lower.endsWith(".txt")) {
+      await importTextKnowledge(file.fileName, companySlug, file.buffer);
     }
   }
 

@@ -66,6 +66,7 @@ export async function GET(request: Request) {
         contactPhone: c.contactPhone,
         location: c.location,
         aiContext: c.aiContext,
+        interviewDurationMinutes: c.interviewDurationMinutes,
         isActive: c.isActive,
         createdAt: c.createdAt,
         sessionCount: c._count.sessions,
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
       industry?: string;
       description?: string;
       aiContext?: string;
+      interviewDurationMinutes?: number;
       contactName?: string;
       contactEmail?: string;
       contactPhone?: string;
@@ -128,6 +130,10 @@ export async function POST(request: Request) {
         industry: body.industry?.trim() || null,
         description: body.description?.trim() || null,
         aiContext: body.aiContext?.trim() || null,
+        interviewDurationMinutes:
+          typeof body.interviewDurationMinutes === "number" && body.interviewDurationMinutes > 0
+            ? Math.min(180, Math.round(body.interviewDurationMinutes))
+            : 45,
         contactName: body.contactName?.trim() || null,
         contactEmail: body.contactEmail?.trim() || null,
         contactPhone: body.contactPhone?.trim() || null,

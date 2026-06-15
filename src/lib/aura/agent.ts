@@ -32,6 +32,7 @@ export interface SessionContext {
   } | null;
   messageHistory: { role: "user" | "assistant"; content: string }[];
   questionIndex: number;
+  postIntro?: boolean;
 }
 
 export interface AuraResponse {
@@ -222,13 +223,14 @@ export async function generateAuraResponse(
 
   const sectionPrompt = isPreferredLanguage(lang)
     ? `${bilingualInstruction(lang)}
+${ctx.postIntro ? "POST-INTRO: The employee finished the standard introduction (professional journey + tenure/role). Use admin company knowledge AND their intro answers to ask the first deep-dive question. Keep it objective and easy to answer in writing.\n" : ""}
 Current section: ${sectionInfo?.name} (${ctx.currentSection})
 Client company: ${ctx.company.name}
 Suggested focus questions (locale): ${questions.join(" | ")}
 English reference questions: ${enQuestions.join(" | ")}
 Question progress in section: ${ctx.questionIndex + 1}/${questions.length}
 Participant: ${ctx.participant?.fullName ?? "unknown"} | ${ctx.participant?.department ?? ""} | ${ctx.participant?.designation ?? ""}`
-    : `Respond in English with ONE acknowledgment and ONE follow-up question only.`;
+    : `${ctx.postIntro ? "POST-INTRO: The employee finished the standard introduction. Use admin company knowledge AND their intro answers for the first deep-dive question. Keep it objective and simple.\n" : ""}Respond in English with ONE acknowledgment and ONE follow-up question only.`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },

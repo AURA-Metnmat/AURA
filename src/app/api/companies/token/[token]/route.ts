@@ -17,6 +17,7 @@ export async function GET(
       category: true,
       industry: true,
       description: true,
+      interviewDurationMinutes: true,
     },
   });
 
