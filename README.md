@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AURA-METNMAT Platform
 
-## Getting Started
+**Multi-company AI Requirement Gathering & Stakeholder Interview Platform** powered by METNMAT.
 
-First, run the development server:
+Use this platform for **any client company** METNMAT onboarded — not limited to a single organization.
+
+## Architecture
+
+| Database | Purpose |
+|----------|---------|
+| **Reference DB** | Per-company Excel/PDF operational data |
+| **Interview DB** | Companies, employee interviews, attachments, reports |
+
+## Quick Start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd aura-platform
+npm install
+npm run setup      # DB + seed companies + import reference data
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## OpenAI
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Set `OPENAI_API_KEY` in `.env` for AI-powered conversations and report generation.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Multi-Company Workflow
 
-## Learn More
+1. **Admin → Companies** — Add a client company (name, industry, AI context)
+2. **Admin → Import** — Import reference files scoped to company slug
+3. **Interview** — Employee selects company → language → details → chat
 
-To learn more about Next.js, take a look at the following resources:
+## Pre-seeded Companies
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `jsl` — JSL (Jindal Stainless) — example with furnace/industrial context
+- `demo-corp` — Demo Corporation — generic example
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Scripts
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Command | Description |
+|---------|-------------|
+| `npm run db:seed` | Seed/update companies |
+| `npm run db:import` | Import reference data (set `IMPORT_COMPANY_SLUG`) |
+| `npm run dev` | Start dev server |

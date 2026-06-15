@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Interview / multi-tenant ───────────────────────────────────────────────
+
+model Company {
+  id           String             @id @default(cuid())
+  slug         String             @unique
+  inviteToken  String             @unique
+  name         String
+  category     String?
+  industry     String?
+  description  String?
+  aiContext    String?
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  location     String?
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  sessions     InterviewSession[]
+
+  @@index([isActive])
+  @@index([category])
+  @@index([inviteToken])
+}
+
+model InterviewSession {
+  id              String              @id @default(cuid())
+  companyId       String
+  status          String              @default("active")
+  language        String              @default("en")
+  stakeholderType String?
+  currentSection  String              @default("B")
+  completionPct   Int                 @default(0)
+  startedAt       DateTime            @default(now())
+  completedAt     DateTime?
+  updatedAt       DateTime            @updatedAt
+  company         Company             @relation(fields: [companyId], references: [id])
+  participant     ParticipantProfile?
+  messages        Message[]
+  attachments     MessageAttachment[]
+  processes       ProcessRecord[]
+  painPoints      PainPoint[]
+  requirements    Requirement[]
+  integrations    IntegrationReq[]
+  reporting       ReportingReq[]
+  approvals       ApprovalWorkflow[]
+  report          InterviewReport?
+
+  @@index([status])
+  @@index([companyId])
+}
+
+model ParticipantProfile {
+  id               String           @id @default(cuid())
+  sessionId        String           @unique
+  fullName         String?
+  employeeId       String?
+  department       String?
+  team             String?
+  designation      String?
+  reportingManager String?
+  location         String?
+  mobile           String?
+  email            String?
+  contactInfo      String?
+  businessContext  String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  session          InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id          String              @id @default(cuid())
+  sessionId   String
+  role        String
+  content     String
+  section     String?
+  createdAt   DateTime            @default(now())
+  session     InterviewSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attachments MessageAttachment[]
+
+  @@index([sessionId])
+}
+
+model MessageAttachment {
+  id         String           @id @default(cuid())
+  sessionId  String
+  messageId  String?
+  fileName   String
+  fileType   String
+  fileSize   Int
+  filePath   String
+  storageKey String?
+  createdAt  DateTime         @default(now())
+  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message    Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([messageId])
+}
+
+model ProcessRecord {
+  id             String           @id @default(cuid())
+  sessionId      String
+  processName    String
+  objective      String?
+  triggerEvent   String?
+  steps          String?
+  processOwner   String?
+  inputs         String?
+  outputs        String?
+  approvalLevels String?
+  escalationPath String?
+  exceptions     String?
+  toolsUsed      String?
+  frequency      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  session        InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model PainPoint {
+  id          String           @id @default(cuid())
+  sessionId   String
+  title       String
+  description String?
+  category    String?
+  frequency   String?
+  impact      String?
+  severity    String           @default("medium")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  session     InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([severity])
+}
+
+model Requirement {
+  id          String           @id @default(cuid())
+  sessionId   String
+  type        String
+  title       String
+  description String?
+  priority    String           @default("medium")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  session     InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([type])
+}
+
+model IntegrationReq {
+  id         String           @id @default(cuid())
+  sessionId  String
+  systemName String
+  purpose    String?
+  dataFlow   String?
+  frequency  String?
+  direction  String?
+  security   String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model ReportingReq {
+  id           String           @id @default(cuid())
+  sessionId    String
+  reportName   String
+  kpis         String?
+  frequency    String?
+  recipients   String?
+  exportFormat String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  session      InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model ApprovalWorkflow {
+  id          String           @id @default(cuid())
+  sessionId   String
+  processName String?
+  levels      String
+  hierarchy   String?
+  sla         String?
+  delegation  String?
+  escalation  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  session     InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model InterviewReport {
+  id                   String           @id @default(cuid())
+  sessionId            String           @unique
+  executiveSummary     String
+  processDocumentation String
+  requirements         String
+  painPointsSummary    String
+  integrationSummary   String
+  reportingSummary     String
+  risks                String
+  recommendations      String
+  architecture         String
+  actionItems          String
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  session              InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ─── Reference data (per company) ───────────────────────────────────────────
+
+model DataFile {
+  id          String        @id @default(cuid())
+  companySlug String?
+  fileName    String
+  fileType    String
+  category    String
+  fileSize    Int
+  sheetCount  Int           @default(0)
+  rowCount    Int           @default(0)
+  description String?
+  importedAt  DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  records     DataRecord[]
+  sheets      DataSheet[]
+  insights    DataInsight[]
+
+  @@index([category])
+  @@index([fileName])
+  @@index([companySlug])
+}
+
+model DataSheet {
+  id        String       @id @default(cuid())
+  fileId    String
+  sheetName String
+  rowCount  Int          @default(0)
+  colCount  Int          @default(0)
+  headers   String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  file      DataFile     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  records   DataRecord[]
+
+  @@index([fileId])
+}
+
+model DataRecord {
+  id        String     @id @default(cuid())
+  fileId    String
+  sheetId   String?
+  rowIndex  Int
+  category  String
+  data      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  file      DataFile   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  sheet     DataSheet? @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+
+  @@index([fileId])
+  @@index([category])
+  @@index([sheetId])
+}
+
+model FurnaceSpec {
+  id            String   @id @default(cuid())
+  companySlug   String?
+  furnaceNumber String
+  parameter     String
+  value         String
+  unit          String?
+  sourceFile    String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([furnaceNumber])
+  @@index([companySlug])
+}
+
+model DataInsight {
+  id        String    @id @default(cuid())
+  fileId    String?
+  category  String
+  title     String
+  content   String
+  priority  String    @default("medium")
+  tags      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  file      DataFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([category])
+}
+
+model PdfDocument {
+  id          String   @id @default(cuid())
+  companySlug String?
+  fileName    String
+  pageCount   Int
+  content     String
+  summary     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companySlug])
+}
