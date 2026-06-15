@@ -2,31 +2,32 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { env } from "@/lib/env";
 import type { Language } from "@/lib/aura/i18n";
-import { TTS_VOICE } from "@/lib/aura/bilingual";
+import { generateSpeechAudio } from "@/lib/aura/tts";
+import { TTS_MAX_CHARS } from "@/lib/aura/tts-config";
+
+const VALID_LANGUAGES: Language[] = ["en", "hi", "or", "bn"];
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { text?: string; language?: Language };
     const text = body.text?.trim();
-    const language = body.language ?? "en";
+    const language = VALID_LANGUAGES.includes(body.language as Language)
+      ? (body.language as Language)
+      : "en";
 
-    if (!text || text.length > 4096) {
-      return NextResponse.json({ error: "Invalid text" }, { status: 400 });
+    if (!text) {
+      return NextResponse.json({ error: "Text is required" }, { status: 400 });
+    }
+
+    if (text.length > TTS_MAX_CHARS) {
+      return NextResponse.json({ error: "Text too long for speech" }, { status: 400 });
     }
 
     const apiKey = env().openaiApiKey;
     const openai = new OpenAI({ apiKey });
+    const buffer = await generateSpeechAudio(openai, text, language);
 
-    const speech = await openai.audio.speech.create({
-      model: "tts-1-hd",
-      voice: TTS_VOICE,
-      input: text,
-      response_format: "mp3",
-    });
-
-    const buffer = Buffer.from(await speech.arrayBuffer());
-
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
@@ -39,7 +40,6 @@ export async function POST(request: Request) {
   }
 }
 
-// Employees use TTS during interview — no admin gate
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204 });
 }

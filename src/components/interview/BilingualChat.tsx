@@ -58,7 +58,7 @@ function MessageColumn({
         >
           {label}
         </span>
-        <AudioPlayButton text={text} language={lang} label="Audio" />
+        <AudioPlayButton text={text} language={lang} label="Listen" />
       </div>
       <p className="whitespace-pre-wrap">{text}</p>
       {attachments}

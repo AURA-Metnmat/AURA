@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Mic, Square, AlertCircle } from "lucide-react";
-import { SPEECH_LANG_MAP } from "@/lib/aura/bilingual";
+import { LANGUAGE_TTS_PROFILE } from "@/lib/aura/tts-config";
 import type { Language } from "@/lib/aura/i18n";
 import { cn } from "@/lib/utils";
 
@@ -108,7 +108,7 @@ export function VoiceInputButton({
     const recognition = new Ctor();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = SPEECH_LANG_MAP[language];
+    recognition.lang = LANGUAGE_TTS_PROFILE[language].speechLang;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = "";
@@ -207,7 +207,7 @@ export function VoiceInputButton({
 
   useEffect(() => {
     if (listening && recognitionRef.current) {
-      recognitionRef.current.lang = SPEECH_LANG_MAP[language];
+      recognitionRef.current.lang = LANGUAGE_TTS_PROFILE[language].speechLang;
     }
   }, [language, listening]);
 

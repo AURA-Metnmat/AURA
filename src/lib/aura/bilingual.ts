@@ -39,7 +39,8 @@ export function bilingualInstruction(lang: RegionalLanguage): string {
   return `IMPORTANT: Respond ONLY with valid JSON (no markdown fences):
 {"en":"...","locale":"..."}
 - "en": professional English — warm acknowledgment + ONE follow-up question.
-- "locale": same meaning in ${name}.
+- "locale": same meaning in ${name}, written fully in native script (not romanized).
+- Keep each field to 2-4 short sentences that sound natural when read aloud (clear for voice/TTS).
 - Never ask multiple questions at once.
 - Sound like a friendly senior colleague, not a form. Acknowledge what they shared before the next question.
 - If they mention problems, confusion, or blockers, empathize first and offer to clarify or break the question into smaller parts.
@@ -60,3 +61,5 @@ export const SPEECH_LANG_MAP: Record<Language, string> = {
   or: "or-IN",
   bn: "bn-IN",
 };
+
+export { LANGUAGE_TTS_PROFILE } from "./tts-config";
