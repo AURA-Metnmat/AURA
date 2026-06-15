@@ -7,6 +7,7 @@ import NeuralBackground from "@/components/ui/flow-field-background";
 import { PLATFORM_NAME, DEFAULT_GAPS } from "@/lib/aura/config";
 import { COMPANY_CATEGORIES } from "@/lib/aura/company-utils";
 import ConfirmDeleteModal from "@/components/admin/ConfirmDeleteModal";
+import CompanyDetailView from "@/components/admin/CompanyDetailView";
 
 interface CompanyRow {
   id: string;
@@ -651,147 +652,51 @@ export default function AdminPage() {
       )}
 
       {view === "company-detail" && companyDetail && (
-        <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+        editing ? (
+          <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
             <button onClick={() => { setView("dashboard"); setCompanyDetail(null); setEditing(false); }} className="text-sm text-slate-400 hover:text-white">← Back to dashboard</button>
-            <div className="flex gap-2">
-              {!editing && (
-                <button onClick={startEditingCompany} className="text-sm border border-slate-700 px-3 py-2 rounded-lg hover:bg-slate-800">
-                  Edit Company
-                </button>
-              )}
-              <button
-                onClick={() => openDeleteModal({ id: companyDetail.company.id, name: companyDetail.company.name })}
-                className="text-sm text-red-400 border border-red-900/50 px-3 py-2 rounded-lg hover:bg-red-950/40"
-              >
-                Delete Company
-              </button>
-            </div>
-          </div>
-
-          {editing ? (
-            <div className="bg-slate-900 rounded-2xl p-6 border border-amber-500/30 space-y-4">
+            <div className={`${glassPanel} rounded-2xl p-6 border-amber-500/30 space-y-4`}>
               <h2 className="text-lg font-semibold">Edit Company</h2>
-              <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Company name" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm" />
+              <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Company name" className={`w-full ${glassInput} px-4 py-2.5 text-sm`} />
               <div className="grid grid-cols-2 gap-3">
-                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm">
+                <select value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className={`${glassInput} px-4 py-2.5 text-sm`}>
                   {COMPANY_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
-                <input value={editForm.industry} onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })} placeholder="Industry" className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm" />
+                <input value={editForm.industry} onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })} placeholder="Industry" className={`${glassInput} px-4 py-2.5 text-sm`} />
               </div>
-              <input value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} placeholder="Location" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm" />
-              <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm h-24" />
-              <textarea value={editForm.aiContext} onChange={(e) => setEditForm({ ...editForm, aiContext: e.target.value })} placeholder="AI context" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm h-28" />
+              <input value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} placeholder="Location" className={`w-full ${glassInput} px-4 py-2.5 text-sm`} />
+              <textarea value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className={`w-full ${glassInput} px-4 py-2.5 text-sm h-24`} />
+              <textarea value={editForm.aiContext} onChange={(e) => setEditForm({ ...editForm, aiContext: e.target.value })} placeholder="AI context" className={`w-full ${glassInput} px-4 py-2.5 text-sm h-28`} />
               <div className="flex gap-3">
-                <button onClick={() => setEditing(false)} className="flex-1 border border-slate-700 rounded-xl py-3 text-sm">Cancel</button>
+                <button onClick={() => setEditing(false)} className="flex-1 border border-white/10 rounded-xl py-3 text-sm hover:bg-slate-800/60">Cancel</button>
                 <button onClick={saveCompanyEdits} disabled={saving || !editForm.name.trim()} className="flex-[2] bg-amber-500 disabled:opacity-50 text-slate-950 font-semibold rounded-xl py-3 text-sm">
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </div>
-          ) : (
-          <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full">{companyDetail.company.category}</span>
-                <h2 className="text-2xl font-bold mt-2">{companyDetail.company.name}</h2>
-                <p className="text-sm text-slate-400 mt-1">{companyDetail.company.industry} · {companyDetail.company.location}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-3xl font-bold text-amber-400">{companyDetail.sessions.length}</p>
-                <p className="text-xs text-slate-500">total interviews</p>
-              </div>
-            </div>
-
-            <div className="mt-6 bg-slate-950 rounded-xl p-4 border border-slate-700">
-              <p className="text-xs text-slate-500 mb-2">Employee Interview Link</p>
-              <div className="flex gap-2">
-                <input readOnly value={companyDetail.company.interviewLink} className="flex-1 bg-transparent text-sm text-amber-400 truncate" />
-                <a
-                  href={companyDetail.company.interviewLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="border border-slate-600 text-slate-200 font-semibold px-4 py-2 rounded-lg text-sm"
-                >
-                  Open
-                </a>
-                <button onClick={() => copyLink(companyDetail.company.interviewLink)} className="bg-amber-500 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm">{copied ? "Copied!" : "Copy"}</button>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {!showRegenerateConfirm ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowRegenerateConfirm(true)}
-                    className="text-xs text-slate-400 hover:text-amber-400 underline"
-                  >
-                    Regenerate link (invalidates old URLs)
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs bg-amber-950/30 border border-amber-900/40 rounded-lg px-3 py-2">
-                    <span className="text-amber-200">Old interview links will stop working.</span>
-                    <button onClick={regenerateInterviewLink} disabled={regenerating} className="text-amber-400 font-semibold hover:underline disabled:opacity-50">
-                      {regenerating ? "..." : "Confirm"}
-                    </button>
-                    <button onClick={() => setShowRegenerateConfirm(false)} className="text-slate-400 hover:text-white">Cancel</button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {companyDetail.company.description && (
-              <p className="text-sm text-slate-400 mt-4">{companyDetail.company.description}</p>
-            )}
-
-            <div className="mt-6 border border-slate-800 rounded-xl p-4">
-              <p className="text-sm font-medium mb-2">Import reference data (Excel / PDF)</p>
-              <p className="text-xs text-slate-500 mb-3">Upload client files — works on Vercel production.</p>
-              <input
-                type="file"
-                multiple
-                accept=".xlsx,.xls,.pdf"
-                disabled={uploading}
-                onChange={(e) => uploadReferenceFiles(companyDetail.company.slug, e.target.files)}
-                className="text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-amber-500 file:text-slate-950 file:font-semibold"
-              />
-            </div>
-          </div>
-          )}
-
-          <section>
-            <h3 className="text-lg font-semibold mb-4">Employee Interviews</h3>
-            {companyDetail.sessions.length === 0 ? (
-              <p className="text-slate-500 text-sm">No interviews yet. Share the link above with employees.</p>
-            ) : (
-              <div className="space-y-3">
-                {companyDetail.sessions.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => loadSession(s.id)}
-                    className="w-full text-left bg-slate-900 rounded-xl p-4 border border-slate-800 hover:border-amber-500/40 transition-colors"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">{s.participant?.fullName ?? "Anonymous"}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {s.participant?.designation && `${s.participant.designation} · `}
-                          {s.participant?.department && `${s.participant.department} · `}
-                          {s.participant?.mobile && `📱 ${s.participant.mobile}`}
-                        </p>
-                        <p className="text-xs text-slate-600 mt-1">{new Date(s.startedAt).toLocaleString()} · {s.language.toUpperCase()}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-xs px-2 py-1 rounded-full ${s.status === "completed" ? "bg-green-950 text-green-400" : "bg-slate-800 text-slate-400"}`}>{s.status}</span>
-                        <p className="text-sm text-amber-400 mt-1">{s.completionPct}%</p>
-                        {s.hasReport && <p className="text-xs text-green-500 mt-1">Report ✓ — click to view</p>}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
-        </main>
+          </main>
+        ) : (
+          <CompanyDetailView
+            company={companyDetail.company}
+            sessions={companyDetail.sessions}
+            glassPanel={glassPanel}
+            glassCard={glassCard}
+            copied={copied}
+            uploading={uploading}
+            showRegenerateConfirm={showRegenerateConfirm}
+            regenerating={regenerating}
+            onBack={() => { setView("dashboard"); setCompanyDetail(null); setEditing(false); }}
+            onEdit={startEditingCompany}
+            onDelete={() => openDeleteModal({ id: companyDetail.company.id, name: companyDetail.company.name })}
+            onCopyLink={copyLink}
+            onRegenerateConfirm={() => setShowRegenerateConfirm(true)}
+            onRegenerateCancel={() => setShowRegenerateConfirm(false)}
+            onRegenerate={regenerateInterviewLink}
+            onUploadReference={uploadReferenceFiles}
+            onOpenSession={loadSession}
+            onRefresh={() => companyDetail && loadCompanyDetail(companyDetail.company.id)}
+          />
+        )
       )}
 
       {view === "session-detail" && sessionDetail && (

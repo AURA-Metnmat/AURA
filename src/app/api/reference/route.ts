@@ -18,7 +18,11 @@ export async function GET(request: Request) {
         orderBy: { importedAt: "desc" },
         take: 50,
       }),
-      db.dataInsight.findMany({ orderBy: { priority: "asc" } }),
+      db.dataInsight.findMany({
+        where: companySlug ? { file: { companySlug } } : {},
+        orderBy: { priority: "asc" },
+        take: 50,
+      }),
       db.furnaceSpec.findMany({
         where: companySlug ? { companySlug } : {},
         orderBy: { parameter: "asc" },
@@ -31,7 +35,9 @@ export async function GET(request: Request) {
         db.dataRecord.count({
           where: companySlug ? { file: { companySlug } } : {},
         }),
-        db.dataInsight.count(),
+        db.dataInsight.count({
+          where: companySlug ? { file: { companySlug } } : {},
+        }),
         db.furnaceSpec.count({
           where: companySlug ? { companySlug } : {},
         }),

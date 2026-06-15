@@ -4,12 +4,12 @@ import { SplineScene } from "@/components/ui/splite";
 import { Card } from "@/components/ui/card";
 import { Spotlight } from "@/components/ui/spotlight";
 import { cn } from "@/lib/utils";
-import type { Language } from "@/lib/aura/i18n";
+import type { PreferredLanguage } from "@/lib/aura/i18n";
 
 const SPLINE_SCENE = "https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode";
 
 interface LanguageOption {
-  id: Language;
+  id: PreferredLanguage;
   label: string;
   native: string;
 }
@@ -20,7 +20,7 @@ interface InterviewWelcomeProps {
   welcomeDesc: string;
   selectLanguage: string;
   languages: LanguageOption[];
-  onSelectLanguage: (language: Language) => void;
+  onSelectLanguage: (language: PreferredLanguage) => void;
 }
 
 export function InterviewWelcome({

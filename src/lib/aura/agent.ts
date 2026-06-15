@@ -8,11 +8,17 @@ import {
 } from "./config";
 import {
   type Language,
+  type PreferredLanguage,
   SECTION_QUESTIONS_I18N,
   getAcknowledgments,
   getFollowUps,
-  languageInstruction,
 } from "./i18n";
+import {
+  bilingualInstruction,
+  isPreferredLanguage,
+  parseBilingualJson,
+  type BilingualText,
+} from "./bilingual";
 
 export interface SessionContext {
   sessionId: string;
@@ -27,6 +33,15 @@ export interface SessionContext {
   } | null;
   messageHistory: { role: "user" | "assistant"; content: string }[];
   questionIndex: number;
+}
+
+export interface AuraResponse {
+  content: string;
+  contentLocale: string;
+  nextSection: SectionId;
+  nextQuestionIndex: number;
+  completionPct: number;
+  shouldComplete: boolean;
 }
 
 function getQuestions(lang: Language, section: SectionId): string[] {
@@ -69,58 +84,66 @@ function advanceSection(
   return { section: current, questionIndex };
 }
 
-function buildFallbackResponse(ctx: SessionContext, userMessage: string): {
-  content: string;
-  nextSection: SectionId;
-  nextQuestionIndex: number;
-  completionPct: number;
-  shouldComplete: boolean;
-} {
+function buildFallbackBilingual(ctx: SessionContext, userMessage: string): AuraResponse {
   const lang = ctx.language;
   const questions = getQuestions(lang, ctx.currentSection);
+  const enQuestions = getQuestions("en", ctx.currentSection);
   const currentQ = questions[ctx.questionIndex] ?? questions[0];
-  const acks = getAcknowledgments(lang);
-  const ack = acks[ctx.messageHistory.length % acks.length];
-  const followUps = getFollowUps(lang);
+  const currentQEn = enQuestions[ctx.questionIndex] ?? enQuestions[0];
+  const ackEn = getAcknowledgments("en")[ctx.messageHistory.length % 3];
+  const ackLoc = getAcknowledgments(lang)[ctx.messageHistory.length % 3];
+  const followUpsEn = getFollowUps("en");
+  const followUpsLoc = getFollowUps(lang);
 
   const userLower = userMessage.toLowerCase();
   const isShort = userMessage.trim().split(/\s+/).length < 8;
 
-  let followUp = "";
+  let followUpEn = "";
+  let followUpLoc = "";
   if (isShort) {
-    followUp = followUps.short;
+    followUpEn = followUpsEn.short;
+    followUpLoc = followUpsLoc.short;
   } else if (userLower.includes("excel")) {
-    followUp = followUps.excel;
+    followUpEn = followUpsEn.excel;
+    followUpLoc = followUpsLoc.excel;
   } else if (userLower.includes("sap")) {
-    followUp = followUps.sap;
-  } else if (userLower.includes("approv")) {
-    followUp = currentQ;
+    followUpEn = followUpsEn.sap;
+    followUpLoc = followUpsLoc.sap;
   } else if (userLower.includes("furnace") || userLower.includes("saf")) {
-    followUp = followUps.furnace;
+    followUpEn = followUpsEn.furnace;
+    followUpLoc = followUpsLoc.furnace;
   } else if (userLower.includes("lab") || userLower.includes("analysis")) {
-    followUp = followUps.lab;
+    followUpEn = followUpsEn.lab;
+    followUpLoc = followUpsLoc.lab;
   } else {
-    followUp = currentQ;
+    followUpEn = currentQEn;
+    followUpLoc = currentQ;
   }
 
   const advanced = advanceSection(lang, ctx.currentSection, ctx.questionIndex);
   const nextQuestions = getQuestions(lang, advanced.section);
+  const nextQuestionsEn = getQuestions("en", advanced.section);
   const nextQ = nextQuestions[advanced.questionIndex] ?? "";
+  const nextQEn = nextQuestionsEn[advanced.questionIndex] ?? "";
 
   const allSectionsDone =
     ctx.currentSection === "J" &&
     ctx.questionIndex >= getQuestions(lang, "J").length - 1 &&
     !isShort;
 
-  const confirmMessages: Record<Language, string> = {
-    en: `${ack} I believe we've covered the key areas. Could you please confirm — is everything we've discussed accurate and complete? If yes, I'll generate your comprehensive requirement report.`,
-    hi: `${ack} मुझे लगता है हमने सभी मुख्य areas cover कर लिए हैं। कृपया पुष्टि करें — क्या हमने जो चर्चा की वह सही और पूर्ण है? यदि हाँ, तो मैं आपकी comprehensive requirement report तैयार करूँगा।`,
-    or: `${ack} ମୁଁ ଭାବୁଛି ଆମେ ସବୁ key areas cover କରିସାରିଛୁ। ଦୟାକରି confirm କରନ୍ତୁ — ଆମେ discuss କରିଥିବା ସବୁ accurate ଏବଂ complete କି? ହଁ ହେଲେ, ମୁଁ comprehensive requirement report generate କରିବି।`,
+  const confirmEn =
+    `${ackEn} I believe we've covered the key areas. Could you please confirm — is everything we've discussed accurate and complete? If yes, I'll generate your comprehensive requirement report.`;
+  const confirmLoc: Record<Language, string> = {
+    en: confirmEn,
+    hi: `${ackLoc} मुझे लगता है हमने सभी मुख्य areas cover कर लिए हैं। कृपया पुष्टि करें — क्या हमने जो चर्चा की वह सही और पूर्ण है?`,
+    or: `${ackLoc} ମୁଁ ଭାବୁଛି ଆମେ ସବୁ key areas cover କରିସାରିଛୁ। ଦୟାକରି confirm କରନ୍ତୁ — ଆମେ discuss କରିଥିବା ସବୁ accurate ଏବଂ complete କି?`,
+    bn: `${ackLoc} আমি মনে করি আমরা মূল বিষয়গুলো কভার করেছি। অনুগ্রহ করে নিশ্চিত করুন — আমরা যা আলোচনা করেছি তা কি সঠিক ও সম্পূর্ণ?`,
   };
 
   if (allSectionsDone) {
     return {
-      content: confirmMessages[lang],
+      content: confirmEn,
+      contentLocale: confirmLoc[lang],
       nextSection: "J",
       nextQuestionIndex: ctx.questionIndex,
       completionPct: 95,
@@ -128,10 +151,14 @@ function buildFallbackResponse(ctx: SessionContext, userMessage: string): {
     };
   }
 
-  const content = `${ack}\n\n${followUp}${nextQ && (advanced.section !== ctx.currentSection || advanced.questionIndex > ctx.questionIndex) ? `\n\n${nextQ}` : ""}`.trim();
+  const showNext =
+    nextQ && (advanced.section !== ctx.currentSection || advanced.questionIndex > ctx.questionIndex);
+  const contentEn = `${ackEn}\n\n${followUpEn}${showNext ? `\n\n${nextQEn}` : ""}`.trim();
+  const contentLocale = `${ackLoc}\n\n${followUpLoc}${showNext ? `\n\n${nextQ}` : ""}`.trim();
 
   return {
-    content,
+    content: contentEn,
+    contentLocale,
     nextSection: advanced.section,
     nextQuestionIndex: advanced.questionIndex,
     completionPct: calculateCompletion(advanced.section, advanced.questionIndex),
@@ -139,34 +166,66 @@ function buildFallbackResponse(ctx: SessionContext, userMessage: string): {
   };
 }
 
+export async function normalizeUserMessage(
+  text: string,
+  preferredLang: PreferredLanguage
+): Promise<BilingualText> {
+  const openai = getOpenAIClient();
+  if (!openai) {
+    return { en: text, locale: text };
+  }
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Return JSON only: {"en":"English translation for records","locale":"original or cleaned text in employee language"}
+Employee preferred language: ${preferredLang}. Preserve meaning. If already English, duplicate appropriately in locale only if it was typed in preferred script.`,
+        },
+        { role: "user", content: text },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: 400,
+    });
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as { en?: string; locale?: string };
+    return {
+      en: parsed.en?.trim() || text,
+      locale: parsed.locale?.trim() || text,
+    };
+  } catch {
+    return { en: text, locale: text };
+  }
+}
+
 export async function generateAuraResponse(
   ctx: SessionContext,
   userMessage: string
-): Promise<{
-  content: string;
-  nextSection: SectionId;
-  nextQuestionIndex: number;
-  completionPct: number;
-  shouldComplete: boolean;
-}> {
+): Promise<AuraResponse> {
   const openai = getOpenAIClient();
   const lang = ctx.language;
 
   if (!openai) {
-    return buildFallbackResponse(ctx, userMessage);
+    return buildFallbackBilingual(ctx, userMessage);
   }
 
   const sectionInfo = INTERVIEW_SECTIONS.find((s) => s.id === ctx.currentSection);
   const questions = getQuestions(lang, ctx.currentSection);
+  const enQuestions = getQuestions("en", ctx.currentSection);
   const systemPrompt = buildSystemPrompt(ctx.company);
-  const sectionPrompt = `${languageInstruction(lang)}
+
+  const sectionPrompt = isPreferredLanguage(lang)
+    ? `${bilingualInstruction(lang)}
 Current section: ${sectionInfo?.name} (${ctx.currentSection})
 Client company: ${ctx.company.name}
-Suggested focus questions: ${questions.join(" | ")}
+Suggested focus questions (locale): ${questions.join(" | ")}
+English reference questions: ${enQuestions.join(" | ")}
 Question progress in section: ${ctx.questionIndex + 1}/${questions.length}
-Participant: ${ctx.participant?.fullName ?? "unknown"} | ${ctx.participant?.department ?? ""} | ${ctx.participant?.designation ?? ""}
-
-Respond with ONE acknowledgment and ONE follow-up question only. Never ask multiple questions at once.`;
+Participant: ${ctx.participant?.fullName ?? "unknown"} | ${ctx.participant?.department ?? ""} | ${ctx.participant?.designation ?? ""}`
+    : `Respond in English with ONE acknowledgment and ONE follow-up question only.`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -182,17 +241,25 @@ Respond with ONE acknowledgment and ONE follow-up question only. Never ask multi
     model: "gpt-4o-mini",
     messages,
     temperature: 0.7,
-    max_tokens: 500,
+    max_tokens: 700,
+    ...(isPreferredLanguage(lang) ? { response_format: { type: "json_object" } } : {}),
   });
 
-  const content =
+  const raw =
     completion.choices[0]?.message?.content ??
-    buildFallbackResponse(ctx, userMessage).content;
+    buildFallbackBilingual(ctx, userMessage).content;
+
+  let bilingual: BilingualText;
+  if (isPreferredLanguage(lang)) {
+    bilingual = parseBilingualJson(raw, buildFallbackBilingual(ctx, userMessage).contentLocale);
+  } else {
+    bilingual = { en: raw, locale: raw };
+  }
 
   const advanced = advanceSection(lang, ctx.currentSection, ctx.questionIndex);
 
   const confirmKeywords =
-    /^(yes|correct|accurate|confirmed|complete|that's right|haan|हाँ|हां|ହଁ|ଠିକ)/i;
+    /^(yes|correct|accurate|confirmed|complete|that's right|haan|हाँ|हां|ହଁ|ଠିକ|হ্যাঁ|ঠিক)/i;
   const currentCompletion = calculateCompletion(ctx.currentSection, ctx.questionIndex);
   const shouldComplete =
     ctx.currentSection === "J" &&
@@ -200,7 +267,8 @@ Respond with ONE acknowledgment and ONE follow-up question only. Never ask multi
     confirmKeywords.test(userMessage.trim());
 
   return {
-    content,
+    content: bilingual.en,
+    contentLocale: bilingual.locale,
     nextSection: advanced.section,
     nextQuestionIndex: advanced.questionIndex,
     completionPct: calculateCompletion(advanced.section, advanced.questionIndex),

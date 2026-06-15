@@ -1,11 +1,18 @@
 import type { SectionId } from "./config";
 
-export type Language = "en" | "hi" | "or";
+export type Language = "en" | "hi" | "or" | "bn";
+export type PreferredLanguage = Exclude<Language, "en">;
+
+/** Languages employees can choose as their preferred interaction language */
+export const PREFERRED_LANGUAGES: { id: PreferredLanguage; label: string; native: string }[] = [
+  { id: "hi", label: "Hindi", native: "हिन्दी" },
+  { id: "or", label: "Odia", native: "ଓଡ଼ିଆ" },
+  { id: "bn", label: "Bangla", native: "বাংলা" },
+];
 
 export const LANGUAGES: { id: Language; label: string; native: string }[] = [
   { id: "en", label: "English", native: "English" },
-  { id: "hi", label: "Hindi", native: "हिन्दी" },
-  { id: "or", label: "Odia", native: "ଓଡ଼ିଆ" },
+  ...PREFERRED_LANGUAGES,
 ];
 
 export interface UiStrings {
@@ -137,6 +144,38 @@ export const UI: Record<Language, UiStrings> = {
     departmentRequired: "ବିଭାଗ ଆବଶ୍ୟକ",
     mobileRequired: "ମୋବାଇଲ୍ ନମ୍ବର ଆବଶ୍ୟକ",
   },
+  bn: {
+    welcome: "AURA-তে স্বাগতম",
+    welcomeDesc:
+      "আমি আপনার অপারেশন, প্রক্রিয়া এবং প্রয়োজনীয়তা বোঝার জন্য একটি স্বাভাবিক কথোপকথনের মাধ্যমে আপনাকে গাইড করব। একবারে একটি প্রশ্ন — যেন একজন সিনিয়র পরামর্শদাতার সাক্ষাৎকার।",
+    selectLanguage: "আপনার পছন্দের ভাষা নির্বাচন করুন",
+    selectCompany: "আপনার কোম্পানি নির্বাচন করুন",
+    yourDetails: "শুরু করতে আপনার বিবরণ দিন",
+    fullName: "পুরো নাম",
+    designation: "পদবি",
+    department: "বিভাগ",
+    mobile: "মোবাইল নম্বর",
+    email: "ইমেইল",
+    emailOptional: "ইমেইল (ঐচ্ছিক)",
+    startInterview: "সাক্ষাৎকার শুরু করুন",
+    required: "আবশ্যক",
+    invalidMobile: "একটি বৈধ ১০ অঙ্কের মোবাইল নম্বর দিন",
+    typeResponse: "আপনার উত্তর লিখুন...",
+    send: "পাঠান",
+    attachFile: "ফাইল বা ছবি সংযুক্ত করুন",
+    attachHint: "ছবি, PDF, Excel, Word (সর্বোচ্চ ১০ MB)",
+    thinking: "AURA চিন্তা করছে...",
+    finishReport: "সাক্ষাৎকার শেষ করুন ও রিপোর্ট তৈরি করুন",
+    reportComplete: "সাক্ষাৎকার সম্পন্ন",
+    viewAdmin: "অ্যাডমিনে দেখুন →",
+    section: "অংশ",
+    uploaded: "সংযুক্ত",
+    removeFile: "সরান",
+    nameRequired: "নাম আবশ্যক",
+    designationRequired: "পদবি আবশ্যক",
+    departmentRequired: "বিভাগ আবশ্যক",
+    mobileRequired: "মোবাইল নম্বর আবশ্যক",
+  },
 };
 
 export const SECTION_NAMES: Record<Language, Record<string, string>> = {
@@ -175,6 +214,18 @@ export const SECTION_NAMES: Record<Language, Record<string, string>> = {
     H: "ଏକୀକରଣ",
     I: "ଅନୁମୋଦନ",
     J: "ଭବିଷ୍ୟତ ଦୃଷ୍ଟି",
+  },
+  bn: {
+    A: "অংশগ্রহণকারীর তথ্য",
+    B: "ব্যবসায়িক প্রসঙ্গ",
+    C: "প্রক্রিয়া আবিষ্কার",
+    D: "বিদ্যমান সিস্টেম",
+    E: "সমস্যা",
+    F: "প্রয়োজনীয়তা",
+    G: "রিপোর্টিং",
+    H: "ইন্টিগ্রেশন",
+    I: "অনুমোদন",
+    J: "ভবিষ্যৎ দৃষ্টি",
   },
 };
 
@@ -324,6 +375,54 @@ export const SECTION_QUESTIONS_I18N: Record<Language, Record<SectionId, string[]
       "ବର୍ତ୍ତମାନ ପ୍ରକ୍ରିୟାର କେଉଁ ଅଂଶ କେବେ ବି ବଦଳିବା ଉଚିତ ନୁହେଁ?",
     ],
   },
+  bn: {
+    A: [],
+    B: [
+      "আপনার বিভাগের প্রাথমিক উদ্দেশ্যগুলো কী?",
+      "কর্মক্ষমতা ও মানের জন্য আপনার দল কোন KPI ট্র্যাক করে?",
+      "আজ আপনার বিভাগের সবচেয়ে বড় চ্যালেঞ্জগুলো কী?",
+    ],
+    C: [
+      "আপনি আপনার প্রধান দৈনন্দিন প্রক্রিয়াটি বর্ণনা করতে পারেন — এটি কীভাবে শুরু হয় এবং মূল ধাপগুলো কী?",
+      "এই প্রক্রিয়ার দায়িত্ব কার, এবং এর ইনপুট ও আউটপুট কী?",
+      "কিছু ভুল হলে অনুমোদনের স্তর বা এসক্যালেশন পথ আছে কি?",
+    ],
+    D: [
+      "আপনি প্রতিদিন কোন সফটওয়্যার সিস্টেম বা টুল ব্যবহার করেন — SAP, Excel, ল্যাব সিস্টেম, বা অভ্যন্তরীণ অ্যাপ?",
+      "প্রতিটি টুলের জন্য, কী ভালো কাজ করে এবং কী সমস্যা সৃষ্টি করে?",
+      "আপনার কাজের কতটা এখনও ম্যানুয়াল Excel বা ইমেইলের উপর নির্ভরশীল?",
+    ],
+    E: [
+      "আপনি আপনার ওয়ার্কফ্লোতে সবচেয়ে বেশি কোন ধরনের দেরি বা বাধা অনুভব করেন?",
+      "সম্প্রতি এমন একটি উদাহরণ দিতে পারেন যেখানে পুনরায় কাজ বা ডুপ্লিকেট প্রচেষ্টা হয়েছিল?",
+      "এটি কতবার ঘটে, এবং ব্যবসায়িক প্রভাব কী?",
+    ],
+    F: [
+      "আমরা যদি আপনার দলের জন্য একটি আদর্শ সিস্টেম তৈরি করি, তাহলে এটি কী করতে পারবে?",
+      "কোন পারফরম্যান্স, নিরাপত্তা, বা মোবাইল অ্যাক্সেস প্রয়োজনীয়তা আপনার জন্য গুরুত্বপূর্ণ?",
+      "কোন ব্যবহারকারী ভূমিকাগুলোর অ্যাক্সেস দরকার, এবং প্রতিটি ভূমিকা কী দেখবে বা করবে?",
+    ],
+    G: [
+      "আপনার কোন রিপোর্ট বা ড্যাশবোর্ড দরকার — দৈনিক, সাপ্তাহিক, বা মাসিক?",
+      "সেই রিপোর্টে কোন KPI থাকতে হবে, এবং কে গ্রহণ করে?",
+      "আপনার এক্সপোর্ট কোন ফরম্যাটে দরকার — Excel, PDF, বা লাইভ ড্যাশবোর্ড?",
+    ],
+    H: [
+      "কোন সিস্টেমগুলো নতুন সমাধানের সাথে ইন্টিগ্রেট হওয়া উচিত — SAP, ERP, ল্যাব LIMS, HRMS, বা ইমেইল?",
+      "সিস্টেমগুলোর মধ্যে কোন ডেটা প্রবাহিত হওয়া উচিত, এবং কতবার?",
+      "ডেটা বিনিময়ের জন্য নিরাপত্তা বা সম্মতি সীমাবদ্ধতা আছে কি?",
+    ],
+    I: [
+      "চার্জ মিক্স পরিবর্তন, ল্যাব ফলাফল, বা উৎপাদন সিদ্ধান্তের জন্য অনুমোদনের কাঠামো কী?",
+      "প্রতিটি অনুমোদন 단계ের SLA প্রত্যাশা কী?",
+      "অনুমোদনকারী অনুপলব্ধ থাকলে প্রতিনিধিত্ব কীভাবে কাজ করে?",
+    ],
+    J: [
+      "আপনার জন্য একটি আদর্শ সিস্টেম কেমন দেখাবে?",
+      "আপনি যদি প্রথমে একটি জিনিস অটোমেট করতে পারেন, তাহলে সেটা কী হবে?",
+      "বর্তমান প্রক্রিয়ার কোন অংশ কখনো পরিবর্তন হওয়া উচিত নয়?",
+    ],
+  },
 };
 
 export function getWelcomeMessage(
@@ -332,12 +431,25 @@ export function getWelcomeMessage(
   designation: string,
   companyName: string
 ): string {
-  const templates: Record<Language, string> = {
-    en: `Thank you, ${name}. I've recorded your details as ${designation} at ${companyName}.\n\nLet's begin our conversation about your operations and processes. I'll ask one question at a time.\n\n${SECTION_QUESTIONS_I18N.en.B[0]}`,
+  if (lang === "en") {
+    return `Thank you, ${name}. I've recorded your details as ${designation} at ${companyName}.\n\nLet's begin our conversation about your operations and processes. I'll ask one question at a time.\n\n${SECTION_QUESTIONS_I18N.en.B[0]}`;
+  }
+  return getWelcomeMessageBilingual(lang, name, designation, companyName).locale;
+}
+
+export function getWelcomeMessageBilingual(
+  lang: PreferredLanguage,
+  name: string,
+  designation: string,
+  companyName: string
+): { en: string; locale: string } {
+  const en = `Thank you, ${name}. I've recorded your details as ${designation} at ${companyName}.\n\nLet's begin our conversation about your operations and processes. I'll ask one question at a time.\n\n${SECTION_QUESTIONS_I18N.en.B[0]}`;
+  const localeTemplates: Record<PreferredLanguage, string> = {
     hi: `धन्यवाद, ${name}। मैंने ${companyName} में आपका विवरण ${designation} के रूप में दर्ज कर लिया है।\n\nआइए आपके संचालन और प्रक्रियाओं के बारे में बातचीत शुरू करें। मैं एक समय में एक प्रश्न पूछूँगा।\n\n${SECTION_QUESTIONS_I18N.hi.B[0]}`,
     or: `ଧନ୍ୟବାଦ, ${name}। ମୁଁ ${companyName} ରେ ${designation} ଭାବରେ ଆପଣଙ୍କ ବିବରଣୀ ରେକର୍ଡ କରିଛି।\n\nଆପଣଙ୍କ operations ଏବଂ processes ବିଷୟରେ ଆମ କଥୋପକଥନ ଆରମ୍ଭ କରିବା। ମୁଁ ଏକ ସମୟରେ ଗୋଟିଏ ପ୍ରଶ୍ନ ପଚରିବି।\n\n${SECTION_QUESTIONS_I18N.or.B[0]}`,
+    bn: `ধন্যবাদ, ${name}। আমি ${companyName}-এ ${designation} হিসেবে আপনার বিবরণ রেকর্ড করেছি।\n\nআপনার অপারেশন ও প্রক্রিয়া নিয়ে আমাদের কথোপকথন শুরু করি। আমি একবারে একটি প্রশ্ন করব।\n\n${SECTION_QUESTIONS_I18N.bn.B[0]}`,
   };
-  return templates[lang];
+  return { en, locale: localeTemplates[lang] };
 }
 
 export function getAcknowledgments(lang: Language): string[] {
@@ -356,6 +468,11 @@ export function getAcknowledgments(lang: Language): string[] {
       "ଏହା ସ helpful — ସାଝା କରିଥିବା ପାଇଁ ଧନ୍ୟବାଦ।",
       "ମୁଁ ବୁଝିଲି। ମୁଁ ଏହାକୁ ଆହୁରି ଜାଣିବି।",
       "ଆକର୍ଷଣୀୟ। ଏହା ମୋତେ ଭଲ context ଦେଇଛି।",
+    ],
+    bn: [
+      "এটি সহায়ক — শেয়ার করার জন্য ধন্যবাদ।",
+      "আমি বুঝেছি। আমাকে আরও জানতে দিন।",
+      "আকর্ষণীয়। এটি আমাকে ভালো প্রসঙ্গ দিয়েছে।",
     ],
   };
   return acks[lang];
@@ -396,6 +513,14 @@ export function getFollowUps(lang: Language): {
       furnace: "ଏହା କେଉଁ furnace ସହ ଜଡିତ — SAF-3, SAF-4, କିମ୍ବା ଉଭୟ?",
       lab: "sample collection ରୁ reported result ପର୍ଯ୍ୟନ୍ତ typical turnaround କ'ଣ?",
     },
+    bn: {
+      short:
+        "আপনি কি এটি আরও ভালোভাবে বুঝতে সাহায্য করতে পারেন — হয়তো আপনার সাম্প্রতিক কাজ থেকে একটি উদাহরণ দিয়ে?",
+      excel: "প্রায় কতগুলো Excel ফাইল জড়িত, এবং কে সেগুলো রক্ষণাবেক্ষণ করে?",
+      sap: "এই প্রক্রিয়ায় বর্তমানে কোন SAP মডিউলগুলো জড়িত?",
+      furnace: "এটি কোন ফার্নেসের সাথে সম্পর্কিত — SAF-3, SAF-4, নাকি উভয়?",
+      lab: "নমুনা সংগ্রহ থেকে রিপোর্টেড ফলাফল পর্যন্ত সাধারণ সময় কত?",
+    },
   };
   return followUps[lang];
 }
@@ -405,6 +530,7 @@ export function languageInstruction(lang: Language): string {
     en: "English",
     hi: "Hindi (हिन्दी)",
     or: "Odia (ଓଡ଼ିଆ)",
+    bn: "Bengali (বাংলা)",
   };
   return `IMPORTANT: Respond ONLY in ${names[lang]}. All questions and acknowledgments must be in ${names[lang]}.`;
 }

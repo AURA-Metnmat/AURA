@@ -81,14 +81,15 @@ model ParticipantProfile {
 }
 
 model Message {
-  id          String              @id @default(cuid())
-  sessionId   String
-  role        String
-  content     String
-  section     String?
-  createdAt   DateTime            @default(now())
-  session     InterviewSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  attachments MessageAttachment[]
+  id            String              @id @default(cuid())
+  sessionId     String
+  role          String
+  content       String
+  contentLocale String?
+  section       String?
+  createdAt     DateTime            @default(now())
+  session       InterviewSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attachments   MessageAttachment[]
 
   @@index([sessionId])
 }

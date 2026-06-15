@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
-import { generateAuraResponse, generateInterviewReport } from "@/lib/aura/agent";
-import { getWelcomeMessage, type Language } from "@/lib/aura/i18n";
+import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
+import { getWelcomeMessageBilingual, type Language, type PreferredLanguage } from "@/lib/aura/i18n";
+import { isPreferredLanguage } from "@/lib/aura/bilingual";
 import type { SectionId } from "@/lib/aura/config";
 
 interface StartPayload {
@@ -66,8 +67,9 @@ export async function POST(request: Request) {
         include: { participant: true },
       });
 
-      const welcomeMessage = getWelcomeMessage(
-        language,
+      const welcomeLang = isPreferredLanguage(language) ? language : ("hi" as PreferredLanguage);
+      const welcome = getWelcomeMessageBilingual(
+        welcomeLang,
         participant.fullName,
         participant.designation,
         company.name
@@ -77,14 +79,16 @@ export async function POST(request: Request) {
         data: {
           sessionId: session.id,
           role: "assistant",
-          content: welcomeMessage,
+          content: welcome.en,
+          contentLocale: welcome.locale,
           section: "B",
         },
       });
 
       return NextResponse.json({
         sessionId: session.id,
-        message: welcomeMessage,
+        message: welcome.en,
+        messageLocale: welcome.locale,
         currentSection: "B",
         completionPct: 10,
         company: { id: company.id, name: company.name },
@@ -205,11 +209,17 @@ export async function POST(request: Request) {
       messageContent = `${userMessage}\n\n📎 ${fileList}`;
     }
 
+    const lang = (session.language as Language) || "hi";
+    const preferredLang = isPreferredLanguage(lang) ? lang : ("hi" as PreferredLanguage);
+
+    const userBilingual = await normalizeUserMessage(messageContent, preferredLang);
+
     const userMsg = await db.message.create({
       data: {
         sessionId: session.id,
         role: "user",
-        content: messageContent,
+        content: userBilingual.en,
+        contentLocale: userBilingual.locale,
         section: session.currentSection,
       },
     });
@@ -227,13 +237,12 @@ export async function POST(request: Request) {
       userMessage
     );
 
-    const lang = (session.language as Language) || "en";
     const updatedHistory = [
       ...session.messages.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
-      { role: "user" as const, content: messageContent },
+      { role: "user" as const, content: userBilingual.en },
     ];
 
     const response = await generateAuraResponse(
@@ -252,7 +261,7 @@ export async function POST(request: Request) {
         messageHistory: updatedHistory,
         questionIndex: 0,
       },
-      userMessage
+      userBilingual.en
     );
 
     await db.message.create({
@@ -260,6 +269,7 @@ export async function POST(request: Request) {
         sessionId: session.id,
         role: "assistant",
         content: response.content,
+        contentLocale: response.contentLocale,
         section: response.nextSection,
       },
     });
@@ -275,6 +285,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       sessionId: session.id,
       message: response.content,
+      messageLocale: response.contentLocale,
+      userMessageEn: userBilingual.en,
+      userMessageLocale: userBilingual.locale,
       currentSection: response.nextSection,
       completionPct: response.completionPct,
       shouldComplete: response.shouldComplete,
@@ -335,7 +348,7 @@ async function extractStructuredData(
 ): Promise<void> {
   const lower = message.toLowerCase();
 
-  if (section === "E" && (lower.includes("delay") || lower.includes("problem") || lower.includes("issue") || lower.includes("bottleneck") || lower.includes("समस्या") || lower.includes("ସମସ୍ୟା"))) {
+  if (section === "E" && (lower.includes("delay") || lower.includes("problem") || lower.includes("issue") || lower.includes("bottleneck") || lower.includes("समस्या") || lower.includes("ସମସ୍ୟା") || lower.includes("সমস্যা"))) {
     await db.painPoint.create({
       data: {
         sessionId,
@@ -346,7 +359,7 @@ async function extractStructuredData(
     });
   }
 
-  if (section === "F" && (lower.includes("should") || lower.includes("need") || lower.includes("must") || lower.includes("system") || lower.includes("चाहिए") || lower.includes("ଦରକାର"))) {
+  if (section === "F" && (lower.includes("should") || lower.includes("need") || lower.includes("must") || lower.includes("system") || lower.includes("चाहिए") || lower.includes("ଦରକାର") || lower.includes("দরকার"))) {
     await db.requirement.create({
       data: {
         sessionId,

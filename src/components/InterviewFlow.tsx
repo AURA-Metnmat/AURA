@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import Image from "next/image";
-import { LANGUAGES, UI, SECTION_NAMES, type Language } from "@/lib/aura/i18n";
+import { PREFERRED_LANGUAGES, UI, SECTION_NAMES, type PreferredLanguage } from "@/lib/aura/i18n";
+import { getEngagement } from "@/lib/aura/engagement";
 import { InterviewWelcome } from "@/components/interview/InterviewWelcome";
+import { InterviewDetailsForm } from "@/components/interview/InterviewDetailsForm";
+import { InterviewShell } from "@/components/interview/InterviewShell";
+import { BilingualChat, type BilingualMessage } from "@/components/interview/BilingualChat";
+import { InterviewChatComposer } from "@/components/interview/InterviewChatComposer";
 
 interface Attachment {
   id: string;
@@ -16,7 +20,8 @@ interface Attachment {
 
 interface Message {
   role: "user" | "assistant";
-  content: string;
+  contentEn: string;
+  contentLocale: string;
   attachments?: Attachment[];
 }
 
@@ -40,7 +45,7 @@ export default function InterviewFlow({
   showCompanyBadge = true,
 }: InterviewFlowProps) {
   const [step, setStep] = useState<"language" | "details" | "chat">("language");
-  const [language, setLanguage] = useState<Language>("en");
+  const [language, setLanguage] = useState<PreferredLanguage>("hi");
   const [form, setForm] = useState<ParticipantForm>({
     fullName: "",
     designation: "",
@@ -60,9 +65,10 @@ export default function InterviewFlow({
   const [report, setReport] = useState<Record<string, string> | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const t = UI[language];
+  const tEn = UI.en;
+  const engagement = getEngagement(language);
   const sections = SECTION_NAMES[language];
 
   useEffect(() => {
@@ -85,6 +91,7 @@ export default function InterviewFlow({
   async function startInterview() {
     if (!validateForm()) return;
     setLoading(true);
+    setChatError(null);
     try {
       const res = await fetch("/api/interview", {
         method: "POST",
@@ -105,7 +112,13 @@ export default function InterviewFlow({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setSessionId(data.sessionId);
-      setMessages([{ role: "assistant", content: data.message }]);
+      setMessages([
+        {
+          role: "assistant",
+          contentEn: data.message,
+          contentLocale: data.messageLocale ?? data.message,
+        },
+      ]);
       setCurrentSection(data.currentSection);
       setCompletionPct(data.completionPct);
       setStep("chat");
@@ -135,7 +148,6 @@ export default function InterviewFlow({
       }
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -148,7 +160,12 @@ export default function InterviewFlow({
     setPendingFiles([]);
     setMessages((prev) => [
       ...prev,
-      { role: "user", content: userMsg, attachments: msgAttachments.length ? msgAttachments : undefined },
+      {
+        role: "user",
+        contentEn: userMsg,
+        contentLocale: userMsg,
+        attachments: msgAttachments.length ? msgAttachments : undefined,
+      },
     ]);
     setLoading(true);
     setChatError(null);
@@ -166,7 +183,25 @@ export default function InterviewFlow({
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to send message");
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
+      setMessages((prev) => {
+        const updated = [...prev];
+        const lastUserIdx = updated.length - 1;
+        if (lastUserIdx >= 0 && updated[lastUserIdx].role === "user" && data.userMessageEn) {
+          updated[lastUserIdx] = {
+            ...updated[lastUserIdx],
+            contentEn: data.userMessageEn,
+            contentLocale: data.userMessageLocale ?? updated[lastUserIdx].contentLocale,
+          };
+        }
+        return [
+          ...updated,
+          {
+            role: "assistant",
+            contentEn: data.message,
+            contentLocale: data.messageLocale ?? data.message,
+          },
+        ];
+      });
       setCurrentSection(data.currentSection);
       setCompletionPct(data.completionPct);
       if (data.shouldComplete) await completeInterview();
@@ -210,7 +245,14 @@ export default function InterviewFlow({
         className="block mt-2 rounded-lg overflow-hidden border border-white/20 max-w-xs"
       >
         {isImage ? (
-          <Image src={att.filePath} alt={att.fileName} width={240} height={160} className="object-cover w-full max-h-40" unoptimized />
+          <Image
+            src={att.filePath}
+            alt={att.fileName}
+            width={240}
+            height={160}
+            className="object-cover w-full max-h-40"
+            unoptimized
+          />
         ) : (
           <div className="px-3 py-2 text-xs bg-black/20 flex items-center gap-2">
             <span>📄</span>
@@ -223,15 +265,15 @@ export default function InterviewFlow({
 
   if (report) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100">
-        <header className="border-b border-slate-800 px-6 py-4">
+      <InterviewShell>
+        <header className="border-b border-white/10 px-6 py-4 backdrop-blur-sm bg-slate-950/50">
           <p className="text-xs uppercase tracking-widest text-amber-400">AURA-METNMAT</p>
           <h1 className="text-xl font-semibold">{t.reportComplete}</h1>
           <p className="text-sm text-slate-500 mt-1">{companyName}</p>
         </header>
         <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">
           {Object.entries(report).map(([key, value]) => (
-            <section key={key} className="bg-slate-900 rounded-xl p-6 border border-slate-800">
+            <section key={key} className="bg-slate-900/70 rounded-xl p-6 border border-white/10 backdrop-blur-sm">
               <h2 className="text-lg font-semibold text-amber-400 capitalize mb-4">
                 {key.replace(/([A-Z])/g, " $1").trim()}
               </h2>
@@ -242,39 +284,44 @@ export default function InterviewFlow({
             Thank you. Your responses have been saved for {companyName}.
           </p>
         </main>
-      </div>
+      </InterviewShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between shrink-0">
+    <InterviewShell>
+      <header className="border-b border-white/10 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 backdrop-blur-sm bg-slate-950/60">
         <div>
           <p className="text-xs uppercase tracking-widest text-amber-400">AURA-METNMAT Interview</p>
           <h1 className="text-lg font-semibold">{showCompanyBadge ? companyName : form.fullName || "Interview"}</h1>
         </div>
         <div className="flex items-center gap-3">
-          {step !== "language" && (
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as Language)}
-              disabled={step === "chat"}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs"
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l.id} value={l.id}>{l.native}</option>
-              ))}
-            </select>
+          {step === "details" && (
+            <div className="hidden sm:flex items-center gap-1 text-[10px] uppercase tracking-wider text-slate-500">
+              <span className="text-emerald-400">● Lang</span>
+              <span>—</span>
+              <span className="text-amber-400">● Details</span>
+              <span>—</span>
+              <span>○ Chat</span>
+            </div>
           )}
           {step === "chat" && (
             <>
-              <span className="text-xs bg-slate-800 px-3 py-1 rounded-full hidden sm:inline">
+              <div className="hidden sm:flex items-center gap-1 text-[10px] uppercase tracking-wider bg-slate-800/80 rounded-lg px-2 py-1 border border-white/10">
+                <span className="text-slate-400">EN</span>
+                <span className="text-slate-600">|</span>
+                <span className="text-amber-400">{PREFERRED_LANGUAGES.find((l) => l.id === language)?.native}</span>
+              </div>
+              <span className="text-xs bg-slate-800/80 px-3 py-1 rounded-full hidden md:inline border border-white/10">
                 {t.section} {currentSection}: {sections[currentSection]}
               </span>
-              <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500 transition-all" style={{ width: `${completionPct}%` }} />
+              <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden border border-white/5">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all"
+                  style={{ width: `${completionPct}%` }}
+                />
               </div>
-              <span className="text-xs text-slate-400">{completionPct}%</span>
+              <span className="text-xs text-slate-400 tabular-nums">{completionPct}%</span>
             </>
           )}
         </div>
@@ -283,10 +330,10 @@ export default function InterviewFlow({
       {step === "language" && (
         <InterviewWelcome
           companyName={companyName}
-          welcome={t.welcome}
-          welcomeDesc={t.welcomeDesc}
-          selectLanguage={t.selectLanguage}
-          languages={LANGUAGES}
+          welcome={tEn.welcome}
+          welcomeDesc={tEn.welcomeDesc}
+          selectLanguage={tEn.selectLanguage}
+          languages={PREFERRED_LANGUAGES}
           onSelectLanguage={(lang) => {
             setLanguage(lang);
             setStep("details");
@@ -295,98 +342,77 @@ export default function InterviewFlow({
       )}
 
       {step === "details" && (
-        <main className="flex-1 flex items-center justify-center px-6 py-8">
-          <div className="max-w-md w-full space-y-6">
-            <div className="text-center">
-              <p className="text-amber-400/80 text-sm">{companyName}</p>
-              <h2 className="text-2xl font-bold mt-2 mb-2">{t.yourDetails}</h2>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); startInterview(); }} className="space-y-4 bg-slate-900 rounded-2xl p-6 border border-slate-800">
-              {(
-                [
-                  { key: "fullName" as const, label: t.fullName, required: true, type: "text" },
-                  { key: "designation" as const, label: t.designation, required: true, type: "text" },
-                  { key: "department" as const, label: t.department, required: true, type: "text" },
-                  { key: "mobile" as const, label: t.mobile, required: true, type: "tel" },
-                  { key: "email" as const, label: t.emailOptional, required: false, type: "email" },
-                ]
-              ).map((field) => (
-                <div key={field.key}>
-                  <label className="block text-sm text-slate-400 mb-1">
-                    {field.label}{field.required && <span className="text-amber-500 ml-1">*</span>}
-                  </label>
-                  <input
-                    type={field.type}
-                    value={form[field.key]}
-                    onChange={(e) => setForm({ ...form, [field.key]: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500"
-                  />
-                  {formErrors[field.key] && <p className="text-xs text-red-400 mt-1">{formErrors[field.key]}</p>}
-                </div>
-              ))}
-              {chatError && (
-                <p className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-xl px-4 py-3">{chatError}</p>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setStep("language")} className="flex-1 border border-slate-700 rounded-xl py-3 text-sm hover:bg-slate-800">←</button>
-                <button type="submit" disabled={loading} className="flex-[3] bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-semibold rounded-xl py-3 text-sm">
-                  {loading ? "..." : t.startInterview}
-                </button>
-              </div>
-            </form>
-          </div>
-        </main>
+        <InterviewDetailsForm
+          companyName={companyName}
+          language={language}
+          form={form}
+          formErrors={formErrors}
+          loading={loading}
+          error={chatError}
+          t={t}
+          engagement={engagement}
+          onChange={setForm}
+          onBack={() => setStep("language")}
+          onSubmit={startInterview}
+        />
       )}
 
       {step === "chat" && (
         <>
-          <main className="flex-1 overflow-y-auto px-6 py-6 max-w-3xl mx-auto w-full">
-            <div className="space-y-4">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${msg.role === "user" ? "bg-amber-600 text-white" : "bg-slate-800 text-slate-100 border border-slate-700"}`}>
-                    {msg.role === "assistant" && <p className="text-xs text-amber-400 mb-1 font-medium">AURA</p>}
-                    {msg.content}
-                    {msg.attachments?.map(renderAttachment)}
-                  </div>
-                </div>
-              ))}
-              {loading && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-800 rounded-2xl px-4 py-3 text-sm text-slate-400 border border-slate-700">{t.thinking}</div>
-                </div>
-              )}
-              <div ref={bottomRef} />
-            </div>
-          </main>
-          <footer className="border-t border-slate-800 px-6 py-4 shrink-0">
-            {pendingFiles.length > 0 && (
-              <div className="max-w-3xl mx-auto mb-3 flex flex-wrap gap-2">
-                {pendingFiles.map((f) => (
-                  <div key={f.id} className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-1.5 text-xs">
-                    <span className="truncate max-w-[120px]">{f.fileName}</span>
-                    <button type="button" onClick={() => setPendingFiles((p) => p.filter((x) => x.id !== f.id))} className="text-red-400">×</button>
-                  </div>
-                ))}
-              </div>
-            )}
+          <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 max-w-6xl mx-auto w-full">
             {chatError && (
-              <p className="max-w-3xl mx-auto mb-3 text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-xl px-4 py-3">{chatError}</p>
+              <p className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3">
+                {chatError}
+              </p>
             )}
-            <form onSubmit={sendMessage} className="max-w-3xl mx-auto flex gap-2">
-              <input ref={fileInputRef} type="file" accept="image/*,.pdf,.xlsx,.xls,.doc,.docx,.txt,.csv" multiple className="hidden" onChange={handleFileSelect} />
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={loading || uploading || !sessionId} className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl border border-slate-700 hover:border-amber-500 disabled:opacity-50 text-lg">{uploading ? "…" : "📎"}</button>
-              <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={t.typeResponse} disabled={loading} className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50" />
-              <button type="submit" disabled={loading || (!input.trim() && pendingFiles.length === 0)} className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-semibold px-6 py-3 rounded-xl text-sm">{t.send}</button>
-            </form>
-            {completionPct >= 85 && (
-              <div className="max-w-3xl mx-auto mt-3 text-center">
-                <button onClick={completeInterview} disabled={loading} className="text-xs text-amber-400 hover:text-amber-300 underline">{t.finishReport}</button>
-              </div>
-            )}
-          </footer>
+            <BilingualChat
+              messages={messages.map(
+                (msg): BilingualMessage => ({
+                  role: msg.role,
+                  contentEn: msg.contentEn,
+                  contentLocale: msg.contentLocale,
+                  attachments: msg.attachments?.map(renderAttachment),
+                })
+              )}
+              preferredLanguage={language}
+              thinking={loading}
+              thinkingEn={tEn.thinking}
+              thinkingLocale={t.thinking}
+              engagement={engagement}
+            />
+            <div ref={bottomRef} />
+          </main>
+
+          <InterviewChatComposer
+            input={input}
+            setInput={setInput}
+            onSend={sendMessage}
+            onFileSelect={handleFileSelect}
+            pendingFiles={pendingFiles}
+            onRemoveFile={(id) => setPendingFiles((p) => p.filter((x) => x.id !== id))}
+            loading={loading}
+            uploading={uploading}
+            sessionReady={!!sessionId}
+            language={language}
+            t={t}
+            engagement={engagement}
+            onQuickPrompt={setInput}
+            onVoiceTranscript={(text) => setInput((prev) => (prev ? `${prev} ${text}` : text))}
+          />
+
+          {completionPct >= 85 && (
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-4 text-center">
+              <button
+                onClick={completeInterview}
+                disabled={loading}
+                className="text-xs text-amber-400 hover:text-amber-300 underline"
+              >
+                {t.finishReport}
+              </button>
+            </div>
+          )}
         </>
       )}
-    </div>
+    </InterviewShell>
   );
 }
