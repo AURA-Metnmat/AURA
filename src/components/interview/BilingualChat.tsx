@@ -6,6 +6,7 @@ import { AudioPlayButton } from "@/components/interview/AudioPlayButton";
 import type { Language } from "@/lib/aura/i18n";
 import { PREFERRED_LANGUAGES } from "@/lib/aura/i18n";
 import { localeDisplayName } from "@/lib/aura/bilingual";
+import { resolveMessageLocale } from "@/lib/aura/message-locale";
 import type { EngagementStrings } from "@/lib/aura/engagement";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ interface BilingualChatProps {
   thinkingEn?: string;
   thinkingLocale?: string;
   engagement?: EngagementStrings;
+  participantName?: string;
 }
 
 function MessageColumn({
@@ -85,6 +87,7 @@ export function BilingualChat({
   thinkingEn = "AURA is thinking...",
   thinkingLocale = "...",
   engagement,
+  participantName,
 }: BilingualChatProps) {
   const prefMeta = PREFERRED_LANGUAGES.find((l) => l.id === preferredLanguage);
   const prefLabel = prefMeta?.native ?? localeDisplayName(preferredLanguage);
@@ -108,7 +111,15 @@ export function BilingualChat({
         </div>
       )}
 
-      {messages.map((msg, i) => (
+      {messages.map((msg, i) => {
+        const localeText = resolveMessageLocale(
+          msg.contentEn,
+          msg.contentLocale,
+          preferredLanguage,
+          participantName
+        );
+
+        return (
         <div key={i} className="space-y-3">
           <div
             className={cn(
@@ -163,7 +174,7 @@ export function BilingualChat({
                 <MessageColumn
                   label={prefLabel}
                   lang={preferredLanguage}
-                  text={msg.contentLocale}
+                  text={localeText}
                   isUser={msg.role === "user"}
                   attachments={undefined}
                 />
@@ -171,7 +182,8 @@ export function BilingualChat({
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
 
       {thinking && (
         <div className="space-y-3">

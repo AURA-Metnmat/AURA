@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
 import { getOpeningQuestion1, getOpeningQuestion2 } from "@/lib/aura/opening-questions";
+import { resolveMessageLocale } from "@/lib/aura/message-locale";
 import { loadFullCompanyContext } from "@/lib/companies/company-knowledge";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
@@ -50,9 +51,29 @@ export async function POST(request: Request) {
       if (!sessionId || !valid.includes(language)) {
         return NextResponse.json({ error: "Invalid language update" }, { status: 400 });
       }
-      const session = await db.interviewSession.findUnique({ where: { id: sessionId } });
+      const session = await db.interviewSession.findUnique({
+        where: { id: sessionId },
+        include: { participant: true, messages: { where: { role: "assistant" } } },
+      });
       if (!session) {
         return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+      const participantName = session.participant?.fullName;
+      for (const msg of session.messages) {
+        const contentEn = msg.content;
+        const contentLocale = msg.contentLocale ?? contentEn;
+        const resolved = resolveMessageLocale(
+          contentEn,
+          contentLocale,
+          language,
+          participantName ?? undefined
+        );
+        if (resolved !== contentLocale) {
+          await db.message.update({
+            where: { id: msg.id },
+            data: { contentLocale: resolved },
+          });
+        }
       }
       await db.interviewSession.update({
         where: { id: sessionId },
@@ -110,7 +131,7 @@ export async function POST(request: Request) {
         messageLocale: opening.locale,
         currentSection: "A",
         completionPct: 5,
-        interviewDurationMinutes: company.interviewDurationMinutes ?? 45,
+        interviewDurationMinutes: company.interviewDurationMinutes ?? 5,
         company: { id: company.id, name: company.name },
       });
     }

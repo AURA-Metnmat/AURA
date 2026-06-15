@@ -56,7 +56,7 @@ export default function CompanyInterviewPage({
     <InterviewFlow
       companyId={company.id}
       companyName={company.name}
-      interviewDurationMinutes={company.interviewDurationMinutes ?? 45}
+      interviewDurationMinutes={company.interviewDurationMinutes ?? 5}
     />
   );
 }

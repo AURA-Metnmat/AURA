@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Mic, Square } from "lucide-react";
+import { Mic, Square, AlertCircle } from "lucide-react";
 import { SPEECH_LANG_MAP } from "@/lib/aura/bilingual";
 import type { Language } from "@/lib/aura/i18n";
 import { cn } from "@/lib/utils";
@@ -71,16 +71,30 @@ export function VoiceInputButton({
 }: VoiceInputButtonProps) {
   const [listening, setListening] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const baseTextRef = useRef("");
   const finalTranscriptRef = useRef("");
+  const listeningIntentRef = useRef(false);
+  const onTextChangeRef = useRef(onTextChange);
+
+  useEffect(() => {
+    onTextChangeRef.current = onTextChange;
+  }, [onTextChange]);
+
+  const applyTranscript = useCallback(() => {
+    const spoken = finalTranscriptRef.current.trim();
+    const prefix = baseTextRef.current;
+    onTextChangeRef.current(prefix ? `${prefix} ${spoken}`.trim() : spoken);
+  }, []);
 
   const stop = useCallback(() => {
+    listeningIntentRef.current = false;
     recognitionRef.current?.stop();
     setListening(false);
   }, []);
 
-  const start = useCallback(() => {
+  const startRecognition = useCallback(() => {
     const Ctor = getSpeechRecognition();
     if (!Ctor) {
       setUnsupported(true);
@@ -90,9 +104,6 @@ export function VoiceInputButton({
     if (recognitionRef.current) {
       recognitionRef.current.abort();
     }
-
-    baseTextRef.current = baseText.trim();
-    finalTranscriptRef.current = "";
 
     const recognition = new Ctor();
     recognition.continuous = true;
@@ -113,16 +124,35 @@ export function VoiceInputButton({
 
       const spoken = `${finalTranscriptRef.current}${interim}`.trim();
       const prefix = baseTextRef.current;
-      onTextChange(prefix ? `${prefix} ${spoken}`.trim() : spoken);
+      onTextChangeRef.current(prefix ? `${prefix} ${spoken}`.trim() : spoken);
     };
 
     recognition.onerror = (event) => {
-      if (event.error !== "aborted" && event.error !== "no-speech") {
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setError("Microphone permission denied. Allow mic access in browser settings.");
+        listeningIntentRef.current = false;
         setListening(false);
+        return;
       }
+      if (event.error === "aborted") return;
+      if (event.error === "no-speech") return;
+      setError("Voice capture interrupted. Tap mic to try again.");
+      listeningIntentRef.current = false;
+      setListening(false);
     };
 
     recognition.onend = () => {
+      if (listeningIntentRef.current) {
+        try {
+          recognition.start();
+        } catch {
+          applyTranscript();
+          listeningIntentRef.current = false;
+          setListening(false);
+        }
+        return;
+      }
+      applyTranscript();
       setListening(false);
     };
 
@@ -131,21 +161,55 @@ export function VoiceInputButton({
       recognition.start();
       setListening(true);
       setUnsupported(false);
+      setError(null);
     } catch {
       setUnsupported(true);
+      listeningIntentRef.current = false;
       setListening(false);
     }
-  }, [baseText, language, onTextChange]);
+  }, [applyTranscript, language]);
+
+  const start = useCallback(async () => {
+    const Ctor = getSpeechRecognition();
+    if (!Ctor) {
+      setUnsupported(true);
+      return;
+    }
+
+    if (navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((track) => track.stop());
+      } catch {
+        setError("Microphone permission denied. Allow mic access in browser settings.");
+        return;
+      }
+    }
+
+    baseTextRef.current = baseText.trim();
+    finalTranscriptRef.current = "";
+    listeningIntentRef.current = true;
+    startRecognition();
+  }, [baseText, startRecognition]);
 
   const toggle = useCallback(() => {
     if (listening) {
       stop();
     } else {
-      start();
+      void start();
     }
   }, [listening, start, stop]);
 
-  useEffect(() => () => recognitionRef.current?.abort(), []);
+  useEffect(() => () => {
+    listeningIntentRef.current = false;
+    recognitionRef.current?.abort();
+  }, []);
+
+  useEffect(() => {
+    if (listening && recognitionRef.current) {
+      recognitionRef.current.lang = SPEECH_LANG_MAP[language];
+    }
+  }, [language, listening]);
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -170,6 +234,12 @@ export function VoiceInputButton({
       </span>
       {unsupported && (
         <p className="text-[10px] text-amber-400/80 max-w-[140px] text-center">{labels.micUnsupported}</p>
+      )}
+      {error && (
+        <p className="text-[10px] text-red-300/90 max-w-[160px] text-center flex items-start gap-1">
+          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </p>
       )}
     </div>
   );

@@ -112,7 +112,7 @@ export default function AdminPage() {
     contactPhone: "",
     description: "",
     aiContext: "",
-    interviewDurationMinutes: 45,
+    interviewDurationMinutes: 5,
   });
 
   const [onboardStep, setOnboardStep] = useState(0);
@@ -128,7 +128,7 @@ export default function AdminPage() {
     contactPhone: "",
     description: "",
     aiContext: "",
-    interviewDurationMinutes: 45,
+    interviewDurationMinutes: 5,
   });
 
   const [knowledgeFiles, setKnowledgeFiles] = useState<File[]>([]);
@@ -333,7 +333,7 @@ export default function AdminPage() {
       contactPhone: c.contactPhone ?? "",
       description: c.description ?? "",
       aiContext: c.aiContext ?? "",
-      interviewDurationMinutes: c.interviewDurationMinutes ?? 45,
+      interviewDurationMinutes: c.interviewDurationMinutes ?? 5,
     });
     setEditing(true);
   }
@@ -395,7 +395,7 @@ export default function AdminPage() {
       contactPhone: "",
       description: "",
       aiContext: "",
-      interviewDurationMinutes: 45,
+      interviewDurationMinutes: 5,
     });
     setKnowledgeFiles([]);
     setOnboardStep(0);
@@ -556,13 +556,13 @@ export default function AdminPage() {
                 <label className="text-sm text-slate-300">Interview session duration (minutes)</label>
                 <input
                   type="number"
-                  min={15}
-                  max={180}
+                  min={5}
+                  max={60}
                   value={form.interviewDurationMinutes}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      interviewDurationMinutes: Math.min(180, Math.max(15, Number(e.target.value) || 45)),
+                      interviewDurationMinutes: Math.min(60, Math.max(5, Number(e.target.value) || 5)),
                     })
                   }
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm"
@@ -732,13 +732,13 @@ export default function AdminPage() {
                 <label className="text-sm text-slate-300">Interview session duration (minutes)</label>
                 <input
                   type="number"
-                  min={15}
-                  max={180}
+                  min={5}
+                  max={60}
                   value={editForm.interviewDurationMinutes}
                   onChange={(e) =>
                     setEditForm({
                       ...editForm,
-                      interviewDurationMinutes: Math.min(180, Math.max(15, Number(e.target.value) || 45)),
+                      interviewDurationMinutes: Math.min(60, Math.max(5, Number(e.target.value) || 5)),
                     })
                   }
                   className={`w-full ${glassInput} px-4 py-2.5 text-sm`}

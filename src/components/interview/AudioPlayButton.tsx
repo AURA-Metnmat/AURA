@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Volume2, Loader2, Square } from "lucide-react";
 import type { Language } from "@/lib/aura/i18n";
+import { SPEECH_LANG_MAP } from "@/lib/aura/bilingual";
 import { cn } from "@/lib/utils";
 
 interface AudioPlayButtonProps {
@@ -23,11 +24,28 @@ export function AudioPlayButton({ text, language, className, label = "Listen" }:
       audioRef.current.pause();
       audioRef.current = null;
     }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     setPlaying(false);
   }, []);
 
+  const playWithSpeechSynthesis = useCallback(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = SPEECH_LANG_MAP[language];
+    utterance.rate = 0.95;
+    utterance.onend = () => setPlaying(false);
+    utterance.onerror = () => setPlaying(false);
+    window.speechSynthesis.speak(utterance);
+    setPlaying(true);
+    return true;
+  }, [text, language]);
+
   const play = useCallback(async () => {
     if (!text.trim() || loading) return;
+
     if (playing) {
       stop();
       return;
@@ -40,30 +58,32 @@ export function AudioPlayButton({ text, language, className, label = "Listen" }:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, language }),
       });
-      if (!res.ok) throw new Error("TTS failed");
 
-      const blob = await res.blob();
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-      const url = URL.createObjectURL(blob);
-      urlRef.current = url;
+      if (res.ok) {
+        const blob = await res.blob();
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+        const url = URL.createObjectURL(blob);
+        urlRef.current = url;
 
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => setPlaying(false);
-      audio.onerror = () => setPlaying(false);
-      await audio.play();
-      setPlaying(true);
-    } catch {
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.onend = () => setPlaying(false);
-        window.speechSynthesis.speak(utterance);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => setPlaying(false);
+        audio.onerror = () => {
+          setPlaying(false);
+          playWithSpeechSynthesis();
+        };
+        await audio.play();
         setPlaying(true);
+        return;
       }
+
+      playWithSpeechSynthesis();
+    } catch {
+      playWithSpeechSynthesis();
     } finally {
       setLoading(false);
     }
-  }, [text, language, loading, playing, stop]);
+  }, [text, language, loading, playing, stop, playWithSpeechSynthesis]);
 
   return (
     <button

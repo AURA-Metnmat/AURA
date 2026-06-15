@@ -342,6 +342,13 @@ export function PixelHero({
             0% { background-position: 200% center; }
             100% { background-position: 0% center; }
         }
+        .metnmat-red-text {
+            background: linear-gradient(135deg, #fca5a5 0%, #ef4444 35%, #dc2626 70%, #b91c1c 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            filter: drop-shadow(0 8px 24px rgba(220, 38, 38, 0.35));
+        }
       `}</style>
 
       <div className="absolute inset-0 z-0 pointer-events-none">
@@ -353,9 +360,9 @@ export function PixelHero({
         <p className="text-[11px] sm:text-xs uppercase tracking-[0.3em] text-primary/90 font-medium mb-4 md:mb-6">
           {eyebrow}
         </p>
-        <h1 className="tahoe-glass-text flex flex-row items-center justify-center gap-1.5 sm:gap-4 lg:gap-6 px-1 w-full flex-wrap text-[2.8rem] xs:text-[3.2rem] sm:text-6xl md:text-8xl lg:text-9xl leading-none">
-          <span className="font-serif italic font-medium">{word1}</span>
-          <span className="font-sans font-extrabold tracking-tighter">{word2}</span>
+        <h1 className="flex flex-row items-center justify-center gap-1.5 sm:gap-4 lg:gap-6 px-1 w-full flex-wrap text-[2.8rem] xs:text-[3.2rem] sm:text-6xl md:text-8xl lg:text-9xl leading-none">
+          <span className="tahoe-glass-text font-serif italic font-medium">{word1}</span>
+          <span className="metnmat-red-text font-sans font-extrabold tracking-tighter">{word2}</span>
         </h1>
       </div>
 

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { requireAdmin } from "@/lib/auth/admin";
 import { env } from "@/lib/env";
 import type { Language } from "@/lib/aura/i18n";
 import { TTS_VOICE } from "@/lib/aura/bilingual";

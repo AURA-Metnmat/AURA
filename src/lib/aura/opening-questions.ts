@@ -16,9 +16,11 @@ const OPENING_Q1: Record<Language, (name: string) => string> = {
     `স্বাগতম, ${name}। আজ সময় দেওয়ার জন্য ধন্যবাদ। শুরু করতে, অনুগ্রহ করে নিজের পরিচয় দিন এবং আপনার পেশাদারি যাত্রা সংক্ষেপে বলুন?`,
 };
 
+export const OPENING_Q2_EN =
+  "How long have you been working with this organization, and how has your role evolved during that time?";
+
 const OPENING_Q2: Record<Language, (companyName: string) => string> = {
-  en: () =>
-    "How long have you been working with this organization, and how has your role evolved during that time?",
+  en: () => OPENING_Q2_EN,
   hi: () =>
     "आप इस संगठन में कितने समय से काम कर रहे हैं, और इस दौरान आपकी भूमिका कैसे विकसित हुई है?",
   or: () =>
@@ -26,6 +28,9 @@ const OPENING_Q2: Record<Language, (companyName: string) => string> = {
   bn: () =>
     "আপনি এই প্রতিষ্ঠানে কতদিন ধরে কাজ করছেন, এবং সেই সময়ে আপনার ভূমিকা কীভাবে বিকশিত হয়েছে?",
 };
+
+export const OPENING_Q1_EN_PREFIX =
+  "Thank you for taking the time to participate today. To begin, could you please introduce yourself";
 
 export function getOpeningQuestion1(lang: Language, name: string): OpeningBilingual {
   const en = OPENING_Q1.en(name);

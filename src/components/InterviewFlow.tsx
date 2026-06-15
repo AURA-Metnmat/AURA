@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { PREFERRED_LANGUAGES, UI, SECTION_NAMES, type Language } from "@/lib/aura/i18n";
 import { getEngagement } from "@/lib/aura/engagement";
+import { resolveMessageLocale } from "@/lib/aura/message-locale";
 import { InterviewWelcome } from "@/components/interview/InterviewWelcome";
 import { InterviewDetailsForm } from "@/components/interview/InterviewDetailsForm";
 import { InterviewShell } from "@/components/interview/InterviewShell";
@@ -50,7 +51,7 @@ function formatRemaining(seconds: number): string {
 export default function InterviewFlow({
   companyId,
   companyName,
-  interviewDurationMinutes: initialDurationMinutes = 45,
+  interviewDurationMinutes: initialDurationMinutes = 5,
   showCompanyBadge = true,
 }: InterviewFlowProps) {
   const [step, setStep] = useState<"language" | "details" | "chat">("language");
@@ -116,6 +117,21 @@ export default function InterviewFlow({
     if (newLang === language) return;
     setLanguage(newLang);
     setChatError(null);
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.role === "assistant"
+          ? {
+              ...msg,
+              contentLocale: resolveMessageLocale(
+                msg.contentEn,
+                msg.contentLocale,
+                newLang,
+                form.fullName
+              ),
+            }
+          : msg
+      )
+    );
     if (!sessionId) return;
     try {
       const res = await fetch("/api/interview", {
@@ -160,7 +176,12 @@ export default function InterviewFlow({
         {
           role: "assistant",
           contentEn: data.message,
-          contentLocale: data.messageLocale ?? data.message,
+          contentLocale: resolveMessageLocale(
+            data.message,
+            data.messageLocale ?? data.message,
+            language,
+            form.fullName.trim()
+          ),
         },
       ]);
       setCurrentSection(data.currentSection);
@@ -444,6 +465,7 @@ export default function InterviewFlow({
               thinkingEn={tEn.thinking}
               thinkingLocale={t.thinking}
               engagement={engagement}
+              participantName={form.fullName}
             />
             <div ref={bottomRef} />
           </main>

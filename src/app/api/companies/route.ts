@@ -132,8 +132,8 @@ export async function POST(request: Request) {
         aiContext: body.aiContext?.trim() || null,
         interviewDurationMinutes:
           typeof body.interviewDurationMinutes === "number" && body.interviewDurationMinutes > 0
-            ? Math.min(180, Math.round(body.interviewDurationMinutes))
-            : 45,
+            ? Math.min(60, Math.max(5, Math.round(body.interviewDurationMinutes)))
+            : 5,
         contactName: body.contactName?.trim() || null,
         contactEmail: body.contactEmail?.trim() || null,
         contactPhone: body.contactPhone?.trim() || null,

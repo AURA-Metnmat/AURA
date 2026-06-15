@@ -114,8 +114,8 @@ export async function PATCH(
       ...(body.aiContext !== undefined && { aiContext: body.aiContext }),
       ...(body.interviewDurationMinutes !== undefined && {
         interviewDurationMinutes: Math.min(
-          180,
-          Math.max(15, Math.round(body.interviewDurationMinutes))
+          60,
+          Math.max(5, Math.round(body.interviewDurationMinutes))
         ),
       }),
       ...(body.contactName !== undefined && { contactName: body.contactName }),

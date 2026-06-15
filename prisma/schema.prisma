@@ -20,7 +20,7 @@ model Company {
   industry     String?
   description  String?
   aiContext    String?
-  interviewDurationMinutes Int @default(45)
+  interviewDurationMinutes Int @default(5)
   contactName  String?
   contactEmail String?
   contactPhone String?
