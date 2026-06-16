@@ -12,9 +12,16 @@ interface AudioPlayButtonProps {
   language: Language;
   className?: string;
   label?: string;
+  autoPlay?: boolean;
 }
 
-export function AudioPlayButton({ text, language, className, label = "Audio" }: AudioPlayButtonProps) {
+export function AudioPlayButton({
+  text,
+  language,
+  className,
+  label = "Audio",
+  autoPlay = false,
+}: AudioPlayButtonProps) {
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,6 +143,21 @@ export function AudioPlayButton({ text, language, className, label = "Audio" }: 
       setLoading(false);
     }
   }, [loading, playing, startBrowserPlayback, startOpenAiPlayback, stop, text]);
+
+  const autoPlayedRef = useRef(false);
+
+  useEffect(() => {
+    autoPlayedRef.current = false;
+  }, [text, language]);
+
+  useEffect(() => {
+    if (!autoPlay || !text.trim() || autoPlayedRef.current) return;
+    autoPlayedRef.current = true;
+    const timer = window.setTimeout(() => {
+      void togglePlayback();
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [autoPlay, text, language, togglePlayback]);
 
   return (
     <div className="flex flex-col items-end gap-0.5">

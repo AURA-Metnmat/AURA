@@ -1,8 +1,10 @@
 import type { Language } from "./i18n";
+import { getTenureMcqInteraction, type McqInteraction } from "./interaction";
 
 export interface OpeningBilingual {
   en: string;
   locale: string;
+  interaction?: McqInteraction;
 }
 
 const OPENING_Q1: Record<Language, (name: string) => string> = {
@@ -28,16 +30,16 @@ const OPENING_Q1_WITH_ROLE: Record<Language, (name: string, designation: string)
 };
 
 export const OPENING_Q2_EN =
-  "How long have you been working with this organization, and how has your role evolved during that time?";
+  "How long have you been associated with this organization? Please pick the option that best matches your tenure.";
 
 const OPENING_Q2: Record<Language, (companyName: string) => string> = {
   en: () => OPENING_Q2_EN,
   hi: () =>
-    "आप इस संगठन में कितने समय से काम कर रहे हैं, और इस दौरान आपकी भूमिका कैसे विकसित हुई है?",
+    "आप इस संगठन से कितने समय से जुड़े हैं? कृपया वह विकल्प चुनें जो आपके कार्यकाल से सबसे अच्छा मेल खाता हो।",
   or: () =>
-    "ଆପଣ ଏହି organization ରେ କେତେ ଦିନ ଧରି କାମ କରୁଛନ୍ତି, ଏବଂ ସେହି ସମୟରେ ଆପଣଙ୍କ role କିପରି ବିକଶିତ ହୋଇଛି?",
+    "ଆପଣ ଏହି organization ସହିତ କେତେ ଦିନ ଧରି ଯୁକ୍ତ? ଦୟାକରି ଆପଣଙ୍କ tenure ସହିତ ସବୁଠାରୁ ଭଲ ମେଳ ଖାଉଥିବା option ବାଛନ୍ତୁ।",
   bn: () =>
-    "আপনি এই প্রতিষ্ঠানে কতদিন ধরে কাজ করছেন, এবং সেই সময়ে আপনার ভূমিকা কীভাবে বিকশিত হয়েছে?",
+    "আপনি এই প্রতিষ্ঠানের সঙ্গে কতদিন যুক্ত? অনুগ্রহ করে আপনার কর্মকালের সাথে সবচেয়ে ভালো মিলে এমন বিকল্পটি বেছে নিন।",
 };
 
 export const OPENING_Q1_EN_PREFIX =
@@ -63,5 +65,9 @@ export function getOpeningQuestion1(
 export function getOpeningQuestion2(lang: Language, _companyName: string): OpeningBilingual {
   const en = OPENING_Q2.en(_companyName);
   const locale = OPENING_Q2[lang](_companyName);
-  return { en, locale: lang === "en" ? en : locale };
+  return {
+    en,
+    locale: lang === "en" ? en : locale,
+    interaction: getTenureMcqInteraction(lang),
+  };
 }

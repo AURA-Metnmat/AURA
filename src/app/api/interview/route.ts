@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
 import { getOpeningQuestion1, getOpeningQuestion2 } from "@/lib/aura/opening-questions";
+import { serializeInteraction } from "@/lib/aura/interaction";
 import { resolveMessageLocale } from "@/lib/aura/message-locale";
 import { loadFullCompanyContext } from "@/lib/companies/company-knowledge";
 import { requireEmployeeSession } from "@/lib/auth/employee";
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
           messages: existing.messages,
           message: existing.messages.at(-1)?.contentEn ?? "",
           messageLocale: existing.messages.at(-1)?.contentLocale ?? "",
+          interaction: existing.messages.at(-1)?.interaction ?? null,
           currentSection: existing.currentSection,
           completionPct: existing.completionPct,
           introStep: existing.introStep,
@@ -339,12 +341,16 @@ export async function POST(request: Request) {
 
     if (introStep === 1) {
       const opening2 = getOpeningQuestion2(lang, session.company.name);
+      const metadata = opening2.interaction
+        ? serializeInteraction(opening2.interaction)
+        : null;
       await db.message.create({
         data: {
           sessionId: session.id,
           role: "assistant",
           content: opening2.en,
           contentLocale: opening2.locale,
+          metadata,
           section: "A",
         },
       });
@@ -356,6 +362,7 @@ export async function POST(request: Request) {
         sessionId: session.id,
         message: opening2.en,
         messageLocale: opening2.locale,
+        interaction: opening2.interaction ?? null,
         userMessageEn: userBilingual.en,
         userMessageLocale: userBilingual.locale,
         currentSection: "A",
@@ -396,6 +403,7 @@ export async function POST(request: Request) {
         role: "assistant",
         content: response.content,
         contentLocale: response.contentLocale,
+        metadata: response.metadata ?? null,
         section: response.nextSection,
       },
     });
@@ -413,6 +421,7 @@ export async function POST(request: Request) {
       sessionId: session.id,
       message: response.content,
       messageLocale: response.contentLocale,
+      interaction: response.interaction ?? null,
       userMessageEn: userBilingual.en,
       userMessageLocale: userBilingual.locale,
       currentSection: response.nextSection,

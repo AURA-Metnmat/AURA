@@ -1,19 +1,22 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Bot, User, Sparkles } from "lucide-react";
 import { AudioPlayButton } from "@/components/interview/AudioPlayButton";
+import { McqOptions } from "@/components/interview/McqOptions";
 import type { Language } from "@/lib/aura/i18n";
 import { PREFERRED_LANGUAGES } from "@/lib/aura/i18n";
 import { localeDisplayName } from "@/lib/aura/bilingual";
 import { resolveMessageLocale } from "@/lib/aura/message-locale";
 import type { EngagementStrings } from "@/lib/aura/engagement";
+import type { MessageInteraction } from "@/lib/aura/interaction";
 import { cn } from "@/lib/utils";
 
 export interface BilingualMessage {
   role: "user" | "assistant";
   contentEn: string;
   contentLocale: string;
+  interaction?: MessageInteraction | null;
   attachments?: ReactNode;
 }
 
@@ -25,6 +28,9 @@ interface BilingualChatProps {
   thinkingLocale?: string;
   engagement?: EngagementStrings;
   participantName?: string;
+  loading?: boolean;
+  autoPlayLatest?: boolean;
+  onMcqSelect?: (answerEn: string, answerLocale: string) => void;
 }
 
 function MessageColumn({
@@ -33,12 +39,16 @@ function MessageColumn({
   text,
   isUser,
   attachments,
+  listenLabel,
+  autoPlay,
 }: {
   label: string;
   lang: Language;
   text: string;
   isUser: boolean;
   attachments?: ReactNode;
+  listenLabel: string;
+  autoPlay?: boolean;
 }) {
   return (
     <div
@@ -58,7 +68,12 @@ function MessageColumn({
         >
           {label}
         </span>
-        <AudioPlayButton text={text} language={lang} label="Listen" />
+        <AudioPlayButton
+          text={text}
+          language={lang}
+          label={listenLabel}
+          autoPlay={autoPlay}
+        />
       </div>
       <p className="whitespace-pre-wrap">{text}</p>
       {attachments}
@@ -80,6 +95,12 @@ function TypingDots() {
   );
 }
 
+function isMessageAnswered(messages: BilingualMessage[], index: number): boolean {
+  if (messages[index]?.role !== "assistant") return false;
+  const next = messages[index + 1];
+  return next?.role === "user";
+}
+
 export function BilingualChat({
   messages,
   preferredLanguage,
@@ -88,10 +109,18 @@ export function BilingualChat({
   thinkingLocale = "...",
   engagement,
   participantName,
+  loading,
+  autoPlayLatest = true,
+  onMcqSelect,
 }: BilingualChatProps) {
   const prefMeta = PREFERRED_LANGUAGES.find((l) => l.id === preferredLanguage);
   const prefLabel = prefMeta?.native ?? localeDisplayName(preferredLanguage);
   const englishOnly = preferredLanguage === "en";
+  const listenLabel = engagement?.listenLabel ?? "Listen";
+  const lastAssistantIdx = messages.reduce(
+    (acc, msg, i) => (msg.role === "assistant" ? i : acc),
+    -1
+  );
 
   return (
     <div className="space-y-8">
@@ -103,9 +132,8 @@ export function BilingualChat({
           <div>
             <p className="text-sm font-medium text-amber-200">Let&apos;s make this easy</p>
             <p className="text-xs text-slate-400">
-              {englishOnly
-                ? "Answer naturally — type, speak, or upload files. AURA will ask friendly follow-ups in English."
-                : "Answer naturally — type, speak, or upload files. AURA will ask friendly follow-ups."}
+              {engagement?.welcomeChatHint ??
+                "Tap options, speak, or type — AURA guides you with clear, friendly questions."}
             </p>
           </div>
         </div>
@@ -118,70 +146,101 @@ export function BilingualChat({
           preferredLanguage,
           participantName
         );
+        const answered = isMessageAnswered(messages, i);
+        const isLatestAssistant = i === lastAssistantIdx && !thinking;
+        const shouldAutoPlay =
+          autoPlayLatest && isLatestAssistant && msg.role === "assistant" && !answered;
+
+        const mcqBlock =
+          msg.role === "assistant" &&
+          msg.interaction?.type === "mcq" &&
+          onMcqSelect ? (
+            <McqOptions
+              interaction={msg.interaction}
+              preferredLanguage={preferredLanguage}
+              disabled={loading || thinking}
+              answered={answered}
+              selectHint={engagement?.mcqSelectHint}
+              orTypeHint={engagement?.mcqOrTypeHint}
+              onSelect={onMcqSelect}
+            />
+          ) : null;
 
         return (
-        <div key={i} className="space-y-3">
-          <div
-            className={cn(
-              "flex items-center gap-2 px-1",
-              msg.role === "user" && "flex-row-reverse"
-            )}
-          >
+          <div key={i} className="space-y-3">
             <div
               className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                msg.role === "assistant"
-                  ? "bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-500/30"
-                  : "bg-slate-800 border border-white/10"
+                "flex items-center gap-2 px-1",
+                msg.role === "user" && "flex-row-reverse"
               )}
             >
-              {msg.role === "assistant" ? (
-                <Bot className="w-4 h-4 text-amber-400" />
-              ) : (
-                <User className="w-4 h-4 text-slate-300" />
-              )}
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                  msg.role === "assistant"
+                    ? "bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-500/30"
+                    : "bg-slate-800 border border-white/10"
+                )}
+              >
+                {msg.role === "assistant" ? (
+                  <Bot className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <User className="w-4 h-4 text-slate-300" />
+                )}
+              </div>
+              <span className="text-xs font-medium text-slate-500">
+                {msg.role === "assistant" ? "AURA" : engagement?.youLabel ?? "You"}
+              </span>
             </div>
-            <span className="text-xs font-medium text-slate-500">
-              {msg.role === "assistant" ? "AURA" : engagement?.youLabel ?? "You"}
-            </span>
-          </div>
 
-          {englishOnly ? (
-            <MessageColumn
-              label="English"
-              lang="en"
-              text={msg.contentEn}
-              isUser={msg.role === "user"}
-              attachments={msg.role === "user" ? msg.attachments : undefined}
-            />
-          ) : (
-            <div
-              className={cn(
-                "grid grid-cols-1 md:grid-cols-2 gap-3",
-                msg.role === "user" && "md:[direction:rtl]"
-              )}
-            >
-              <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
+            {englishOnly ? (
+              <div>
                 <MessageColumn
                   label="English"
                   lang="en"
                   text={msg.contentEn}
                   isUser={msg.role === "user"}
                   attachments={msg.role === "user" ? msg.attachments : undefined}
+                  listenLabel={listenLabel}
+                  autoPlay={shouldAutoPlay}
                 />
+                {mcqBlock}
               </div>
-              <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
-                <MessageColumn
-                  label={prefLabel}
-                  lang={preferredLanguage}
-                  text={localeText}
-                  isUser={msg.role === "user"}
-                  attachments={undefined}
-                />
+            ) : (
+              <div className="space-y-3">
+                <div
+                  className={cn(
+                    "grid grid-cols-1 md:grid-cols-2 gap-3",
+                    msg.role === "user" && "md:[direction:rtl]"
+                  )}
+                >
+                  <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
+                    <MessageColumn
+                      label="English"
+                      lang="en"
+                      text={msg.contentEn}
+                      isUser={msg.role === "user"}
+                      attachments={msg.role === "user" ? msg.attachments : undefined}
+                      listenLabel={listenLabel}
+                      autoPlay={false}
+                    />
+                  </div>
+                  <div className={msg.role === "user" ? "md:[direction:ltr]" : undefined}>
+                    <MessageColumn
+                      label={prefLabel}
+                      lang={preferredLanguage}
+                      text={localeText}
+                      isUser={msg.role === "user"}
+                      attachments={undefined}
+                      listenLabel={listenLabel}
+                      autoPlay={shouldAutoPlay}
+                    />
+                  </div>
+                </div>
+                {mcqBlock}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         );
       })}
 

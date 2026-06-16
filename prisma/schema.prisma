@@ -135,6 +135,7 @@ model Message {
   role          String
   content       String
   contentLocale String?
+  metadata      String?
   section       String?
   createdAt     DateTime            @default(now())
   session       InterviewSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)

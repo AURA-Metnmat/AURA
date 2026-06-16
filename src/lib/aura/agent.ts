@@ -14,10 +14,16 @@ import {
 } from "./i18n";
 import {
   bilingualInstruction,
+  englishInstruction,
   isPreferredLanguage,
   parseBilingualJson,
   type BilingualText,
 } from "./bilingual";
+import {
+  parseAssistantPayload,
+  serializeInteraction,
+  type MessageInteraction,
+} from "./interaction";
 
 export interface SessionContext {
   sessionId: string;
@@ -42,6 +48,8 @@ export interface AuraResponse {
   nextQuestionIndex: number;
   completionPct: number;
   shouldComplete: boolean;
+  interaction?: MessageInteraction | null;
+  metadata?: string | null;
 }
 
 function getQuestions(lang: Language, section: SectionId): string[] {
@@ -230,7 +238,7 @@ IMPORTANT: Ask questions specific to a ${designation} at ${ctx.company.name}. Fo
 
   const sectionPrompt = isPreferredLanguage(lang)
     ? `${bilingualInstruction(lang)}
-${ctx.postIntro ? "POST-INTRO: The employee finished the standard introduction (professional journey + tenure/role). Use admin company knowledge AND their intro answers to ask the first deep-dive question. Keep it objective and easy to answer in writing.\n" : ""}
+${ctx.postIntro ? "POST-INTRO: The employee finished introduction (journey + tenure). Use company knowledge AND their answers. First deep-dive question MUST use MCQ when asking about frequency, volume, team size, tools, or severity.\n" : ""}
 ${roleFocus}
 Current section: ${sectionInfo?.name} (${ctx.currentSection})
 Client company: ${ctx.company.name}
@@ -238,7 +246,13 @@ Suggested focus questions (locale): ${questions.join(" | ")}
 English reference questions: ${enQuestions.join(" | ")}
 Question progress in section: ${ctx.questionIndex + 1}/${questions.length}
 Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${designation}`
-    : `${ctx.postIntro ? "POST-INTRO: The employee finished the standard introduction. Use admin company knowledge AND their intro answers for the first deep-dive question. Keep it objective and simple.\n" : ""}Respond in English with ONE acknowledgment and ONE follow-up question only. Use 2-4 short, clear sentences that sound natural when read aloud.`;
+    : `${englishInstruction()}
+${ctx.postIntro ? "POST-INTRO: Employee finished introduction. First deep-dive MUST use MCQ when appropriate (frequency, scale, tools, severity).\n" : ""}${roleFocus}
+Current section: ${sectionInfo?.name} (${ctx.currentSection})
+Client company: ${ctx.company.name}
+Suggested questions: ${enQuestions.join(" | ")}
+Question progress: ${ctx.questionIndex + 1}/${questions.length}
+Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${designation}`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
@@ -254,19 +268,29 @@ Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${desig
     model: "gpt-4o-mini",
     messages,
     temperature: 0.55,
-    max_tokens: 550,
-    ...(isPreferredLanguage(lang) ? { response_format: { type: "json_object" } } : {}),
+    max_tokens: 700,
+    response_format: { type: "json_object" },
   });
 
   const raw =
     completion.choices[0]?.message?.content ??
     buildFallbackBilingual(ctx, userMessage).content;
 
+  const fallback = buildFallbackBilingual(ctx, userMessage);
   let bilingual: BilingualText;
+  let interaction: MessageInteraction | null = null;
+
   if (isPreferredLanguage(lang)) {
-    bilingual = parseBilingualJson(raw, buildFallbackBilingual(ctx, userMessage).contentLocale);
+    const parsed = parseAssistantPayload(raw, fallback.contentLocale);
+    bilingual = { en: parsed.en, locale: parsed.locale };
+    interaction = parsed.interaction;
+    if (!parsed.en) {
+      bilingual = parseBilingualJson(raw, fallback.contentLocale);
+    }
   } else {
-    bilingual = { en: raw, locale: raw };
+    const parsed = parseAssistantPayload(raw, raw);
+    bilingual = { en: parsed.en || raw, locale: parsed.locale || parsed.en || raw };
+    interaction = parsed.interaction;
   }
 
   const advanced = advanceSection(lang, ctx.currentSection, ctx.questionIndex);
@@ -286,6 +310,8 @@ Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${desig
     nextQuestionIndex: advanced.questionIndex,
     completionPct: calculateCompletion(advanced.section, advanced.questionIndex),
     shouldComplete,
+    interaction,
+    metadata: interaction ? serializeInteraction(interaction) : null,
   };
 }
 

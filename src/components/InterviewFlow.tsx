@@ -11,6 +11,7 @@ import { LanguageBar } from "@/components/interview/LanguageBar";
 import { BilingualChat, type BilingualMessage } from "@/components/interview/BilingualChat";
 import { InterviewChatComposer } from "@/components/interview/InterviewChatComposer";
 import { EmployeeAuthPanel } from "@/components/interview/EmployeeAuthPanel";
+import type { MessageInteraction } from "@/lib/aura/interaction";
 
 interface Attachment {
   id: string;
@@ -24,6 +25,7 @@ interface Message {
   role: "user" | "assistant";
   contentEn: string;
   contentLocale: string;
+  interaction?: MessageInteraction | null;
   attachments?: Attachment[];
 }
 
@@ -278,6 +280,7 @@ export default function InterviewFlow({
             role: m.role,
             contentEn: m.contentEn,
             contentLocale: m.contentLocale,
+            interaction: m.interaction ?? null,
           }))
         );
         setLanguage(data.language ?? language);
@@ -343,13 +346,8 @@ export default function InterviewFlow({
     }
   }
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
-    if ((!input.trim() && pendingFiles.length === 0) || loading || !sessionId) return;
-    const userMsg = input.trim() || `📎 ${pendingFiles.map((f) => f.fileName).join(", ")}`;
-    const msgAttachments = [...pendingFiles];
-    setInput("");
-    setPendingFiles([]);
+  async function submitUserAnswer(userMsg: string, msgAttachments: Attachment[] = []) {
+    if (!sessionId) return;
     setMessages((prev) => [
       ...prev,
       {
@@ -391,6 +389,7 @@ export default function InterviewFlow({
             role: "assistant",
             contentEn: data.message,
             contentLocale: data.messageLocale ?? data.message,
+            interaction: data.interaction ?? null,
           },
         ];
       });
@@ -399,9 +398,27 @@ export default function InterviewFlow({
       if (data.shouldComplete) await completeInterview();
     } catch (e) {
       setChatError(e instanceof Error ? e.message : "Failed to send message. Please try again.");
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setLoading(false);
     }
+  }
+
+  async function sendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if ((!input.trim() && pendingFiles.length === 0) || loading || !sessionId) return;
+    const userMsg = input.trim() || `📎 ${pendingFiles.map((f) => f.fileName).join(", ")}`;
+    const msgAttachments = [...pendingFiles];
+    setInput("");
+    setPendingFiles([]);
+    await submitUserAnswer(userMsg, msgAttachments);
+  }
+
+  async function handleMcqSelect(answerEn: string, answerLocale: string) {
+    if (loading || !sessionId) return;
+    const display =
+      language === "en" ? answerEn : answerLocale || answerEn;
+    await submitUserAnswer(display);
   }
 
   async function completeInterview() {
@@ -584,6 +601,7 @@ export default function InterviewFlow({
                   role: msg.role,
                   contentEn: msg.contentEn,
                   contentLocale: msg.contentLocale,
+                  interaction: msg.interaction,
                   attachments: msg.attachments?.map(renderAttachment),
                 })
               )}
@@ -593,6 +611,8 @@ export default function InterviewFlow({
               thinkingLocale={t.thinking}
               engagement={engagement}
               participantName={form.fullName}
+              loading={loading}
+              onMcqSelect={(en, locale) => void handleMcqSelect(en, locale)}
             />
             <div ref={bottomRef} />
           </main>

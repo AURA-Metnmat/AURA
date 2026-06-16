@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import type { Language } from "@/lib/aura/i18n";
+import { parseInteraction, type MessageInteraction } from "@/lib/aura/interaction";
 
 export interface ResumedSessionPayload {
   sessionId: string;
@@ -12,6 +13,7 @@ export interface ResumedSessionPayload {
     role: "user" | "assistant";
     contentEn: string;
     contentLocale: string;
+    interaction?: MessageInteraction | null;
   }[];
   participant: {
     fullName: string;
@@ -61,6 +63,7 @@ export async function findActiveSessionForEmployee(
       role: m.role as "user" | "assistant",
       contentEn: m.content,
       contentLocale: m.contentLocale ?? m.content,
+      interaction: parseInteraction(m.metadata),
     })),
     participant: {
       fullName: p?.fullName ?? employee.employeeName,

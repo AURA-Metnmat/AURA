@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import {
-  UserPlus,
-  LogIn,
   Loader2,
   ArrowLeft,
   Phone,
@@ -13,7 +11,12 @@ import {
   Building2,
   Sparkles,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  AuthSwitch,
+  AuthInputField,
+  AuthFieldHint,
+  AuthError,
+} from "@/components/ui/auth-switch";
 import type { Language } from "@/lib/aura/i18n";
 
 type AuthMode = "register" | "login";
@@ -66,6 +69,11 @@ export function EmployeeAuthPanel({
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [loginMobile, setLoginMobile] = useState("");
+
+  function switchMode(next: AuthMode) {
+    setMode(next);
+    setError(null);
+  }
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -136,9 +144,96 @@ export function EmployeeAuthPanel({
     }
   }
 
+  const iconSize = 18;
+
+  const signInForm = (
+    <form onSubmit={handleLogin} className="w-full flex flex-col items-center">
+      <p className="auth-subtitle">Enter your mobile number to continue where you left off.</p>
+      <AuthInputField
+        icon={<Phone size={iconSize} />}
+        type="tel"
+        name="loginMobile"
+        value={loginMobile}
+        onChange={setLoginMobile}
+        placeholder="Mobile number"
+        required
+        autoComplete="tel"
+      />
+      {error && mode === "login" && <AuthError message={error} />}
+      <button type="submit" disabled={loading} className="auth-btn">
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+        Continue interview
+      </button>
+    </form>
+  );
+
+  const signUpForm = (
+    <form onSubmit={handleRegister} className="w-full flex flex-col items-center">
+      <p className="auth-subtitle">
+        Fill in your details once — then start talking with AURA at {companyName}.
+      </p>
+      <AuthInputField
+        icon={<User size={iconSize} />}
+        name="fullName"
+        value={fullName}
+        onChange={setFullName}
+        placeholder="Employee name"
+        required
+        autoComplete="name"
+      />
+      <AuthInputField
+        icon={<Briefcase size={iconSize} />}
+        name="designation"
+        value={designation}
+        onChange={setDesignation}
+        placeholder="Designation"
+        required
+        autoComplete="organization-title"
+      />
+      <AuthInputField
+        icon={<Building2 size={iconSize} />}
+        name="department"
+        value={department}
+        onChange={setDepartment}
+        placeholder="Department"
+        required
+        autoComplete="organization"
+      />
+      <AuthInputField
+        icon={<Phone size={iconSize} />}
+        type="tel"
+        name="mobile"
+        value={mobile}
+        onChange={setMobile}
+        placeholder="Mobile number"
+        required
+        autoComplete="tel"
+      />
+      <AuthFieldHint>Use this same number to sign in later.</AuthFieldHint>
+      <AuthInputField
+        icon={<Mail size={iconSize} />}
+        type="email"
+        name="email"
+        value={email}
+        onChange={setEmail}
+        placeholder="Email (optional)"
+        autoComplete="email"
+      />
+      {error && mode === "register" && <AuthError message={error} />}
+      <button type="submit" disabled={loading} className="auth-btn">
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Sparkles className="w-4 h-4" />
+        )}
+        Register & start interview
+      </button>
+    </form>
+  );
+
   return (
-    <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-8 overflow-y-auto">
-      <div className="w-full max-w-md space-y-6 my-auto">
+    <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-10 overflow-y-auto">
+      <div className="w-full max-w-[920px] space-y-5 my-auto">
         <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
           <span className="text-emerald-400">● Language</span>
           <span>—</span>
@@ -147,164 +242,30 @@ export function EmployeeAuthPanel({
           <span className="text-slate-600">○ Interview</span>
         </div>
 
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-1 px-2">
           <p className="text-xs uppercase tracking-widest text-amber-400/90">{companyName}</p>
-          <h2 className="text-2xl font-semibold text-slate-100">
-            {mode === "register" ? "Create your profile" : "Welcome back"}
-          </h2>
-          <p className="text-sm text-slate-400">
-            {mode === "register"
-              ? "Fill in your details once — then start talking with AURA."
-              : "Enter your mobile number to continue where you left off."}
+          <p className="text-sm text-slate-400 hidden sm:block">
+            AURA-METNMAT secure employee access
           </p>
         </div>
 
-        <div className="flex rounded-xl border border-white/10 bg-slate-900/60 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("register");
-              setError(null);
-            }}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              mode === "register"
-                ? "bg-amber-500/20 text-amber-200 border border-amber-500/30"
-                : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            <UserPlus className="w-4 h-4" />
-            Register
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("login");
-              setError(null);
-            }}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              mode === "login"
-                ? "bg-amber-500/20 text-amber-200 border border-amber-500/30"
-                : "text-slate-400 hover:text-slate-200"
-            )}
-          >
-            <LogIn className="w-4 h-4" />
-            Sign in
-          </button>
-        </div>
-
-        <div className="rounded-2xl border border-white/10 bg-slate-900/70 backdrop-blur-sm p-6 shadow-xl">
-          {mode === "register" ? (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" /> Employee Name *
-                </span>
-                <input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="Rahul Sharma"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5" /> Designation *
-                </span>
-                <input
-                  value={designation}
-                  onChange={(e) => setDesignation(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="Production Manager"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5" /> Department *
-                </span>
-                <input
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="Operations"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5" /> Mobile Number *
-                </span>
-                <input
-                  type="tel"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="9876543210"
-                />
-                <p className="text-[11px] text-slate-500">Use this same number to sign in later.</p>
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5" /> Email (optional)
-                </span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="rahul@company.com"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Register & start interview
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5" /> Mobile Number *
-                </span>
-                <input
-                  type="tel"
-                  value={loginMobile}
-                  onChange={(e) => setLoginMobile(e.target.value)}
-                  required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="9876543210"
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Continue interview
-              </button>
-            </form>
-          )}
-
-          {error && (
-            <p className="mt-4 text-sm text-red-300 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3">
-              {error}
-            </p>
-          )}
-        </div>
+        <AuthSwitch
+          isSignUp={mode === "register"}
+          onModeChange={(signUp) => switchMode(signUp ? "register" : "login")}
+          signInTitle="Welcome back"
+          signUpTitle="Create your profile"
+          signUpPanelHeading="New here?"
+          signUpPanelText={`Join ${companyName} on AURA — register once and start your AI interview in seconds.`}
+          signInPanelHeading="One of us?"
+          signInPanelText="Welcome back! Sign in with your mobile number to resume your interview."
+          signInForm={signInForm}
+          signUpForm={signUpForm}
+        />
 
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 mx-auto"
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 mx-auto pt-1"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to language

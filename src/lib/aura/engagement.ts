@@ -17,6 +17,10 @@ export interface EngagementStrings {
   auraTyping: string;
   youLabel: string;
   dropFilesHint: string;
+  mcqSelectHint: string;
+  mcqOrTypeHint: string;
+  listenLabel: string;
+  welcomeChatHint: string;
 }
 
 export const ENGAGEMENT: Record<Language, EngagementStrings> = {
@@ -37,6 +41,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     auraTyping: "AURA is preparing the next question…",
     youLabel: "You",
     dropFilesHint: "Attach Excel, PDF, images, or photos of forms & screens",
+    mcqSelectHint: "Tap an option to answer",
+    mcqOrTypeHint: "Or type your own answer below",
+    listenLabel: "Listen",
+    welcomeChatHint: "Tap options, speak, or type — AURA guides you with clear, friendly questions.",
   },
   hi: {
     detailsDesc: "बातचीत शुरू करने के लिए कुछ बुनियादी जानकारी। एक मिनट से कम समय लगेगा।",
@@ -55,6 +63,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     auraTyping: "AURA अगला प्रश्न तैयार कर रहा है…",
     youLabel: "आप",
     dropFilesHint: "Excel, PDF, छवि या फॉर्म की फोटो संलग्न करें",
+    mcqSelectHint: "उत्तर देने के लिए विकल्प चुनें",
+    mcqOrTypeHint: "या नीचे अपना उत्तर टाइप करें",
+    listenLabel: "सुनें",
+    welcomeChatHint: "विकल्प चुनें, बोलें या टाइप करें — AURA स्पष्ट, मित्रवत प्रश्न पूछता है।",
   },
   or: {
     detailsDesc: "କଥୋପକଥନ ଆରମ୍ଭ କରିବା ପାଇଁ କିଛି ମୂଳ ତଥ୍ୟ। ଏକ ମିନିଟରୁ କମ ସମୟ।",
@@ -73,6 +85,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     auraTyping: "AURA ପରବର୍ତ୍ତୀ ପ୍ରଶ୍ନ ପ୍ରସ୍ତୁତ କରୁଛି…",
     youLabel: "ଆପଣ",
     dropFilesHint: "Excel, PDF, ଛବି କିମ୍ବା ଫର୍ମ ଫଟୋ ସଂଲଗ୍ନ କରନ୍ତୁ",
+    mcqSelectHint: "ଉତ୍ତର ଦେବା ପାଇଁ ଏକ option ବାଛନ୍ତୁ",
+    mcqOrTypeHint: "କିମ୍ବା ନିମ୍ନରେ ନିଜ ଉତ୍ତର ଟାଇପ୍ କରନ୍ତୁ",
+    listenLabel: "ଶୁଣନ୍ତୁ",
+    welcomeChatHint: "option ବାଛନ୍ତୁ, କହନ୍ତୁ କିମ୍ବା ଟାଇପ୍ କରନ୍ତୁ — AURA ସ୍ପଷ୍ଟ ପ୍ରଶ୍ନ ପଚାରେ।",
   },
   bn: {
     detailsDesc: "কথোপকথন শুরু করতে কয়েকটি মৌলিক তথ্য। এক মিনিটেরও কম সময় লাগবে।",
@@ -91,6 +107,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     auraTyping: "AURA পরের প্রশ্ন প্রস্তুত করছে…",
     youLabel: "আপনি",
     dropFilesHint: "Excel, PDF, ছবি বা ফর্মের ফটো সংযুক্ত করুন",
+    mcqSelectHint: "উত্তর দিতে একটি বিকল্প বেছে নিন",
+    mcqOrTypeHint: "অথবা নিচে নিজের উত্তর লিখুন",
+    listenLabel: "শুনুন",
+    welcomeChatHint: "বিকল্প বেছে নিন, বলুন বা লিখুন — AURA স্পষ্ট, বন্ধুত্বপূর্ণ প্রশ্ন করে।",
   },
 };
 

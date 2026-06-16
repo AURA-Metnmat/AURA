@@ -37,15 +37,30 @@ export function parseBilingualJson(raw: string, fallbackLocale: string): Bilingu
 export function bilingualInstruction(lang: RegionalLanguage): string {
   const name = LOCALE_NAMES[lang];
   return `IMPORTANT: Respond ONLY with valid JSON (no markdown fences):
-{"en":"...","locale":"..."}
-- "en": professional English — warm acknowledgment + ONE follow-up question.
+{"en":"...","locale":"...","interaction":{...}}
+- "en": professional English — warm acknowledgment + ONE clear question (no options listed in prose when using MCQ).
 - "locale": same meaning in ${name}, written fully in native script (not romanized).
-- Keep each field to 2-4 short sentences that sound natural when read aloud (clear for voice/TTS).
-- Never ask multiple questions at once.
-- Sound like a friendly senior colleague, not a form. Acknowledge what they shared before the next question.
-- If they mention problems, confusion, or blockers, empathize first and offer to clarify or break the question into smaller parts.
-- Use familiar, conversational phrasing. Invite specifics: names, numbers, steps, tools, and real examples from daily work.
-- The employee may reply in ${name}; understand their intent.`;
+- "interaction": use for objective/multiple-choice questions whenever possible:
+  {"type":"mcq","allowFreeText":true,"options":[{"id":"a","en":"Option in English","locale":"Option in ${name}"}, ...]}
+  Provide exactly 3-4 concise, mutually exclusive options. IDs: short letters a,b,c,d.
+  Use MCQ for: tenure, frequency, scale (team size), yes/no with nuance, severity, tool choice, process stage.
+  Use open text only when the answer truly cannot be structured (e.g. describe a workflow).
+- Keep en/locale to 2-3 short sentences. Sound like a friendly senior colleague.
+- Never ask multiple unrelated questions at once.
+- Acknowledge what they shared before the next question.
+- If they mention problems, empathize first and offer to clarify.
+- Invite specifics when follow-up is open-ended.`;
+}
+
+export function englishInstruction(): string {
+  return `IMPORTANT: Respond ONLY with valid JSON (no markdown fences):
+{"en":"...","interaction":{...}}
+- "en": warm acknowledgment + ONE clear question. Do not list MCQ options in the prose when interaction is present.
+- "interaction": use for objective questions:
+  {"type":"mcq","allowFreeText":true,"options":[{"id":"a","en":"Option text","locale":"Option text"}, ...]}
+  Provide exactly 3-4 concise options. Use MCQ for tenure, frequency, scale, severity, tool/process choices.
+- Keep to 2-3 short sentences natural for voice/TTS.
+- One question at a time. Friendly senior colleague tone.`;
 }
 
 /** True when AI should return bilingual JSON (EN + regional locale) */
