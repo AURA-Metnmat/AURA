@@ -3,40 +3,41 @@ import { db } from "@/lib/db";
 import {
   createEmployeeSessionToken,
   employeeSessionCookieOptions,
-  verifyPassword,
 } from "@/lib/auth/employee";
 import { logEmployeeAuth } from "@/lib/employees/auth-log";
-import { sanitizeTextInput } from "@/lib/employees/validation";
-
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCK_DURATION_MS = 15 * 60 * 1000;
+import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
+import {
+  isValidMobileNumber,
+  normalizeMobileNumber,
+} from "@/lib/employees/validation";
 
 interface LoginBody {
-  username?: string;
-  password?: string;
+  mobile_number?: string;
   company_id?: string;
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as LoginBody;
-    const username = sanitizeTextInput(body.username ?? "", 120);
-    const password = body.password ?? "";
+    const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
     const companyId = body.company_id?.trim();
 
-    if (!username || !password) {
-      return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
+    if (!isValidMobileNumber(mobileNumber)) {
+      return NextResponse.json({ error: "Enter your registered 10-digit mobile number." }, { status: 400 });
     }
     if (!companyId) {
       return NextResponse.json({ error: "Company context is required." }, { status: 400 });
     }
 
     const employee = await db.employee.findFirst({
-      where: { companyId, username },
+      where: { companyId, mobileNumber },
     });
 
     if (!employee) {
-      return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Mobile number not found. Please register first." },
+        { status: 404 }
+      );
     }
 
     if (employee.accountStatus === "disabled") {
@@ -51,50 +52,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const valid = await verifyPassword(password, employee.passwordHash);
-    if (!valid) {
-      const attempts = employee.failedLoginAttempts + 1;
-      const shouldLock = attempts >= MAX_FAILED_ATTEMPTS;
-      await db.employee.update({
-        where: { id: employee.id },
-        data: {
-          failedLoginAttempts: attempts,
-          lockedUntil: shouldLock ? new Date(Date.now() + LOCK_DURATION_MS) : null,
-          accountStatus: shouldLock ? "locked" : employee.accountStatus,
-        },
-      });
-      await logEmployeeAuth(employee.id, shouldLock ? "account_locked" : "login_failed", request, {
-        attempts,
-      });
-      return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
-    }
-
     await db.employee.update({
       where: { id: employee.id },
       data: {
         failedLoginAttempts: 0,
         lockedUntil: null,
         accountStatus: employee.accountStatus === "locked" ? "active" : employee.accountStatus,
+        isFirstLogin: false,
       },
     });
 
     await logEmployeeAuth(employee.id, "login_success", request);
 
+    const activeSession = await findActiveSessionForEmployee(employee.id, companyId);
+
     const token = createEmployeeSessionToken(employee.id, companyId);
     const response = NextResponse.json({
       success: true,
       employee_id: employee.employeeCode,
-      username: employee.username,
-      is_first_login: employee.isFirstLogin,
       employee_name: employee.employeeName,
       designation: employee.designation,
+      department: employee.department,
       mobile_number: employee.mobileNumber,
       email: employee.email,
+      active_session: activeSession,
     });
     response.cookies.set(employeeSessionCookieOptions(token));
     return response;
   } catch (error) {
     console.error("Employee login error:", error);
-    return NextResponse.json({ error: "Login failed. Please try again." }, { status: 500 });
+    return NextResponse.json({ error: "Sign in failed. Please try again." }, { status: 500 });
   }
 }

@@ -6,7 +6,7 @@ import {
   employeeSessionCookieOptions,
   hashPassword,
 } from "@/lib/auth/employee";
-import { generateEmployeeCode, generateNumericPassword, generateUniqueUsername } from "@/lib/employees/credentials";
+import { generateEmployeeCode, generateUniqueUsername } from "@/lib/employees/credentials";
 import { logEmployeeAuth } from "@/lib/employees/auth-log";
 import {
   isValidDesignation,
@@ -17,11 +17,11 @@ import {
   sanitizeEmployeeName,
   sanitizeTextInput,
 } from "@/lib/employees/validation";
-import { deliverEmployeeCredentials } from "@/lib/notifications/credentials-delivery";
 
 interface RegisterBody {
   employee_name?: string;
   designation?: string;
+  department?: string;
   mobile_number?: string;
   email?: string;
   company_id?: string;
@@ -32,6 +32,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as RegisterBody;
     const employeeName = sanitizeEmployeeName(body.employee_name ?? "");
     const designation = sanitizeDesignation(body.designation ?? "");
+    const department = sanitizeTextInput(body.department ?? "", 120);
     const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
     const email = body.email?.trim() ? sanitizeTextInput(body.email, 254) : null;
     const companyId = body.company_id?.trim();
@@ -44,6 +45,9 @@ export async function POST(request: Request) {
         { error: "Designation / job title is required (e.g. Production Manager)." },
         { status: 400 }
       );
+    }
+    if (!department || department.length < 2) {
+      return NextResponse.json({ error: "Department is required." }, { status: 400 });
     }
     if (!isValidMobileNumber(mobileNumber)) {
       return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
@@ -67,14 +71,13 @@ export async function POST(request: Request) {
     });
     if (existing) {
       return NextResponse.json(
-        { error: "This mobile number is already registered. Please log in instead." },
+        { error: "This mobile number is already registered. Use Sign in with your mobile number." },
         { status: 409 }
       );
     }
 
     const username = await generateUniqueUsername(companyId, employeeName);
-    const plainPassword = generateNumericPassword();
-    const passwordHash = await hashPassword(plainPassword);
+    const passwordHash = await hashPassword(mobileNumber);
     const employeeCode = await generateEmployeeCode(companyId);
 
     const employee = await db.employee.create({
@@ -83,45 +86,27 @@ export async function POST(request: Request) {
         companyId,
         employeeName,
         designation,
+        department,
         mobileNumber,
         email,
         username,
         passwordHash,
-        isFirstLogin: true,
+        isFirstLogin: false,
         accountStatus: "active",
       },
     });
 
     await logEmployeeAuth(employee.id, "register", request, { employeeCode, username, designation });
 
-    const delivery = await deliverEmployeeCredentials({
-      companyName: company.name,
-      username,
-      password: plainPassword,
-      mobileNumber,
-      email,
-    });
-
-    if (!delivery.smsSent) {
-      await db.employee.delete({ where: { id: employee.id } });
-      return NextResponse.json(
-        {
-          error:
-            "Could not send SMS credentials. Configure Twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER) or use development mode.",
-        },
-        { status: 503 }
-      );
-    }
-
     const token = createEmployeeSessionToken(employee.id, companyId);
     const response = NextResponse.json({
       success: true,
       employee_id: employee.employeeCode,
-      username,
-      designation,
-      message: "Credentials sent successfully.",
-      email_sent: delivery.emailSent,
-      dev_credentials_logged: delivery.devLogged,
+      employee_name: employee.employeeName,
+      designation: employee.designation,
+      department: employee.department,
+      mobile_number: employee.mobileNumber,
+      email: employee.email,
     });
     response.cookies.set(employeeSessionCookieOptions(token));
     return response;
@@ -131,7 +116,7 @@ export async function POST(request: Request) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === "P2002") {
         return NextResponse.json(
-          { error: "This mobile number is already registered. Please log in instead." },
+          { error: "This mobile number is already registered. Use Sign in with your mobile number." },
           { status: 409 }
         );
       }

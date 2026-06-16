@@ -1,55 +1,86 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, LogIn, Loader2, ArrowLeft, Phone, Mail, User, Briefcase } from "lucide-react";
+import {
+  UserPlus,
+  LogIn,
+  Loader2,
+  ArrowLeft,
+  Phone,
+  Mail,
+  User,
+  Briefcase,
+  Building2,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Language } from "@/lib/aura/i18n";
 
 type AuthMode = "register" | "login";
+
+export interface EmployeeProfileForm {
+  fullName: string;
+  designation: string;
+  department: string;
+  mobile: string;
+  email: string;
+}
+
+interface ActiveSessionPayload {
+  sessionId: string;
+  language: Language;
+  currentSection: string;
+  completionPct: number;
+  interviewDurationMinutes: number;
+  messages: {
+    role: "user" | "assistant";
+    contentEn: string;
+    contentLocale: string;
+  }[];
+  participant: EmployeeProfileForm;
+  startedAt: string;
+}
 
 interface EmployeeAuthPanelProps {
   companyName: string;
   companyId: string;
   onBack: () => void;
-  onSuccess: (payload: {
-    isFirstLogin: boolean;
-    employeeName: string;
-    username: string;
-    mobile: string;
-    email: string;
-    designation: string;
-  }) => void;
+  onRegistered: (form: EmployeeProfileForm) => void;
+  onLoggedIn: (payload: { form: EmployeeProfileForm; activeSession: ActiveSessionPayload | null }) => void;
 }
 
 export function EmployeeAuthPanel({
   companyName,
   companyId,
   onBack,
-  onSuccess,
+  onRegistered,
+  onLoggedIn,
 }: EmployeeAuthPanelProps) {
   const [mode, setMode] = useState<AuthMode>("register");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [employeeName, setEmployeeName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [designation, setDesignation] = useState("");
+  const [department, setDepartment] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
-
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [loginMobile, setLoginMobile] = useState("");
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
+      const normalizedMobile = mobile.replace(/\D/g, "").slice(-10);
       const res = await fetch("/api/employees/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          employee_name: employeeName,
-          designation: designation.trim(),
-          mobile_number: mobile,
+          employee_name: fullName,
+          designation,
+          department,
+          mobile_number: normalizedMobile,
           email: email || undefined,
           company_id: companyId,
         }),
@@ -57,13 +88,12 @@ export function EmployeeAuthPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Registration failed");
 
-      onSuccess({
-        isFirstLogin: true,
-        employeeName: employeeName.trim(),
-        username: data.username,
-        mobile: mobile.replace(/\D/g, "").slice(-10),
-        email: email.trim(),
+      onRegistered({
+        fullName: fullName.trim(),
         designation: designation.trim(),
+        department: department.trim(),
+        mobile: normalizedMobile,
+        email: email.trim(),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -77,36 +107,38 @@ export function EmployeeAuthPanel({
     setLoading(true);
     setError(null);
     try {
+      const normalizedMobile = loginMobile.replace(/\D/g, "").slice(-10);
       const res = await fetch("/api/employees/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username,
-          password,
+          mobile_number: normalizedMobile,
           company_id: companyId,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Login failed");
+      if (!res.ok) throw new Error(data.error ?? "Sign in failed");
 
-      onSuccess({
-        isFirstLogin: data.is_first_login,
-        employeeName: data.employee_name,
-        username: data.username,
-        mobile: data.mobile_number,
-        email: data.email ?? "",
-        designation: data.designation ?? "",
+      onLoggedIn({
+        form: {
+          fullName: data.employee_name ?? "",
+          designation: data.designation ?? "",
+          department: data.department ?? "",
+          mobile: data.mobile_number ?? normalizedMobile,
+          email: data.email ?? "",
+        },
+        activeSession: data.active_session ?? null,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : "Sign in failed");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-8">
-      <div className="w-full max-w-md space-y-6">
+    <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-8 overflow-y-auto">
+      <div className="w-full max-w-md space-y-6 my-auto">
         <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
           <span className="text-emerald-400">● Language</span>
           <span>—</span>
@@ -122,8 +154,8 @@ export function EmployeeAuthPanel({
           </h2>
           <p className="text-sm text-slate-400">
             {mode === "register"
-              ? "Register once — your credentials will be sent by SMS."
-              : "Log in to continue your interview where you left off."}
+              ? "Fill in your details once — then start talking with AURA."
+              : "Enter your mobile number to continue where you left off."}
           </p>
         </div>
 
@@ -158,7 +190,7 @@ export function EmployeeAuthPanel({
             )}
           >
             <LogIn className="w-4 h-4" />
-            Login
+            Sign in
           </button>
         </div>
 
@@ -170,8 +202,8 @@ export function EmployeeAuthPanel({
                   <User className="w-3.5 h-3.5" /> Employee Name *
                 </span>
                 <input
-                  value={employeeName}
-                  onChange={(e) => setEmployeeName(e.target.value)}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                   required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
                   placeholder="Rahul Sharma"
@@ -179,14 +211,26 @@ export function EmployeeAuthPanel({
               </label>
               <label className="block space-y-1.5">
                 <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5" /> Designation / Job Title *
+                  <Briefcase className="w-3.5 h-3.5" /> Designation *
                 </span>
                 <input
                   value={designation}
                   onChange={(e) => setDesignation(e.target.value)}
                   required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="Production Manager, QA Engineer, Shift In-charge"
+                  placeholder="Production Manager"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5" /> Department *
+                </span>
+                <input
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
+                  placeholder="Operations"
                 />
               </label>
               <label className="block space-y-1.5">
@@ -201,6 +245,7 @@ export function EmployeeAuthPanel({
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
                   placeholder="9876543210"
                 />
+                <p className="text-[11px] text-slate-500">Use this same number to sign in later.</p>
               </label>
               <label className="block space-y-1.5">
                 <span className="text-xs text-slate-400 flex items-center gap-1.5">
@@ -219,32 +264,23 @@ export function EmployeeAuthPanel({
                 disabled={loading}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Register & receive credentials
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Register & start interview
               </button>
             </form>
           ) : (
             <form onSubmit={handleLogin} className="space-y-4">
               <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400">Username</span>
+                <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <Phone className="w-3.5 h-3.5" /> Mobile Number *
+                </span>
                 <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="tel"
+                  value={loginMobile}
+                  onChange={(e) => setLoginMobile(e.target.value)}
                   required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="Username from SMS"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs text-slate-400">Password</span>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  inputMode="numeric"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="4-digit code from SMS"
+                  placeholder="9876543210"
                 />
               </label>
               <button
@@ -253,7 +289,7 @@ export function EmployeeAuthPanel({
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Log in & continue
+                Continue interview
               </button>
             </form>
           )}
