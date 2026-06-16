@@ -9,13 +9,21 @@ interface InterviewShellProps {
   children: ReactNode;
   className?: string;
   background?: "neural" | "dotted";
+  /** Accent for neural flow lines and ambient glow */
+  accentColor?: string;
 }
 
 export function InterviewShell({
   children,
   className,
   background = "neural",
+  accentColor = "#f59e0b",
 }: InterviewShellProps) {
+  const glowRgb =
+    accentColor === "#3b82f6" || accentColor === "#2563eb"
+      ? "37,99,235"
+      : "245,158,11";
+
   return (
     <div
       className={cn(
@@ -35,9 +43,23 @@ export function InterviewShell({
           />
         </>
       ) : (
-        <div className="absolute inset-0 pointer-events-none opacity-40">
-          <NeuralBackground color="#f59e0b" trailOpacity={0.08} particleCount={400} speed={0.6} />
-        </div>
+        <>
+          <div className="absolute inset-0 pointer-events-none opacity-40">
+            <NeuralBackground
+              color={accentColor}
+              trailOpacity={0.07}
+              particleCount={400}
+              speed={0.55}
+            />
+          </div>
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 -z-0"
+            style={{
+              background: `radial-gradient(ellipse at 50% 20%, rgba(${glowRgb}, 0.12), transparent 55%)`,
+            }}
+          />
+        </>
       )}
       <div className="relative z-10 flex flex-col min-h-screen">{children}</div>
     </div>

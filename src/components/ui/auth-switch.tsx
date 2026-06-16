@@ -38,9 +38,11 @@ export function AuthSwitch({
           width: 100%;
           max-width: 920px;
           min-height: 560px;
-          background: #ffffff;
-          border-radius: 20px;
-          box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.06);
+          background: #fafbfc;
+          border-radius: 16px;
+          box-shadow:
+            0 32px 64px rgba(0, 20, 60, 0.28),
+            0 0 0 1px rgba(30, 58, 138, 0.08);
           overflow: hidden;
         }
 
@@ -100,39 +102,45 @@ export function AuthSwitch({
         }
 
         .aura-auth-switch .auth-title {
-          font-size: 1.75rem;
-          color: #1e293b;
+          font-size: 1.65rem;
+          color: #0f172a;
           margin-bottom: 0.35rem;
           font-weight: 700;
+          letter-spacing: -0.02em;
         }
 
         .aura-auth-switch .auth-subtitle {
-          font-size: 0.85rem;
+          font-size: 0.84rem;
           color: #64748b;
-          margin-bottom: 1rem;
+          margin-bottom: 1.1rem;
           text-align: center;
-          max-width: 320px;
+          max-width: 340px;
+          line-height: 1.55;
         }
 
         .aura-auth-switch .input-field {
           max-width: 380px;
           width: 100%;
           background-color: #f1f5f9;
-          margin: 8px 0;
-          min-height: 52px;
-          border-radius: 9999px;
+          margin: 7px 0;
+          min-height: 50px;
+          border-radius: 10px;
           display: flex;
           align-items: center;
           padding: 0 1rem 0 0.85rem;
           gap: 0.65rem;
-          transition: 0.25s;
-          border: 2px solid transparent;
+          transition: 0.2s;
+          border: 1px solid #e2e8f0;
         }
 
         .aura-auth-switch .input-field:focus-within {
           background-color: #fff;
-          border-color: #f59e0b;
-          box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+
+        .aura-auth-switch .input-field:focus-within svg {
+          color: #1e40af;
         }
 
         .aura-auth-switch .input-field svg {
@@ -160,17 +168,18 @@ export function AuthSwitch({
         .aura-auth-switch .auth-btn {
           width: 100%;
           max-width: 380px;
-          background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+          background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
           border: none;
           outline: none;
-          min-height: 49px;
-          border-radius: 9999px;
-          color: #0f172a;
-          font-weight: 700;
-          margin: 12px 0 4px;
+          min-height: 48px;
+          border-radius: 10px;
+          color: #ffffff;
+          font-weight: 600;
+          margin: 14px 0 4px;
           cursor: pointer;
-          transition: 0.3s;
-          font-size: 0.9rem;
+          transition: 0.25s;
+          font-size: 0.875rem;
+          letter-spacing: 0.01em;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -178,8 +187,9 @@ export function AuthSwitch({
         }
 
         .aura-auth-switch .auth-btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(245, 158, 11, 0.35);
+          transform: translateY(-1px);
+          background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+          box-shadow: 0 10px 28px rgba(30, 58, 138, 0.35);
         }
 
         .aura-auth-switch .auth-btn:disabled {
@@ -225,34 +235,39 @@ export function AuthSwitch({
         .aura-auth-switch .panel h3 {
           font-weight: 600;
           line-height: 1.2;
-          font-size: 1.45rem;
+          font-size: 1.4rem;
           margin-bottom: 10px;
+          letter-spacing: -0.01em;
         }
 
         .aura-auth-switch .panel p {
-          font-size: 0.92rem;
-          padding: 0.7rem 0;
-          line-height: 1.5;
-          opacity: 0.95;
+          font-size: 0.9rem;
+          padding: 0.65rem 0;
+          line-height: 1.55;
+          opacity: 0.92;
+          color: rgba(255, 255, 255, 0.92);
         }
 
         .aura-auth-switch .btn-transparent {
           margin: 0 auto;
           background: transparent;
-          border: 2px solid #fff;
+          border: 1.5px solid rgba(255, 255, 255, 0.85);
           width: 140px;
           min-height: 42px;
-          border-radius: 9999px;
+          border-radius: 10px;
           font-weight: 600;
-          font-size: 0.8rem;
+          font-size: 0.78rem;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
           color: #fff;
           cursor: pointer;
-          transition: 0.3s;
+          transition: 0.25s;
         }
 
         .aura-auth-switch .btn-transparent:hover {
-          background: rgba(255, 255, 255, 0.12);
-          transform: translateY(-2px);
+          background: rgba(255, 255, 255, 0.1);
+          border-color: #fff;
+          transform: translateY(-1px);
         }
 
         .aura-auth-switch .right-panel .content {
@@ -267,7 +282,7 @@ export function AuthSwitch({
           top: -10%;
           right: 48%;
           transform: translateY(-50%);
-          background: linear-gradient(-45deg, #b45309 0%, #f59e0b 45%, #fcd34d 100%);
+          background: linear-gradient(145deg, #0a1628 0%, #1e3a8a 42%, #2563eb 100%);
           transition: 1.8s ease-in-out;
           border-radius: 50%;
           z-index: 6;
