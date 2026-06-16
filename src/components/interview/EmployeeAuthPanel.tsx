@@ -234,19 +234,19 @@ export function EmployeeAuthPanel({
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-10 overflow-y-auto">
       <div className="w-full max-w-[920px] space-y-5 my-auto">
-        <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
-          <span className="text-emerald-400/90">● Language</span>
-          <span className="text-slate-700">—</span>
-          <span className="text-blue-400 font-medium">● Account</span>
-          <span className="text-slate-700">—</span>
-          <span className="text-slate-600">○ Interview</span>
+        <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500">
+          <span className="text-neutral-400">● Language</span>
+          <span className="text-neutral-700">—</span>
+          <span className="text-red-400/90 font-medium">● Account</span>
+          <span className="text-neutral-700">—</span>
+          <span className="text-neutral-600">○ Interview</span>
         </div>
 
         <div className="text-center space-y-1 px-2">
-          <p className="text-xs uppercase tracking-[0.18em] text-blue-300/90 font-medium">
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-200 font-medium">
             {companyName}
           </p>
-          <p className="text-sm text-slate-400 hidden sm:block">
+          <p className="text-sm text-neutral-500 hidden sm:block">
             AURA-METNMAT secure employee access
           </p>
         </div>

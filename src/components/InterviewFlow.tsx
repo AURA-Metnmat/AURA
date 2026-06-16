@@ -510,7 +510,7 @@ export default function InterviewFlow({
   return (
     <InterviewShell
       background={step === "chat" ? "dotted" : "neural"}
-      accentColor={step === "auth" ? "#2563eb" : "#f59e0b"}
+      accentColor={step === "auth" ? "#b91c1c" : "#f59e0b"}
     >
       <header className="border-b border-white/10 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 backdrop-blur-sm bg-slate-950/60">
         <div>

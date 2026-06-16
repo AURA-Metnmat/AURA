@@ -19,10 +19,12 @@ export function InterviewShell({
   background = "neural",
   accentColor = "#f59e0b",
 }: InterviewShellProps) {
-  const glowRgb =
-    accentColor === "#3b82f6" || accentColor === "#2563eb"
-      ? "37,99,235"
-      : "245,158,11";
+  const glowRgb = (() => {
+    const c = accentColor.toLowerCase();
+    if (c === "#3b82f6" || c === "#2563eb") return "37,99,235";
+    if (c === "#b91c1c" || c === "#dc2626" || c === "#991b1b") return "185,28,28";
+    return "245,158,11";
+  })();
 
   return (
     <div
