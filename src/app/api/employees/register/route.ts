@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@/generated/client";
 import { db } from "@/lib/db";
 import {
   createEmployeeSessionToken,
@@ -8,9 +9,11 @@ import {
 import { generateEmployeeCode, generateNumericPassword, generateUniqueUsername } from "@/lib/employees/credentials";
 import { logEmployeeAuth } from "@/lib/employees/auth-log";
 import {
+  isValidDesignation,
   isValidEmail,
   isValidMobileNumber,
   normalizeMobileNumber,
+  sanitizeDesignation,
   sanitizeEmployeeName,
   sanitizeTextInput,
 } from "@/lib/employees/validation";
@@ -18,6 +21,7 @@ import { deliverEmployeeCredentials } from "@/lib/notifications/credentials-deli
 
 interface RegisterBody {
   employee_name?: string;
+  designation?: string;
   mobile_number?: string;
   email?: string;
   company_id?: string;
@@ -27,12 +31,19 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as RegisterBody;
     const employeeName = sanitizeEmployeeName(body.employee_name ?? "");
+    const designation = sanitizeDesignation(body.designation ?? "");
     const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
     const email = body.email?.trim() ? sanitizeTextInput(body.email, 254) : null;
     const companyId = body.company_id?.trim();
 
     if (!employeeName || employeeName.length < 2) {
       return NextResponse.json({ error: "Employee name is required." }, { status: 400 });
+    }
+    if (!isValidDesignation(designation)) {
+      return NextResponse.json(
+        { error: "Designation / job title is required (e.g. Production Manager)." },
+        { status: 400 }
+      );
     }
     if (!isValidMobileNumber(mobileNumber)) {
       return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
@@ -71,6 +82,7 @@ export async function POST(request: Request) {
         employeeCode,
         companyId,
         employeeName,
+        designation,
         mobileNumber,
         email,
         username,
@@ -80,7 +92,7 @@ export async function POST(request: Request) {
       },
     });
 
-    await logEmployeeAuth(employee.id, "register", request, { employeeCode, username });
+    await logEmployeeAuth(employee.id, "register", request, { employeeCode, username, designation });
 
     const delivery = await deliverEmployeeCredentials({
       companyName: company.name,
@@ -106,6 +118,7 @@ export async function POST(request: Request) {
       success: true,
       employee_id: employee.employeeCode,
       username,
+      designation,
       message: "Credentials sent successfully.",
       email_sent: delivery.emailSent,
       dev_credentials_logged: delivery.devLogged,
@@ -114,6 +127,22 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error("Employee register error:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          { error: "This mobile number is already registered. Please log in instead." },
+          { status: 409 }
+        );
+      }
+      if (error.code === "P2021") {
+        return NextResponse.json(
+          { error: "Employee tables are not set up yet. Run database migration (db push)." },
+          { status: 503 }
+        );
+      }
+    }
+
     return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
   }
 }

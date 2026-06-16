@@ -35,6 +35,7 @@ interface InterviewDetailsFormProps {
   onChange: (form: ParticipantForm) => void;
   onBack: () => void;
   onSubmit: () => void;
+  readOnlyFields?: (keyof ParticipantForm)[];
 }
 
 const FIELDS = [
@@ -64,7 +65,9 @@ export function InterviewDetailsForm({
   onChange,
   onBack,
   onSubmit,
+  readOnlyFields = [],
 }: InterviewDetailsFormProps) {
+  const locked = new Set(readOnlyFields);
   return (
     <main className="flex-1 flex items-center justify-center px-4 sm:px-6 py-8">
       <div className="w-full max-w-lg space-y-6">
@@ -106,9 +109,11 @@ export function InterviewDetailsForm({
                   type={type}
                   value={form[key]}
                   onChange={(e) => onChange({ ...form, [key]: e.target.value })}
+                  readOnly={locked.has(key)}
                   className={cn(
                     "w-full bg-slate-950/80 border rounded-xl px-4 py-3 text-sm transition-colors",
                     "focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/20",
+                    locked.has(key) && "opacity-70 cursor-not-allowed border-white/5",
                     formErrors[key] ? "border-red-500/50" : "border-white/10"
                   )}
                 />

@@ -16,6 +16,17 @@ const OPENING_Q1: Record<Language, (name: string) => string> = {
     `স্বাগতম, ${name}। আজ সময় দেওয়ার জন্য ধন্যবাদ। শুরু করতে, অনুগ্রহ করে নিজের পরিচয় দিন এবং আপনার পেশাদারি যাত্রা সংক্ষেপে বলুন?`,
 };
 
+const OPENING_Q1_WITH_ROLE: Record<Language, (name: string, designation: string) => string> = {
+  en: (name, designation) =>
+    `Welcome, ${name}. Thank you for joining today as ${designation}. To begin, could you briefly describe your day-to-day responsibilities in this role and the teams or systems you work with most?`,
+  hi: (name, designation) =>
+    `स्वागत है, ${name}। ${designation} के रूप में आज समय देने के लिए धन्यवाद। शुरू करने के लिए, कृपया इस भूमिका में अपनी दैनिक जिम्मेदारियाँ और जिन टीमों/सिस्टम के साथ आप सबसे अधिक काम करते हैं, संक्षेप में बताएं?`,
+  or: (name, designation) =>
+    `ସ୍ୱାଗତ, ${name}। ${designation} ଭାବରେ ଆଜି ସମୟ ଦେବା ପାଇଁ ଧନ୍ୟବାଦ। ଆରମ୍ଭ କରିବା ପାଇଁ, ଏହି role ରେ ଆପଣଙ୍କ daily responsibilities ଏବଂ ଯେଉଁ teams/systems ସହିତ ଆପଣ ସର୍ବାଧିକ କାମ କରନ୍ତି, ସଂକ୍ଷେପରେ ବର୍ଣ୍ଣନା କରନ୍ତୁ?`,
+  bn: (name, designation) =>
+    `স্বাগতম, ${name}। ${designation} হিসেবে আজ সময় দেওয়ার জন্য ধন্যবাদ। শুরু করতে, এই ভূমিকায় আপনার দৈনন্দিন দায়িত্ব এবং যে দল/সিস্টেমের সাথে আপনি সবচেয়ে বেশি কাজ করেন, সংক্ষেপে বর্ণনা করুন?`,
+};
+
 export const OPENING_Q2_EN =
   "How long have you been working with this organization, and how has your role evolved during that time?";
 
@@ -32,7 +43,18 @@ const OPENING_Q2: Record<Language, (companyName: string) => string> = {
 export const OPENING_Q1_EN_PREFIX =
   "Thank you for taking the time to participate today. To begin, could you please introduce yourself";
 
-export function getOpeningQuestion1(lang: Language, name: string): OpeningBilingual {
+export function getOpeningQuestion1(
+  lang: Language,
+  name: string,
+  designation?: string | null
+): OpeningBilingual {
+  const role = designation?.trim();
+  if (role) {
+    const en = OPENING_Q1_WITH_ROLE.en(name, role);
+    const locale = OPENING_Q1_WITH_ROLE[lang](name, role);
+    return { en, locale: lang === "en" ? en : locale };
+  }
+
   const en = OPENING_Q1.en(name);
   const locale = OPENING_Q1[lang](name);
   return { en, locale: lang === "en" ? en : locale };

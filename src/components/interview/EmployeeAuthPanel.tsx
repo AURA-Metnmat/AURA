@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus, LogIn, Loader2, ArrowLeft, Phone, Mail, User } from "lucide-react";
+import { UserPlus, LogIn, Loader2, ArrowLeft, Phone, Mail, User, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type AuthMode = "register" | "login";
@@ -16,6 +16,7 @@ interface EmployeeAuthPanelProps {
     username: string;
     mobile: string;
     email: string;
+    designation: string;
   }) => void;
 }
 
@@ -30,6 +31,7 @@ export function EmployeeAuthPanel({
   const [error, setError] = useState<string | null>(null);
 
   const [employeeName, setEmployeeName] = useState("");
+  const [designation, setDesignation] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
 
@@ -46,6 +48,7 @@ export function EmployeeAuthPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           employee_name: employeeName,
+          designation: designation.trim(),
           mobile_number: mobile,
           email: email || undefined,
           company_id: companyId,
@@ -60,6 +63,7 @@ export function EmployeeAuthPanel({
         username: data.username,
         mobile: mobile.replace(/\D/g, "").slice(-10),
         email: email.trim(),
+        designation: designation.trim(),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -91,6 +95,7 @@ export function EmployeeAuthPanel({
         username: data.username,
         mobile: data.mobile_number,
         email: data.email ?? "",
+        designation: data.designation ?? "",
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -174,6 +179,18 @@ export function EmployeeAuthPanel({
               </label>
               <label className="block space-y-1.5">
                 <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <Briefcase className="w-3.5 h-3.5" /> Designation / Job Title *
+                </span>
+                <input
+                  value={designation}
+                  onChange={(e) => setDesignation(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
+                  placeholder="Production Manager, QA Engineer, Shift In-charge"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs text-slate-400 flex items-center gap-1.5">
                   <Phone className="w-3.5 h-3.5" /> Mobile Number *
                 </span>
                 <input
@@ -215,7 +232,7 @@ export function EmployeeAuthPanel({
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-amber-500/50"
-                  placeholder="Your registered name"
+                  placeholder="Username from SMS"
                 />
               </label>
               <label className="block space-y-1.5">

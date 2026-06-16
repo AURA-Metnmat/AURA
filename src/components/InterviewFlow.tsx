@@ -61,6 +61,7 @@ export default function InterviewFlow({
   const [step, setStep] = useState<FlowStep>("language");
   const [language, setLanguage] = useState<Language>("en");
   const [employeeUsername, setEmployeeUsername] = useState("");
+  const [designationLocked, setDesignationLocked] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [form, setForm] = useState<ParticipantForm>({
     fullName: "",
@@ -113,6 +114,7 @@ export default function InterviewFlow({
           email: data.employee.email ?? "",
         });
         setEmployeeUsername(data.employee.username ?? "");
+        setDesignationLocked(Boolean(data.employee.designation?.trim()));
 
         if (data.employee.is_first_login) {
           setStep("changePassword");
@@ -167,14 +169,17 @@ export default function InterviewFlow({
     username: string;
     mobile: string;
     email: string;
+    designation: string;
   }) {
     setEmployeeUsername(payload.username);
     setForm((prev) => ({
       ...prev,
       fullName: payload.employeeName,
+      designation: payload.designation || prev.designation,
       mobile: payload.mobile,
       email: payload.email,
     }));
+    setDesignationLocked(Boolean(payload.designation?.trim()));
 
     if (payload.isFirstLogin) {
       setStep("changePassword");
@@ -622,6 +627,7 @@ export default function InterviewFlow({
           onChange={setForm}
           onBack={() => setStep("auth")}
           onSubmit={startInterview}
+          readOnlyFields={designationLocked ? ["designation"] : []}
         />
       )}
 

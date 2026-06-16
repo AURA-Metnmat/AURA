@@ -87,6 +87,7 @@ export async function POST(request: Request) {
       username: employee.username,
       is_first_login: employee.isFirstLogin,
       employee_name: employee.employeeName,
+      designation: employee.designation,
       mobile_number: employee.mobileNumber,
       email: employee.email,
     });

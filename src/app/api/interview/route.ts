@@ -133,6 +133,9 @@ export async function POST(request: Request) {
         },
       });
 
+      const resolvedDesignation =
+        participant.designation.trim() || employee.designation?.trim() || "";
+
       const session = await db.interviewSession.create({
         data: {
           companyId: company.id,
@@ -144,7 +147,7 @@ export async function POST(request: Request) {
           participant: {
             create: {
               fullName: participant.fullName,
-              designation: participant.designation,
+              designation: resolvedDesignation,
               department: participant.department,
               mobile: participant.mobile,
               email: participant.email || null,
@@ -156,7 +159,7 @@ export async function POST(request: Request) {
         include: { participant: true },
       });
 
-      const opening = getOpeningQuestion1(language, participant.fullName);
+      const opening = getOpeningQuestion1(language, participant.fullName, resolvedDesignation);
 
       await db.message.create({
         data: {

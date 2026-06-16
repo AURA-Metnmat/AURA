@@ -221,15 +221,23 @@ export async function generateAuraResponse(
   const enQuestions = getQuestions("en", ctx.currentSection);
   const systemPrompt = buildSystemPrompt(ctx.company);
 
+  const designation = ctx.participant?.designation?.trim() || "not specified";
+  const department = ctx.participant?.department?.trim() || "not specified";
+  const roleFocus = designation !== "not specified"
+    ? `Employee role/designation: ${designation}. Department: ${department}.
+IMPORTANT: Ask questions specific to a ${designation} at ${ctx.company.name}. Focus on their daily workflows, tools, approvals, handoffs, KPIs, and pain points for THIS post — avoid generic questions unrelated to their job.`
+    : `Participant department: ${department}.`;
+
   const sectionPrompt = isPreferredLanguage(lang)
     ? `${bilingualInstruction(lang)}
 ${ctx.postIntro ? "POST-INTRO: The employee finished the standard introduction (professional journey + tenure/role). Use admin company knowledge AND their intro answers to ask the first deep-dive question. Keep it objective and easy to answer in writing.\n" : ""}
+${roleFocus}
 Current section: ${sectionInfo?.name} (${ctx.currentSection})
 Client company: ${ctx.company.name}
 Suggested focus questions (locale): ${questions.join(" | ")}
 English reference questions: ${enQuestions.join(" | ")}
 Question progress in section: ${ctx.questionIndex + 1}/${questions.length}
-Participant: ${ctx.participant?.fullName ?? "unknown"} | ${ctx.participant?.department ?? ""} | ${ctx.participant?.designation ?? ""}`
+Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${designation}`
     : `${ctx.postIntro ? "POST-INTRO: The employee finished the standard introduction. Use admin company knowledge AND their intro answers for the first deep-dive question. Keep it objective and simple.\n" : ""}Respond in English with ONE acknowledgment and ONE follow-up question only. Use 2-4 short, clear sentences that sound natural when read aloud.`;
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
