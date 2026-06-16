@@ -11,6 +11,8 @@ import { InterviewShell } from "@/components/interview/InterviewShell";
 import { LanguageBar } from "@/components/interview/LanguageBar";
 import { BilingualChat, type BilingualMessage } from "@/components/interview/BilingualChat";
 import { InterviewChatComposer } from "@/components/interview/InterviewChatComposer";
+import { EmployeeAuthPanel } from "@/components/interview/EmployeeAuthPanel";
+import { EmployeeChangePasswordForm } from "@/components/interview/EmployeeChangePasswordForm";
 
 interface Attachment {
   id: string;
@@ -48,14 +50,18 @@ function formatRemaining(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+type FlowStep = "language" | "auth" | "changePassword" | "details" | "chat";
+
 export default function InterviewFlow({
   companyId,
   companyName,
   interviewDurationMinutes: initialDurationMinutes = 5,
   showCompanyBadge = true,
 }: InterviewFlowProps) {
-  const [step, setStep] = useState<"language" | "details" | "chat">("language");
+  const [step, setStep] = useState<FlowStep>("language");
   const [language, setLanguage] = useState<Language>("en");
+  const [employeeUsername, setEmployeeUsername] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
   const [form, setForm] = useState<ParticipantForm>({
     fullName: "",
     designation: "",
@@ -87,6 +93,133 @@ export default function InterviewFlow({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pendingFiles]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkAuth() {
+      try {
+        const res = await fetch(`/api/employees/me?company_id=${encodeURIComponent(companyId)}`);
+        const data = await res.json();
+        if (cancelled || !data.authenticated) {
+          setAuthChecked(true);
+          return;
+        }
+
+        setForm({
+          fullName: data.employee.employee_name ?? "",
+          designation: data.employee.designation ?? "",
+          department: data.employee.department ?? "",
+          mobile: data.employee.mobile_number ?? "",
+          email: data.employee.email ?? "",
+        });
+        setEmployeeUsername(data.employee.username ?? "");
+
+        if (data.employee.is_first_login) {
+          setStep("changePassword");
+        } else if (data.active_session) {
+          hydrateSession(data.active_session, data.employee.employee_name);
+          setStep("chat");
+        } else {
+          setStep("details");
+        }
+      } finally {
+        if (!cancelled) setAuthChecked(true);
+      }
+    }
+    void checkAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  function hydrateSession(
+    active: {
+      sessionId: string;
+      language: Language;
+      currentSection: string;
+      completionPct: number;
+      interviewDurationMinutes: number;
+      messages: Message[];
+      participant: ParticipantForm;
+      startedAt: string;
+    },
+    fallbackName?: string
+  ) {
+    setSessionId(active.sessionId);
+    setLanguage(active.language);
+    setMessages(active.messages);
+    setCurrentSection(active.currentSection);
+    setCompletionPct(active.completionPct);
+    setSessionDurationMinutes(active.interviewDurationMinutes);
+    setSessionStartedAt(new Date(active.startedAt).getTime());
+    setForm({
+      fullName: active.participant.fullName || fallbackName || "",
+      designation: active.participant.designation,
+      department: active.participant.department,
+      mobile: active.participant.mobile,
+      email: active.participant.email,
+    });
+  }
+
+  async function afterAuthSuccess(payload: {
+    isFirstLogin: boolean;
+    employeeName: string;
+    username: string;
+    mobile: string;
+    email: string;
+  }) {
+    setEmployeeUsername(payload.username);
+    setForm((prev) => ({
+      ...prev,
+      fullName: payload.employeeName,
+      mobile: payload.mobile,
+      email: payload.email,
+    }));
+
+    if (payload.isFirstLogin) {
+      setStep("changePassword");
+      return;
+    }
+
+    await continueAfterPasswordChange();
+  }
+
+  async function continueAfterPasswordChange() {
+    setLoading(true);
+    setChatError(null);
+    try {
+      const res = await fetch(`/api/employees/me?company_id=${encodeURIComponent(companyId)}`);
+      const data = await res.json();
+      if (!data.authenticated) {
+        setStep("auth");
+        return;
+      }
+
+      if (data.active_session) {
+        hydrateSession(data.active_session, data.employee.employee_name);
+        setStep("chat");
+        return;
+      }
+
+      setStep("details");
+    } catch {
+      setChatError("Failed to load your profile. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    await fetch("/api/employees/me", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company_id: companyId }),
+    });
+    setSessionId(null);
+    setMessages([]);
+    setEmployeeUsername("");
+    setStep("auth");
+  }
 
   useEffect(() => {
     if (!sessionStartedAt || step !== "chat") return;
@@ -171,6 +304,29 @@ export default function InterviewFlow({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+
+      if (data.resumed && Array.isArray(data.messages)) {
+        setSessionId(data.sessionId);
+        setMessages(
+          data.messages.map((m: Message) => ({
+            role: m.role,
+            contentEn: m.contentEn,
+            contentLocale: m.contentLocale,
+          }))
+        );
+        setLanguage(data.language ?? language);
+        setCurrentSection(data.currentSection);
+        setCompletionPct(data.completionPct);
+        if (typeof data.interviewDurationMinutes === "number") {
+          setSessionDurationMinutes(data.interviewDurationMinutes);
+        }
+        setSessionStartedAt(
+          data.startedAt ? new Date(data.startedAt).getTime() : Date.now()
+        );
+        setStep("chat");
+        return;
+      }
+
       setSessionId(data.sessionId);
       setMessages([
         {
@@ -332,6 +488,16 @@ export default function InterviewFlow({
     );
   }
 
+  if (!authChecked) {
+    return (
+      <InterviewShell>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-slate-400 text-sm">Loading your profile…</p>
+        </div>
+      </InterviewShell>
+    );
+  }
+
   if (report) {
     return (
       <InterviewShell>
@@ -358,13 +524,22 @@ export default function InterviewFlow({
   }
 
   return (
-    <InterviewShell>
+    <InterviewShell background={step === "chat" ? "dotted" : "neural"}>
       <header className="border-b border-white/10 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 backdrop-blur-sm bg-slate-950/60">
         <div>
           <p className="text-xs uppercase tracking-widest text-amber-400">AURA-METNMAT Interview</p>
           <h1 className="text-lg font-semibold">{showCompanyBadge ? companyName : form.fullName || "Interview"}</h1>
         </div>
         <div className="flex items-center gap-3">
+          {step === "chat" && employeeUsername && (
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="text-[10px] uppercase tracking-wider text-slate-500 hover:text-slate-300 px-2 py-1 rounded-lg border border-white/10"
+            >
+              Log out
+            </button>
+          )}
           {step === "details" && (
             <div className="hidden sm:flex items-center gap-1 text-[10px] uppercase tracking-wider text-slate-500">
               <span className="text-emerald-400">● Lang</span>
@@ -411,8 +586,26 @@ export default function InterviewFlow({
           languages={PREFERRED_LANGUAGES}
           onSelectLanguage={(lang) => {
             setLanguage(lang);
-            setStep("details");
+            setStep("auth");
           }}
+        />
+      )}
+
+      {step === "auth" && (
+        <EmployeeAuthPanel
+          companyName={companyName}
+          companyId={companyId}
+          onBack={() => setStep("language")}
+          onSuccess={afterAuthSuccess}
+        />
+      )}
+
+      {step === "changePassword" && (
+        <EmployeeChangePasswordForm
+          companyId={companyId}
+          username={employeeUsername || form.fullName}
+          onBack={() => setStep("auth")}
+          onSuccess={() => void continueAfterPasswordChange()}
         />
       )}
 
@@ -427,7 +620,7 @@ export default function InterviewFlow({
           t={t}
           engagement={engagement}
           onChange={setForm}
-          onBack={() => setStep("language")}
+          onBack={() => setStep("auth")}
           onSubmit={startInterview}
         />
       )}

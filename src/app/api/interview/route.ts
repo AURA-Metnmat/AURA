@@ -5,6 +5,9 @@ import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } f
 import { getOpeningQuestion1, getOpeningQuestion2 } from "@/lib/aura/opening-questions";
 import { resolveMessageLocale } from "@/lib/aura/message-locale";
 import { loadFullCompanyContext } from "@/lib/companies/company-knowledge";
+import { requireEmployeeSession } from "@/lib/auth/employee";
+import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
+import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
@@ -58,6 +61,8 @@ export async function POST(request: Request) {
       if (!session) {
         return NextResponse.json({ error: "Session not found" }, { status: 404 });
       }
+      const langDenied = await assertEmployeeOwnsSession(request, session);
+      if (langDenied) return langDenied;
       const participantName = session.participant?.fullName;
       for (const msg of session.messages) {
         const contentEn = msg.content;
@@ -85,6 +90,9 @@ export async function POST(request: Request) {
     if ("action" in body && body.action === "start") {
       const { participant, language, companyId } = body;
 
+      const auth = await requireEmployeeSession(request, companyId);
+      if (auth instanceof NextResponse) return auth;
+
       const company = await db.company.findUnique({
         where: { id: companyId, isActive: true },
       });
@@ -92,9 +100,43 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Company not found" }, { status: 404 });
       }
 
+      const employee = await db.employee.findUnique({
+        where: { id: auth.session.employeeId },
+      });
+      if (!employee) {
+        return NextResponse.json({ error: "Employee not found" }, { status: 404 });
+      }
+
+      const existing = await findActiveSessionForEmployee(employee.id, companyId);
+      if (existing) {
+        return NextResponse.json({
+          resumed: true,
+          sessionId: existing.sessionId,
+          messages: existing.messages,
+          message: existing.messages.at(-1)?.contentEn ?? "",
+          messageLocale: existing.messages.at(-1)?.contentLocale ?? "",
+          currentSection: existing.currentSection,
+          completionPct: existing.completionPct,
+          introStep: existing.introStep,
+          language: existing.language,
+          interviewDurationMinutes: existing.interviewDurationMinutes,
+          startedAt: existing.startedAt,
+          company: { id: company.id, name: company.name },
+        });
+      }
+
+      await db.employee.update({
+        where: { id: employee.id },
+        data: {
+          designation: participant.designation.trim() || employee.designation,
+          department: participant.department.trim() || employee.department,
+        },
+      });
+
       const session = await db.interviewSession.create({
         data: {
           companyId: company.id,
+          employeeId: employee.id,
           language,
           currentSection: "A",
           introStep: 1,
@@ -106,6 +148,7 @@ export async function POST(request: Request) {
               department: participant.department,
               mobile: participant.mobile,
               email: participant.email || null,
+              employeeId: employee.employeeCode,
               contactInfo: [participant.mobile, participant.email].filter(Boolean).join(" | "),
             },
           },
@@ -126,6 +169,7 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json({
+        resumed: false,
         sessionId: session.id,
         message: opening.en,
         messageLocale: opening.locale,
@@ -137,7 +181,7 @@ export async function POST(request: Request) {
     }
 
     const sessionId = "sessionId" in body ? body.sessionId : undefined;
-    let session = sessionId
+    const session = sessionId
       ? await db.interviewSession.findUnique({
           where: { id: sessionId },
           include: {
@@ -155,6 +199,9 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+
+    const denied = await assertEmployeeOwnsSession(request, session);
+    if (denied) return denied;
 
     if ("action" in body && body.action === "complete") {
       const fullSession = await db.interviewSession.findUnique({

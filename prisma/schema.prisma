@@ -29,6 +29,7 @@ model Company {
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
   sessions     InterviewSession[]
+  employees    Employee[]
 
   @@index([isActive])
   @@index([category])
@@ -38,6 +39,7 @@ model Company {
 model InterviewSession {
   id              String              @id @default(cuid())
   companyId       String
+  employeeId      String?
   status          String              @default("active")
   language        String              @default("en")
   stakeholderType String?
@@ -48,6 +50,7 @@ model InterviewSession {
   completedAt     DateTime?
   updatedAt       DateTime            @updatedAt
   company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee        Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   participant     ParticipantProfile?
   messages        Message[]
   attachments     MessageAttachment[]
@@ -61,6 +64,50 @@ model InterviewSession {
 
   @@index([status])
   @@index([companyId])
+  @@index([employeeId])
+}
+
+model Employee {
+  id                  String              @id @default(cuid())
+  employeeCode        String
+  companyId           String
+  employeeName        String
+  mobileNumber        String
+  email               String?
+  username            String
+  passwordHash        String
+  designation         String?
+  department          String?
+  isFirstLogin        Boolean             @default(true)
+  accountStatus       String              @default("active")
+  failedLoginAttempts Int                 @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sessions            InterviewSession[]
+  authLogs            EmployeeAuthLog[]
+
+  @@unique([companyId, mobileNumber])
+  @@unique([companyId, username])
+  @@unique([companyId, employeeCode])
+  @@index([companyId])
+  @@index([mobileNumber])
+}
+
+model EmployeeAuthLog {
+  id         String   @id @default(cuid())
+  employeeId String
+  action     String
+  ipAddress  String?
+  userAgent  String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model ParticipantProfile {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { storeInterviewFile } from "@/lib/storage";
+import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = [
@@ -33,6 +34,9 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+
+    const denied = await assertEmployeeOwnsSession(request, session);
+    if (denied) return denied;
 
     if (file.size > MAX_SIZE) {
       return NextResponse.json({ error: "File exceeds 10 MB limit" }, { status: 400 });
