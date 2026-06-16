@@ -8,7 +8,8 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=()",
+    // Allow mic on this origin for voice interview input; keep camera/geo off.
+    value: "camera=(), microphone=(self), geolocation=()",
   },
 ];
 
