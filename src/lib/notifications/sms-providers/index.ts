@@ -5,10 +5,9 @@ import type { SmsDeliveryAttempt, SmsProviderName } from "./types";
 
 function configuredProviders(): SmsProviderName[] {
   const preferred = process.env.SMS_OTP_PROVIDER?.trim().toLowerCase();
-  const all: SmsProviderName[] = ["fast2sms", "msg91", "twilio"];
 
   if (preferred === "fast2sms" || preferred === "msg91" || preferred === "twilio") {
-    return [preferred, ...all.filter((p) => p !== preferred)];
+    return [preferred];
   }
 
   const ordered: SmsProviderName[] = [];

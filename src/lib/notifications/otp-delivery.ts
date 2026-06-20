@@ -16,7 +16,11 @@ export function buildOtpDeliveryFailureMessage(smsError?: string): string {
   }
 
   const lower = smsError.toLowerCase();
-  if (lower.includes("unverified") && lower.includes("twilio")) {
+  if (lower.includes("website verification") || lower.includes("otp message menu")) {
+    return "Fast2SMS needs website verification. Open fast2sms.com → OTP Message and complete verification, then try again.";
+  }
+
+  if (lower.includes("unverified")) {
     return "SMS could not be delivered. Configure Fast2SMS or MSG91 for reliable Indian mobile OTP.";
   }
 

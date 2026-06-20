@@ -33,23 +33,36 @@ export async function sendOtpViaFast2Sms(
   });
 
   const raw = await res.text();
-  if (!res.ok) {
-    console.error("[Fast2SMS OTP failed]", res.status, raw);
-    return { ok: false, provider: "fast2sms", error: "SMS delivery failed." };
+  let parsed: { return?: boolean; message?: string | string[]; status_code?: number } | null = null;
+  try {
+    parsed = JSON.parse(raw) as { return?: boolean; message?: string | string[]; status_code?: number };
+  } catch {
+    parsed = null;
   }
 
-  try {
-    const parsed = JSON.parse(raw) as { return?: boolean; message?: string | string[] };
-    if (parsed.return === true) {
-      return { ok: true, provider: "fast2sms" };
-    }
-    const message = Array.isArray(parsed.message)
-      ? parsed.message.join(" ")
-      : parsed.message ?? "SMS delivery failed.";
-    console.error("[Fast2SMS OTP rejected]", message);
-    return { ok: false, provider: "fast2sms", error: message };
-  } catch {
-    console.error("[Fast2SMS OTP parse error]", raw);
-    return { ok: false, provider: "fast2sms", error: "SMS delivery failed." };
+  if (!res.ok) {
+    const message = parsed
+      ? Array.isArray(parsed.message)
+        ? parsed.message.join(" ")
+        : parsed.message
+      : null;
+    console.error("[Fast2SMS OTP failed]", res.status, raw);
+    return {
+      ok: false,
+      provider: "fast2sms",
+      error: message ?? "SMS delivery failed.",
+    };
   }
+
+  if (parsed?.return === true) {
+    return { ok: true, provider: "fast2sms" };
+  }
+
+  const message = parsed
+    ? Array.isArray(parsed.message)
+      ? parsed.message.join(" ")
+      : parsed.message ?? "SMS delivery failed."
+    : "SMS delivery failed.";
+  console.error("[Fast2SMS OTP rejected]", message);
+  return { ok: false, provider: "fast2sms", error: message };
 }
