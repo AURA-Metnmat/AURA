@@ -4,6 +4,22 @@ export function getOtpConfig() {
     process.env.SESSION_SECRET?.trim() ||
     "dev-otp-pepper-change-me";
 
+  const provider =
+    process.env.OTP_PROVIDER?.trim() ||
+    process.env.SMS_OTP_PROVIDER?.trim() ||
+    "msg91";
+
+  const msg91AuthKey =
+    process.env.MSG91_AUTH_KEY?.trim() ||
+    process.env.MSG91_AUTHKEY?.trim() ||
+    process.env.OTP_SMS_API_KEY?.trim() ||
+    "";
+
+  const msg91TemplateId =
+    process.env.MSG91_OTP_TEMPLATE_ID?.trim() ||
+    process.env.OTP_SMS_TEMPLATE_ID?.trim() ||
+    "";
+
   return {
     expiryMinutes: Number(process.env.OTP_EXPIRY_MINUTES ?? "5"),
     resendCooldownSeconds: Number(process.env.OTP_RESEND_COOLDOWN_SECONDS ?? "60"),
@@ -12,15 +28,9 @@ export function getOtpConfig() {
     maxRequestsPerMobilePerHour: 5,
     maxRequestsPerIpPerHour: 20,
     pepper,
-    provider:
-      process.env.OTP_PROVIDER?.trim() ||
-      process.env.SMS_OTP_PROVIDER?.trim() ||
-      "fast2sms",
-    smsApiKey:
-      process.env.OTP_SMS_API_KEY?.trim() ||
-      process.env.FAST2SMS_API_KEY?.trim() ||
-      "",
-    smsSenderId: process.env.OTP_SMS_SENDER_ID?.trim() || "",
-    smsTemplateId: process.env.OTP_SMS_TEMPLATE_ID?.trim() || "",
+    provider,
+    msg91AuthKey,
+    msg91TemplateId,
+    msg91SenderId: process.env.MSG91_SENDER_ID?.trim() || "",
   };
 }

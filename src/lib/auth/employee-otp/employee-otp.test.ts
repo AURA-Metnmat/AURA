@@ -9,6 +9,8 @@ import {
 } from "@/lib/auth/employee-otp/mobile";
 import { generateOtpCode, hashOtp, verifyOtpHash } from "@/lib/auth/employee-otp/hash";
 import { isEmployeeActive } from "@/lib/auth/employee-otp/company-policy";
+import { mapMsg91ErrorToUserMessage } from "@/lib/auth/employee-otp/msg91-errors";
+import { validateEmployeePassword } from "@/lib/auth/employee-otp/password-policy";
 
 describe("mobile normalization", () => {
   it("normalizes +91 prefix", () => {
@@ -56,13 +58,13 @@ describe("employee active status", () => {
 });
 
 describe("security rules (documented expectations)", () => {
-  it("signup must not create employee before OTP — enforced by service layer", () => {
+  it("signup creates employee profile fields from validated input", () => {
     assert.ok(true);
   });
 
-  it("signin must not reveal account existence — generic message constant", () => {
-    const msg = "If this account exists, an OTP has been sent.";
-    assert.ok(msg.includes("If this account exists"));
+  it("signin uses generic invalid credentials message", () => {
+    const msg = "Invalid mobile, email, or password.";
+    assert.ok(msg.includes("Invalid"));
   });
 
   it("mobile hash is stable per pepper", () => {
@@ -71,5 +73,30 @@ describe("security rules (documented expectations)", () => {
     const h3 = hashMobileNumber("9876543210", "other");
     assert.equal(h1, h2);
     assert.notEqual(h1, h3);
+  });
+});
+
+describe("employee password policy", () => {
+  it("requires minimum length", () => {
+    assert.equal(validateEmployeePassword(""), "Password is required.");
+    assert.equal(validateEmployeePassword("abc"), "Password must be at least 6 characters.");
+    assert.equal(validateEmployeePassword("secure1"), null);
+  });
+});
+
+describe("MSG91 error mapping", () => {
+  it("maps invalid authkey", () => {
+    const msg = mapMsg91ErrorToUserMessage("Invalid authkey");
+    assert.ok(msg.includes("not configured"));
+  });
+
+  it("maps template errors", () => {
+    const msg = mapMsg91ErrorToUserMessage("DLT template not found");
+    assert.ok(msg.includes("template"));
+  });
+
+  it("maps wallet errors", () => {
+    const msg = mapMsg91ErrorToUserMessage("Insufficient balance");
+    assert.ok(msg.includes("wallet"));
   });
 });

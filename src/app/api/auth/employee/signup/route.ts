@@ -4,19 +4,7 @@ import { attachSessionCookie, registerEmployee } from "@/lib/auth/employee-otp/d
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const result = await registerEmployee(
-      {
-        companySlug: body.company_slug ?? body.companySlug,
-        name: body.name ?? body.employee_name,
-        designation: body.designation,
-        department: body.department,
-        email: body.email,
-        mobileNumber: body.mobile_number ?? body.mobileNumber,
-        password: body.password,
-        inviteToken: body.invite_token ?? body.inviteToken,
-      },
-      request
-    );
+    const result = await registerEmployee(body, request);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
@@ -24,7 +12,7 @@ export async function POST(request: Request) {
     attachSessionCookie(response, result.sessionToken);
     return response;
   } catch (error) {
-    console.error("employees/register error:", error);
+    console.error("employee signup error:", error);
     return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
   }
 }

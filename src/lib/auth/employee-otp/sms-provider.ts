@@ -1,6 +1,7 @@
 import type { OtpPurpose } from "./types";
 import { getOtpConfig } from "./config";
 import { toE164Indian } from "./mobile";
+import { mapMsg91ErrorToUserMessage, type Msg91OtpResponse } from "./msg91-errors";
 
 export interface SendOtpParams {
   to: string;
@@ -14,56 +15,87 @@ export interface SendOtpResult {
   provider: string;
   devLogged?: boolean;
   error?: string;
+  statusCode?: number;
 }
 
-async function sendViaFast2Sms(mobile10: string, otp: string): Promise<SendOtpResult> {
-  const { smsApiKey } = getOtpConfig();
-  if (!smsApiKey) {
-    return { delivered: false, provider: "fast2sms", error: "SMS API key not configured" };
+function shouldUseDevFallback(): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  return process.env.OTP_SMS_DEV_FALLBACK === "true";
+}
+
+async function parseMsg91Response(res: Response): Promise<Msg91OtpResponse | null> {
+  try {
+    return (await res.json()) as Msg91OtpResponse;
+  } catch {
+    return null;
+  }
+}
+
+async function sendViaMsg91(mobile10: string, otp: string): Promise<SendOtpResult> {
+  const { msg91AuthKey, msg91TemplateId, expiryMinutes } = getOtpConfig();
+
+  if (!msg91AuthKey) {
+    return {
+      delivered: false,
+      provider: "msg91",
+      error: mapMsg91ErrorToUserMessage("invalid authkey"),
+      statusCode: 401,
+    };
   }
 
-  const numbers = `91${mobile10}`;
-  const body = new URLSearchParams({
-    route: "otp",
-    variables_values: otp,
-    numbers,
+  if (!msg91TemplateId) {
+    return {
+      delivered: false,
+      provider: "msg91",
+      error: mapMsg91ErrorToUserMessage("template id missing"),
+      statusCode: 400,
+    };
+  }
+
+  const params = new URLSearchParams({
+    template_id: msg91TemplateId,
+    mobile: `91${mobile10}`,
+    otp,
+    otp_length: String(otp.length),
+    otp_expiry: String(expiryMinutes),
   });
 
-  const res = await fetch("https://www.fast2sms.com/dev/bulkV2", {
+  const res = await fetch(`https://control.msg91.com/api/v5/otp?${params.toString()}`, {
     method: "POST",
     headers: {
-      authorization: smsApiKey,
-      "Content-Type": "application/x-www-form-urlencoded",
+      authkey: msg91AuthKey,
+      accept: "application/json",
+      "content-type": "application/json",
     },
-    body: body.toString(),
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("[Fast2SMS OTP failed]", res.status, text.slice(0, 200));
-    return { delivered: false, provider: "fast2sms", error: "SMS delivery failed" };
+  const data = await parseMsg91Response(res);
+  const success = res.ok && data?.type === "success";
+
+  if (!success) {
+    const providerMessage = data?.message ?? (await res.text().catch(() => ""));
+    console.error("[MSG91 OTP failed]", {
+      httpStatus: res.status,
+      type: data?.type,
+      message: String(providerMessage).slice(0, 300),
+    });
+    return {
+      delivered: false,
+      provider: "msg91",
+      error: mapMsg91ErrorToUserMessage(
+        typeof providerMessage === "string" ? providerMessage : data?.message,
+        res.status
+      ),
+      statusCode: res.status,
+    };
   }
 
-  try {
-    const data = (await res.json()) as { return?: boolean; message?: string | string[] };
-    const ok = data.return === true;
-    if (!ok) {
-      const msg = Array.isArray(data.message) ? data.message.join(" ") : data.message;
-      console.error("[Fast2SMS OTP rejected]", msg);
-      return { delivered: false, provider: "fast2sms", error: "SMS delivery failed" };
-    }
-    return { delivered: true, provider: "fast2sms" };
-  } catch {
-    return { delivered: true, provider: "fast2sms" };
-  }
+  return { delivered: true, provider: "msg91" };
 }
 
 async function sendViaDev(mobile10: string, otp: string, purpose: OtpPurpose): Promise<SendOtpResult> {
-  if (process.env.NODE_ENV === "production") {
-    return { delivered: false, provider: "dev", error: "Dev provider disabled in production" };
-  }
   console.info(
-    `[AURA mobile OTP — dev only] ${purpose} → ${toE164Indian(mobile10)} (ending ${mobile10.slice(-4)})`
+    `[AURA mobile OTP — dev] ${purpose} → ${toE164Indian(mobile10)} code=${otp} (ending ${mobile10.slice(-4)})`
   );
   return { delivered: true, provider: "dev", devLogged: true };
 }
@@ -76,20 +108,12 @@ export async function sendOtp(params: SendOtpParams): Promise<SendOtpResult> {
     return sendViaDev(to, otp, purpose);
   }
 
-  if (provider === "fast2sms") {
-    const result = await sendViaFast2Sms(to, otp);
-    if (result.delivered) return result;
-    if (process.env.NODE_ENV !== "production") {
-      return sendViaDev(to, otp, purpose);
-    }
-    return result;
-  }
+  const result = await sendViaMsg91(to, otp);
+  if (result.delivered) return result;
 
-  // Unknown provider — try Fast2SMS then dev fallback
-  const fast = await sendViaFast2Sms(to, otp);
-  if (fast.delivered) return fast;
-  if (process.env.NODE_ENV !== "production") {
+  if (shouldUseDevFallback()) {
     return sendViaDev(to, otp, purpose);
   }
-  return fast;
+
+  return result;
 }

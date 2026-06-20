@@ -2,7 +2,6 @@ import { Prisma } from "@/generated/client";
 import { db } from "@/lib/db";
 import {
   createEmployeeSessionToken,
-  employeeSessionCookieOptions,
   hashPassword,
 } from "@/lib/auth/employee";
 import { generateEmployeeCode, generateUniqueUsername } from "@/lib/employees/credentials";
@@ -26,7 +25,7 @@ import {
   parseIdentifier,
 } from "./mobile";
 import { checkRateLimits, checkResendCooldown } from "./rate-limit";
-import { sendOtp } from "./sms-provider";
+import { deliverOtpCode } from "./deliver-otp";
 import type { OtpPurpose, OtpRequestSuccess, OtpVerifySuccess, SignupRegistrationPayload } from "./types";
 
 function getClientMeta(request?: Request) {
@@ -190,30 +189,38 @@ export async function requestSignupOtp(
     request,
   });
 
-  const sms = await sendOtp({
-    to: mobileNumber,
+  const delivery = await deliverOtpCode({
+    mobileNumber,
     otp,
     purpose: "EMPLOYEE_SIGNUP",
     companyName: company.name,
   });
 
-  if (!sms.delivered) {
+  if (!delivery.delivered) {
     await logOtpAudit(company.id, "otp_send_failed", request, {
-      metadata: { flow: "signup", provider: sms.provider },
+      metadata: {
+        flow: "signup",
+        provider: delivery.provider,
+        statusCode: delivery.statusCode ?? null,
+      },
     });
-    return { ok: false, status: 503, error: "Could not send OTP. Please try again shortly." };
+    return {
+      ok: false,
+      status: 503,
+      error: delivery.error ?? "Could not send OTP. Please try again shortly.",
+    };
   }
 
   await logOtpAudit(company.id, "otp_sent", request, {
-    metadata: { flow: "signup", provider: sms.provider },
+    metadata: { flow: "signup", provider: delivery.provider },
   });
 
   return {
     ok: true,
     data: {
       ok: true,
-      maskedMobile: maskMobileNumber(mobileNumber),
-      message: `OTP sent to your mobile number ending with ${mobileNumber.slice(-4)}.`,
+      maskedMobile: delivery.maskedMobile ?? maskMobileNumber(mobileNumber),
+      message: delivery.message,
     },
   };
 }
@@ -483,31 +490,39 @@ export async function requestSigninOtp(
     request,
   });
 
-  const sms = await sendOtp({
-    to: targetMobile,
+  const delivery = await deliverOtpCode({
+    mobileNumber: targetMobile,
     otp,
     purpose: "EMPLOYEE_LOGIN",
     companyName: company.name,
   });
 
-  if (!sms.delivered) {
+  if (!delivery.delivered) {
     await logOtpAudit(company.id, "otp_send_failed", request, {
       employeeId: employee.id,
-      metadata: { flow: "signin", provider: sms.provider },
+      metadata: {
+        flow: "signin",
+        provider: delivery.provider,
+        statusCode: delivery.statusCode ?? null,
+      },
     });
-    return { ok: false, status: 503, error: "Could not send OTP. Please try again shortly." };
+    return {
+      ok: false,
+      status: 503,
+      error: delivery.error ?? "Could not send OTP. Please try again shortly.",
+    };
   }
 
   await logOtpAudit(company.id, "otp_sent", request, {
     employeeId: employee.id,
-    metadata: { flow: "signin", provider: sms.provider },
+    metadata: { flow: "signin", provider: delivery.provider },
   });
 
   return {
     ok: true,
     data: {
       ok: true,
-      maskedMobile: maskMobileNumber(targetMobile),
+      maskedMobile: delivery.maskedMobile ?? maskMobileNumber(targetMobile),
       message: GENERIC_SIGNIN_MESSAGE,
     },
   };
@@ -630,9 +645,4 @@ export async function verifySigninOtp(
   };
 }
 
-export function attachSessionCookie(
-  response: import("next/server").NextResponse,
-  sessionToken: string
-): void {
-  response.cookies.set(employeeSessionCookieOptions(sessionToken));
-}
+export { attachSessionCookie, registerEmployee, signInEmployee } from "./direct-auth";

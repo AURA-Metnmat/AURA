@@ -4,20 +4,7 @@ import { attachSessionCookie, signInEmployee } from "@/lib/auth/employee-otp/dir
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const identifier =
-      body.identifier ??
-      body.email ??
-      body.mobile_number ??
-      body.mobileNumber ??
-      "";
-    const result = await signInEmployee(
-      {
-        companySlug: body.company_slug ?? body.companySlug,
-        identifier,
-        password: body.password ?? "",
-      },
-      request
-    );
+    const result = await signInEmployee(body, request);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
@@ -25,7 +12,7 @@ export async function POST(request: Request) {
     attachSessionCookie(response, result.sessionToken);
     return response;
   } catch (error) {
-    console.error("employees/login error:", error);
+    console.error("employee signin error:", error);
     return NextResponse.json({ error: "Sign in failed. Please try again." }, { status: 500 });
   }
 }

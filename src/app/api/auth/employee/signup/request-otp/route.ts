@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
-import { requestSignupOtp } from "@/lib/auth/employee-otp/service";
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-    const result = await requestSignupOtp(body, request);
-    if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
-    }
-    return NextResponse.json(result.data);
-  } catch (error) {
-    console.error("signup request-otp error:", error);
-    return NextResponse.json({ error: "Could not send OTP. Please try again." }, { status: 500 });
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: "OTP verification is disabled. Use POST /api/auth/employee/signup instead." },
+    { status: 410 }
+  );
 }
