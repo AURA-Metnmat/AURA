@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createAndStoreOtp, type OtpPurpose } from "@/lib/employees/otp";
-import { deliverEmployeeOtp } from "@/lib/notifications/otp-delivery";
+import { deliverEmployeeOtp, buildOtpDeliveryFailureMessage } from "@/lib/notifications/otp-delivery";
 import {
   isValidEmail,
   isValidMobileNumber,
@@ -76,13 +76,16 @@ export async function POST(request: Request) {
     });
 
     if (!delivery.delivered) {
-      const hint = deliveryEmail
-        ? "Could not send OTP by SMS or email. Please try again in a moment."
-        : "SMS could not be delivered. Add your email above and tap Send OTP again, or verify your number in Twilio.";
+      const hint = buildOtpDeliveryFailureMessage({
+        hasEmail: !!deliveryEmail,
+        smsError: delivery.smsError,
+        emailError: delivery.emailError,
+      });
       return NextResponse.json(
         {
           error: hint,
           sms_error: delivery.smsError ?? null,
+          email_error: delivery.emailError ?? null,
         },
         { status: 503 }
       );
@@ -92,6 +95,7 @@ export async function POST(request: Request) {
       success: true,
       expires_at: expiresAt.toISOString(),
       delivery_method: delivery.method,
+      delivery_note: delivery.deliveryNote ?? null,
       dev_logged: delivery.devLogged,
       ...(delivery.devLogged && process.env.NODE_ENV !== "production"
         ? { dev_otp: code }

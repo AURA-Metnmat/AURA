@@ -293,11 +293,13 @@ export function EmployeeAuthPanel({
       setResendCooldown(60);
       setDevOtpHint(typeof data.dev_otp === "string" ? data.dev_otp : null);
       setDeliveryHint(
-        data.delivery_method === "email"
-          ? `Code sent to ${email.trim()}. Check your inbox.`
-          : data.delivery_method === "sms"
-            ? `Code sent to +91 ${normalized} via SMS.`
-            : null
+        typeof data.delivery_note === "string"
+          ? data.delivery_note
+          : data.delivery_method === "email"
+            ? `Code sent to ${email.trim()}. Check your inbox.`
+            : data.delivery_method === "sms"
+              ? `Code sent to +91 ${normalized} via SMS.`
+              : null
       );
       autoSendAttempted.current = `${mode}:${normalized}`;
     } catch (err) {
