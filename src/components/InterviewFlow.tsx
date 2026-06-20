@@ -89,8 +89,10 @@ export default function InterviewFlow({
   const sections = SECTION_NAMES[language];
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, pendingFiles]);
+    const el = bottomRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length, loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -508,11 +510,8 @@ export default function InterviewFlow({
   }
 
   return (
-    <InterviewShell
-      background={step === "chat" ? "dotted" : "neural"}
-      accentColor={step === "auth" ? "#b91c1c" : "#f59e0b"}
-    >
-      <header className="border-b border-white/10 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 backdrop-blur-sm bg-slate-950/60">
+    <InterviewShell variant={step === "chat" ? "chat" : "default"}>
+      <header className="border-b border-white/[0.06] px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 bg-[#09090f]/95">
         <div>
           <p className="text-xs uppercase tracking-widest text-amber-400">AURA-METNMAT Interview</p>
           <h1 className="text-lg font-semibold">{showCompanyBadge ? companyName : form.fullName || "Interview"}</h1>
@@ -581,43 +580,45 @@ export default function InterviewFlow({
 
       {step === "chat" && (
         <>
-          <div className="border-b border-white/10 px-4 sm:px-6 py-3 bg-slate-950/70 backdrop-blur-sm shrink-0">
-            <div className="max-w-6xl mx-auto">
+          <div className="border-b border-white/[0.06] px-4 sm:px-6 py-2 bg-[#09090f] shrink-0">
+            <div className="max-w-3xl mx-auto">
               <LanguageBar
                 selected={language}
                 onSelect={changeLanguage}
                 disabled={loading}
                 compact
-                label="Switch your language anytime"
+                label="Language"
               />
             </div>
           </div>
-          <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 max-w-6xl mx-auto w-full">
-            {chatError && (
-              <p className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3">
-                {chatError}
-              </p>
-            )}
-            <BilingualChat
-              messages={messages.map(
-                (msg): BilingualMessage => ({
-                  role: msg.role,
-                  contentEn: msg.contentEn,
-                  contentLocale: msg.contentLocale,
-                  interaction: msg.interaction,
-                  attachments: msg.attachments?.map(renderAttachment),
-                })
+          <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4">
+            <div className="max-w-3xl mx-auto">
+              {chatError && (
+                <p className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3">
+                  {chatError}
+                </p>
               )}
-              preferredLanguage={language}
-              thinking={loading}
-              thinkingEn={tEn.thinking}
-              thinkingLocale={t.thinking}
-              engagement={engagement}
-              participantName={form.fullName}
-              loading={loading}
-              onMcqSelect={(en, locale) => void handleMcqSelect(en, locale)}
-            />
-            <div ref={bottomRef} />
+              <BilingualChat
+                messages={messages.map(
+                  (msg): BilingualMessage => ({
+                    role: msg.role,
+                    contentEn: msg.contentEn,
+                    contentLocale: msg.contentLocale,
+                    interaction: msg.interaction,
+                    attachments: msg.attachments?.map(renderAttachment),
+                  })
+                )}
+                preferredLanguage={language}
+                thinking={loading}
+                thinkingEn={tEn.thinking}
+                thinkingLocale={t.thinking}
+                engagement={engagement}
+                participantName={form.fullName}
+                loading={loading}
+                onMcqSelect={(en, locale) => void handleMcqSelect(en, locale)}
+              />
+              <div ref={bottomRef} className="h-1" />
+            </div>
           </main>
 
           <InterviewChatComposer
@@ -633,12 +634,11 @@ export default function InterviewFlow({
             language={language}
             t={t}
             engagement={engagement}
-            onQuickPrompt={setInput}
             onVoiceTextChange={setInput}
           />
 
           {remainingSeconds === 0 && (
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-2">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-2 shrink-0">
               <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2 text-center">
                 Your allotted session time has ended. You may finish your current answer and complete the interview.
               </p>
@@ -646,7 +646,7 @@ export default function InterviewFlow({
           )}
 
           {completionPct >= 85 && (
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-4 text-center">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-3 text-center shrink-0">
               <button
                 onClick={completeInterview}
                 disabled={loading}

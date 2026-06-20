@@ -6,6 +6,8 @@ import {
 } from "@/lib/auth/employee";
 import { logEmployeeAuth } from "@/lib/employees/auth-log";
 import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
+import { verifyOtpVerificationToken } from "@/lib/employees/otp";
+
 import {
   isValidMobileNumber,
   normalizeMobileNumber,
@@ -14,6 +16,7 @@ import {
 interface LoginBody {
   mobile_number?: string;
   company_id?: string;
+  otp_token?: string;
 }
 
 export async function POST(request: Request) {
@@ -21,12 +24,25 @@ export async function POST(request: Request) {
     const body = (await request.json()) as LoginBody;
     const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
     const companyId = body.company_id?.trim();
+    const otpToken = body.otp_token?.trim();
+
+    if (!otpToken) {
+      return NextResponse.json({ error: "Mobile verification is required." }, { status: 400 });
+    }
 
     if (!isValidMobileNumber(mobileNumber)) {
       return NextResponse.json({ error: "Enter your registered 10-digit mobile number." }, { status: 400 });
     }
     if (!companyId) {
       return NextResponse.json({ error: "Company context is required." }, { status: 400 });
+    }
+
+    const otpVerified = verifyOtpVerificationToken(otpToken, companyId, mobileNumber, "login");
+    if (!otpVerified) {
+      return NextResponse.json(
+        { error: "Mobile verification expired. Please verify your number again." },
+        { status: 401 }
+      );
     }
 
     const employee = await db.employee.findFirst({

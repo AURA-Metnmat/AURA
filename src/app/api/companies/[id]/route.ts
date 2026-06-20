@@ -171,9 +171,8 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Delete company error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete company. Please try again." },
-      { status: 500 }
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to delete company. Please try again.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

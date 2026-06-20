@@ -39,6 +39,10 @@ export async function getDeleteCompanySummary(companyId: string): Promise<Delete
   };
 }
 
+/**
+ * Deletes a company and all related data without interactive transactions.
+ * Interactive $transaction callbacks fail with Supabase PgBouncer (P2028).
+ */
 export async function deleteCompanyCompletely(companyId: string): Promise<DeleteCompanySummary> {
   const company = await db.company.findUnique({
     where: { id: companyId },
@@ -72,32 +76,30 @@ export async function deleteCompanyCompletely(companyId: string): Promise<Delete
     }
   }
 
-  const summary: DeleteCompanySummary = {
+  const referenceFiles = await db.dataFile.findMany({
+    where: { companySlug: company.slug },
+    select: { id: true },
+  });
+  const referenceFileIds = referenceFiles.map((f) => f.id);
+
+  if (referenceFileIds.length > 0) {
+    await db.dataRecord.deleteMany({ where: { fileId: { in: referenceFileIds } } });
+    await db.dataSheet.deleteMany({ where: { fileId: { in: referenceFileIds } } });
+    await db.dataInsight.deleteMany({ where: { fileId: { in: referenceFileIds } } });
+  }
+
+  await db.dataFile.deleteMany({ where: { companySlug: company.slug } });
+  await db.furnaceSpec.deleteMany({ where: { companySlug: company.slug } });
+  await db.pdfDocument.deleteMany({ where: { companySlug: company.slug } });
+  await db.employeeOtp.deleteMany({ where: { companyId: company.id } });
+
+  // Company delete cascades to interview sessions (and their children) and employees.
+  await db.company.delete({ where: { id: company.id } });
+
+  return {
     companyName: company.name,
     sessions: company.sessions.length,
-    referenceFiles: 0,
+    referenceFiles: referenceFiles.length,
     storageFiles: storageKeys.length,
   };
-
-  await db.$transaction(async (tx) => {
-    const referenceFiles = await tx.dataFile.findMany({
-      where: { companySlug: company.slug },
-      select: { id: true },
-    });
-    summary.referenceFiles = referenceFiles.length;
-
-    for (const file of referenceFiles) {
-      await tx.dataRecord.deleteMany({ where: { fileId: file.id } });
-      await tx.dataSheet.deleteMany({ where: { fileId: file.id } });
-      await tx.dataInsight.deleteMany({ where: { fileId: file.id } });
-    }
-
-    await tx.dataFile.deleteMany({ where: { companySlug: company.slug } });
-    await tx.furnaceSpec.deleteMany({ where: { companySlug: company.slug } });
-    await tx.pdfDocument.deleteMany({ where: { companySlug: company.slug } });
-    await tx.interviewSession.deleteMany({ where: { companyId: company.id } });
-    await tx.company.delete({ where: { id: company.id } });
-  });
-
-  return summary;
 }

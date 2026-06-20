@@ -54,6 +54,7 @@ interface VoiceInputButtonProps {
   baseText: string;
   onTextChange: (text: string) => void;
   disabled?: boolean;
+  compact?: boolean;
   labels: {
     speakAnswer: string;
     listening: string;
@@ -67,6 +68,7 @@ export function VoiceInputButton({
   baseText,
   onTextChange,
   disabled,
+  compact,
   labels,
 }: VoiceInputButtonProps) {
   const [listening, setListening] = useState(false);
@@ -106,17 +108,19 @@ export function VoiceInputButton({
     }
 
     const recognition = new Ctor();
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = LANGUAGE_TTS_PROFILE[language].speechLang;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = "";
+      let gotFinal = false;
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const chunk = result[0]?.transcript ?? "";
         if (result.isFinal) {
           finalTranscriptRef.current += chunk;
+          gotFinal = true;
         } else {
           interim += chunk;
         }
@@ -125,6 +129,11 @@ export function VoiceInputButton({
       const spoken = `${finalTranscriptRef.current}${interim}`.trim();
       const prefix = baseTextRef.current;
       onTextChangeRef.current(prefix ? `${prefix} ${spoken}`.trim() : spoken);
+
+      if (gotFinal) {
+        listeningIntentRef.current = false;
+        recognition.stop();
+      }
     };
 
     recognition.onerror = (event) => {
@@ -135,24 +144,20 @@ export function VoiceInputButton({
         return;
       }
       if (event.error === "aborted") return;
-      if (event.error === "no-speech") return;
+      if (event.error === "no-speech") {
+        setError("No speech detected. Tap mic to try again.");
+        listeningIntentRef.current = false;
+        setListening(false);
+        return;
+      }
       setError("Voice capture interrupted. Tap mic to try again.");
       listeningIntentRef.current = false;
       setListening(false);
     };
 
     recognition.onend = () => {
-      if (listeningIntentRef.current) {
-        try {
-          recognition.start();
-        } catch {
-          applyTranscript();
-          listeningIntentRef.current = false;
-          setListening(false);
-        }
-        return;
-      }
       applyTranscript();
+      listeningIntentRef.current = false;
       setListening(false);
     };
 
@@ -192,13 +197,20 @@ export function VoiceInputButton({
     startRecognition();
   }, [baseText, startRecognition]);
 
-  const toggle = useCallback(() => {
+  useEffect(() => {
+    if (disabled && listening) {
+      stop();
+    }
+  }, [disabled, listening, stop]);
+
+  const handleClick = useCallback(() => {
+    if (disabled) return;
     if (listening) {
       stop();
     } else {
       void start();
     }
-  }, [listening, start, stop]);
+  }, [disabled, listening, start, stop]);
 
   useEffect(() => () => {
     listeningIntentRef.current = false;
@@ -212,30 +224,37 @@ export function VoiceInputButton({
   }, [language, listening]);
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className={cn("flex flex-col items-center gap-1", compact && "gap-0")}>
       <button
         type="button"
         disabled={disabled}
-        onClick={toggle}
+        onClick={handleClick}
         className={cn(
-          "shrink-0 w-12 h-12 flex items-center justify-center rounded-xl border transition-all",
+          "shrink-0 flex items-center justify-center rounded-xl border transition-all",
+          compact ? "w-8 h-8" : "w-12 h-12",
           listening
-            ? "bg-red-500/20 border-red-500 text-red-400 scale-105 shadow-lg shadow-red-500/20 animate-pulse"
+            ? "bg-red-500/20 border-red-500 text-red-400 shadow-md shadow-red-500/15"
             : "border-slate-600 hover:border-amber-500 hover:bg-amber-500/10 text-slate-300",
           disabled && "opacity-40 cursor-not-allowed"
         )}
         title={listening ? labels.stopListening : labels.speakAnswer}
         aria-pressed={listening}
       >
-        {listening ? <Square className="w-5 h-5 fill-current" /> : <Mic className="w-5 h-5" />}
+        {listening ? (
+          <Square className={cn("fill-current", compact ? "w-3.5 h-3.5" : "w-5 h-5")} />
+        ) : (
+          <Mic className={compact ? "w-3.5 h-3.5" : "w-5 h-5"} />
+        )}
       </button>
-      <span className="text-[9px] text-slate-500 max-w-[4.5rem] text-center leading-tight">
-        {listening ? labels.listening : labels.speakAnswer}
-      </span>
-      {unsupported && (
+      {!compact && (
+        <span className="text-[9px] text-slate-500 max-w-[4.5rem] text-center leading-tight">
+          {listening ? labels.listening : labels.speakAnswer}
+        </span>
+      )}
+      {!compact && unsupported && (
         <p className="text-[10px] text-amber-400/80 max-w-[140px] text-center">{labels.micUnsupported}</p>
       )}
-      {error && (
+      {!compact && error && (
         <p className="text-[10px] text-red-300/90 max-w-[160px] text-center flex items-start gap-1">
           <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
           <span>{error}</span>

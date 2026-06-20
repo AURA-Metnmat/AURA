@@ -288,8 +288,8 @@ export default function AdminPage() {
     }
   }
 
-  function closeDeleteModal() {
-    if (deleting) return;
+  function closeDeleteModal(force = false) {
+    if (deleting && !force) return;
     setDeleteTarget(null);
     setDeleteSummary(null);
   }
@@ -307,7 +307,7 @@ export default function AdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to delete company");
 
-      closeDeleteModal();
+      closeDeleteModal(true);
       setCompanyDetail(null);
       setSelectedCompanyId(null);
       setView("dashboard");

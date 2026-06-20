@@ -8,6 +8,8 @@ import {
 } from "@/lib/auth/employee";
 import { generateEmployeeCode, generateUniqueUsername } from "@/lib/employees/credentials";
 import { logEmployeeAuth } from "@/lib/employees/auth-log";
+import { verifyOtpVerificationToken } from "@/lib/employees/otp";
+
 import {
   isValidDesignation,
   isValidEmail,
@@ -25,6 +27,7 @@ interface RegisterBody {
   mobile_number?: string;
   email?: string;
   company_id?: string;
+  otp_token?: string;
 }
 
 export async function POST(request: Request) {
@@ -36,6 +39,11 @@ export async function POST(request: Request) {
     const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
     const email = body.email?.trim() ? sanitizeTextInput(body.email, 254) : null;
     const companyId = body.company_id?.trim();
+    const otpToken = body.otp_token?.trim();
+
+    if (!otpToken) {
+      return NextResponse.json({ error: "Mobile verification is required." }, { status: 400 });
+    }
 
     if (!employeeName || employeeName.length < 2) {
       return NextResponse.json({ error: "Employee name is required." }, { status: 400 });
@@ -57,6 +65,14 @@ export async function POST(request: Request) {
     }
     if (!companyId) {
       return NextResponse.json({ error: "Company context is required." }, { status: 400 });
+    }
+
+    const otpVerified = verifyOtpVerificationToken(otpToken, companyId, mobileNumber, "register");
+    if (!otpVerified) {
+      return NextResponse.json(
+        { error: "Mobile verification expired. Please verify your number again." },
+        { status: 401 }
+      );
     }
 
     const company = await db.company.findFirst({

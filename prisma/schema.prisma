@@ -110,6 +110,20 @@ model EmployeeAuthLog {
   @@index([createdAt])
 }
 
+model EmployeeOtp {
+  id           String   @id @default(cuid())
+  companyId    String
+  mobileNumber String
+  codeHash     String
+  purpose      String
+  expiresAt    DateTime
+  attempts     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([companyId, mobileNumber, purpose])
+  @@index([expiresAt])
+}
+
 model ParticipantProfile {
   id               String           @id @default(cuid())
   sessionId        String           @unique
