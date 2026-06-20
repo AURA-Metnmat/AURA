@@ -124,7 +124,7 @@ export async function requireEmployeeSession(
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
 
-  if (employee.accountStatus === "disabled") {
+  if (employee.accountStatus === "disabled" || employee.accountStatus === "INACTIVE") {
     return NextResponse.json(
       { error: "Account is disabled. Contact your administrator." },
       { status: 403 }

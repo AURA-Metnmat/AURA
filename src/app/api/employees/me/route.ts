@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ authenticated: false });
     }
 
-    if (employee.accountStatus === "disabled") {
+    if (employee.accountStatus === "disabled" || employee.accountStatus === "INACTIVE") {
       const response = NextResponse.json({ authenticated: false });
       response.cookies.set(clearEmployeeSessionCookie());
       return response;

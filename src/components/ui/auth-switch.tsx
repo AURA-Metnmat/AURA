@@ -538,7 +538,7 @@ export function AuthSwitch({
                 className="btn-transparent"
                 onClick={() => onModeChange(true)}
               >
-                Register
+                REGISTER
               </button>
             </div>
           </div>
@@ -552,7 +552,7 @@ export function AuthSwitch({
                 className="btn-transparent"
                 onClick={() => onModeChange(false)}
               >
-                Sign in
+                SIGN IN
               </button>
             </div>
           </div>

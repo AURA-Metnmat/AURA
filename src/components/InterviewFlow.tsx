@@ -40,7 +40,9 @@ interface ParticipantForm {
 
 interface InterviewFlowProps {
   companyId: string;
+  companySlug: string;
   companyName: string;
+  inviteToken?: string;
   interviewDurationMinutes?: number;
   showCompanyBadge?: boolean;
 }
@@ -55,7 +57,9 @@ type FlowStep = "language" | "auth" | "chat";
 
 export default function InterviewFlow({
   companyId,
+  companySlug,
   companyName,
+  inviteToken,
   interviewDurationMinutes: initialDurationMinutes = 5,
   showCompanyBadge = true,
 }: InterviewFlowProps) {
@@ -612,7 +616,9 @@ export default function InterviewFlow({
           {step === "auth" && (
         <EmployeeAuthPanel
           companyName={companyName}
+          companySlug={companySlug}
           companyId={companyId}
+          inviteToken={inviteToken}
           onBack={() => setStep("language")}
           onRegistered={handleRegistered}
           onLoggedIn={handleLoggedIn}

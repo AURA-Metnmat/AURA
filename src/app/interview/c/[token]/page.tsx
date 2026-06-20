@@ -12,6 +12,7 @@ export default function CompanyInterviewPage({
   const [company, setCompany] = useState<{
     id: string;
     name: string;
+    slug: string;
     interviewDurationMinutes?: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,9 @@ export default function CompanyInterviewPage({
   return (
     <InterviewFlow
       companyId={company.id}
+      companySlug={company.slug}
       companyName={company.name}
+      inviteToken={token ?? undefined}
       interviewDurationMinutes={company.interviewDurationMinutes ?? 5}
     />
   );

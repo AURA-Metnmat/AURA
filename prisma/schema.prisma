@@ -12,24 +12,30 @@ datasource db {
 // ─── Interview / multi-tenant ───────────────────────────────────────────────
 
 model Company {
-  id           String             @id @default(cuid())
-  slug         String             @unique
-  inviteToken  String             @unique
-  name         String
-  category     String?
-  industry     String?
-  description  String?
-  aiContext    String?
-  interviewDurationMinutes Int @default(5)
-  contactName  String?
-  contactEmail String?
-  contactPhone String?
-  location     String?
-  isActive     Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  sessions     InterviewSession[]
-  employees    Employee[]
+  id                         String             @id @default(cuid())
+  slug                       String             @unique
+  inviteToken                String             @unique
+  name                       String
+  category                   String?
+  industry                   String?
+  description                String?
+  aiContext                  String?
+  interviewDurationMinutes   Int                @default(5)
+  contactName                String?
+  contactEmail               String?
+  contactPhone               String?
+  location                   String?
+  isActive                   Boolean            @default(true)
+  allowEmployeeSelfRegistration Boolean         @default(true)
+  requireMobileOtpForEmployeeLogin Boolean     @default(true)
+  allowedEmailDomains        String?
+  registrationMode           String             @default("OPEN")
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+  sessions                   InterviewSession[]
+  employees                  Employee[]
+  otpVerifications           OtpVerification[]
+  otpAuditLogs               EmployeeOtpAuditLog[]
 
   @@index([isActive])
   @@index([category])
@@ -78,8 +84,9 @@ model Employee {
   passwordHash        String
   designation         String?
   department          String?
+  mobileVerifiedAt    DateTime?
   isFirstLogin        Boolean             @default(true)
-  accountStatus       String              @default("active")
+  accountStatus       String              @default("ACTIVE")
   failedLoginAttempts Int                 @default(0)
   lockedUntil         DateTime?
   createdAt           DateTime            @default(now())
@@ -87,8 +94,10 @@ model Employee {
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   sessions            InterviewSession[]
   authLogs            EmployeeAuthLog[]
+  otpVerifications    OtpVerification[]
 
   @@unique([companyId, mobileNumber])
+  @@unique([companyId, email])
   @@unique([companyId, username])
   @@unique([companyId, employeeCode])
   @@index([companyId])
@@ -122,6 +131,47 @@ model EmployeeOtp {
 
   @@index([companyId, email, purpose])
   @@index([expiresAt])
+}
+
+model OtpVerification {
+  id                  String    @id @default(cuid())
+  companyId           String
+  employeeId          String?
+  purpose             String
+  mobileNumber        String
+  mobileNumberHash    String
+  otpHash             String
+  registrationPayload String?
+  expiresAt           DateTime
+  attempts            Int       @default(0)
+  consumedAt          DateTime?
+  ipAddress           String?
+  userAgent           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employee            Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, purpose, mobileNumberHash])
+  @@index([companyId, employeeId, purpose])
+  @@index([expiresAt])
+  @@index([consumedAt])
+}
+
+model EmployeeOtpAuditLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  employeeId String?
+  action     String
+  ipAddress  String?
+  userAgent  String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model ParticipantProfile {
