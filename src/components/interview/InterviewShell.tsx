@@ -7,7 +7,7 @@ interface InterviewShellProps {
   children: ReactNode;
   className?: string;
   /** Flat static background for chat — no motion or accent shifts */
-  variant?: "default" | "chat";
+  variant?: "default" | "chat" | "welcome";
 }
 
 export function InterviewShell({
@@ -26,6 +26,18 @@ export function InterviewShell({
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-[#09090f]"
+        />
+      ) : variant === "welcome" ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: `
+              radial-gradient(ellipse 70% 50% at 50% 0%, rgba(245,158,11,0.06), transparent 55%),
+              radial-gradient(ellipse 50% 40% at 100% 80%, rgba(245,158,11,0.03), transparent 50%),
+              linear-gradient(180deg, #050508 0%, #09090f 50%, #050508 100%)
+            `,
+          }}
         />
       ) : (
         <div
