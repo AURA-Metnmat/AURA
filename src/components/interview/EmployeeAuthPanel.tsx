@@ -106,6 +106,7 @@ function OtpBlock({
   resendCooldown,
   error,
   devOtpHint,
+  deliveryHint,
   onSendOtp,
   onVerifyOtp,
 }: {
@@ -118,6 +119,7 @@ function OtpBlock({
   resendCooldown: number;
   error: string | null;
   devOtpHint: string | null;
+  deliveryHint: string | null;
   onSendOtp: () => void;
   onVerifyOtp: () => void;
 }) {
@@ -138,7 +140,9 @@ function OtpBlock({
   if (!otpSent) {
     return (
       <div className="space-y-2">
-        <p className="text-xs text-slate-500 px-1">We&apos;ll send a 6-digit code to verify this number.</p>
+        <p className="text-xs text-slate-500 px-1">
+          Enter email first, then mobile. OTP sends via SMS or email if SMS fails.
+        </p>
         <button
           type="button"
           disabled={otpLoading}
@@ -155,7 +159,13 @@ function OtpBlock({
   return (
     <div className="space-y-2 rounded-xl bg-slate-900/40 border border-white/8 p-3">
       <p className="text-xs text-slate-400">
-        Enter OTP sent to <span className="text-slate-200">+91 {normalized}</span>
+        {deliveryHint ? (
+          deliveryHint
+        ) : (
+          <>
+            Enter OTP sent to <span className="text-slate-200">+91 {normalized}</span>
+          </>
+        )}
       </p>
       {devOtpHint && (
         <p className="text-xs text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-center">
@@ -213,6 +223,7 @@ export function EmployeeAuthPanel({
   const [otpCode, setOtpCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
+  const [deliveryHint, setDeliveryHint] = useState<string | null>(null);
   const autoSendAttempted = useRef<string | null>(null);
 
   const [fullName, setFullName] = useState("");
@@ -237,6 +248,7 @@ export function EmployeeAuthPanel({
     setOtpCode("");
     setError(null);
     setDevOtpHint(null);
+    setDeliveryHint(null);
     autoSendAttempted.current = null;
   }, []);
 
@@ -268,6 +280,7 @@ export function EmployeeAuthPanel({
           mobile_number: normalized,
           company_id: companyId,
           purpose: mode,
+          ...(mode === "register" && email.trim() ? { email: email.trim() } : {}),
         }),
       });
       const data = await res.json();
@@ -279,15 +292,23 @@ export function EmployeeAuthPanel({
       setOtpCode("");
       setResendCooldown(60);
       setDevOtpHint(typeof data.dev_otp === "string" ? data.dev_otp : null);
+      setDeliveryHint(
+        data.delivery_method === "email"
+          ? `Code sent to ${email.trim()}. Check your inbox.`
+          : data.delivery_method === "sms"
+            ? `Code sent to +91 ${normalized} via SMS.`
+            : null
+      );
       autoSendAttempted.current = `${mode}:${normalized}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send OTP");
     } finally {
       setOtpLoading(false);
     }
-  }, [activeMobile, companyId, mode]);
+  }, [activeMobile, companyId, mode, email]);
 
   useEffect(() => {
+    if (mode !== "login") return;
     const normalized = normalizeMobile(activeMobile);
     const key = `${mode}:${normalized}`;
     if (!isValidMobile(normalized) || otpSent || otpVerified || otpLoading) return;
@@ -428,6 +449,7 @@ export function EmployeeAuthPanel({
       resendCooldown={resendCooldown}
       error={error}
       devOtpHint={devOtpHint}
+      deliveryHint={deliveryHint}
       onSendOtp={() => void sendOtp()}
       onVerifyOtp={() => void verifyOtp()}
     />
@@ -485,9 +507,9 @@ export function EmployeeAuthPanel({
               <AuthField icon={<User size={iconSize} />} value={fullName} onChange={setFullName} placeholder="Employee name" required autoComplete="name" />
               <AuthField icon={<Briefcase size={iconSize} />} value={designation} onChange={setDesignation} placeholder="Designation" required autoComplete="organization-title" />
               <AuthField icon={<Building2 size={iconSize} />} value={department} onChange={setDepartment} placeholder="Department" required autoComplete="organization" />
+              <AuthField icon={<Mail size={iconSize} />} type="email" value={email} onChange={setEmail} placeholder="Email (for OTP backup)" autoComplete="email" />
               <AuthField icon={<Phone size={iconSize} />} type="tel" value={mobile} onChange={handleMobileChange} placeholder="Mobile number" required autoComplete="tel" />
               {otpBlock}
-              <AuthField icon={<Mail size={iconSize} />} type="email" value={email} onChange={setEmail} placeholder="Email (optional)" autoComplete="email" />
             </div>
           ) : (
             <div className="space-y-3">

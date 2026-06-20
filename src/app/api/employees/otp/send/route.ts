@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { createAndStoreOtp, type OtpPurpose } from "@/lib/employees/otp";
 import { deliverEmployeeOtp } from "@/lib/notifications/otp-delivery";
 import {
+  isValidEmail,
   isValidMobileNumber,
   normalizeMobileNumber,
 } from "@/lib/employees/validation";
@@ -11,6 +12,7 @@ interface SendOtpBody {
   mobile_number?: string;
   company_id?: string;
   purpose?: OtpPurpose;
+  email?: string;
 }
 
 export async function POST(request: Request) {
@@ -19,6 +21,7 @@ export async function POST(request: Request) {
     const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
     const companyId = body.company_id?.trim();
     const purpose = body.purpose;
+    const requestEmail = body.email?.trim() || null;
 
     if (!isValidMobileNumber(mobileNumber)) {
       return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
@@ -39,6 +42,7 @@ export async function POST(request: Request) {
 
     const existing = await db.employee.findFirst({
       where: { companyId, mobileNumber },
+      select: { email: true },
     });
 
     if (purpose === "register" && existing) {
@@ -55,17 +59,31 @@ export async function POST(request: Request) {
       );
     }
 
+    const deliveryEmail =
+      purpose === "login"
+        ? existing?.email?.trim() || null
+        : requestEmail && isValidEmail(requestEmail)
+          ? requestEmail
+          : null;
+
     const { code, expiresAt } = await createAndStoreOtp(companyId, mobileNumber, purpose);
     const delivery = await deliverEmployeeOtp({
       companyName: company.name,
       mobileNumber,
       code,
       purpose,
+      email: deliveryEmail,
     });
 
-    if (!delivery.smsSent) {
+    if (!delivery.delivered) {
+      const hint = deliveryEmail
+        ? "Could not send OTP by SMS or email. Please try again in a moment."
+        : "SMS could not be delivered. Add your email above and tap Send OTP again, or verify your number in Twilio.";
       return NextResponse.json(
-        { error: "Could not send OTP. Please try again later." },
+        {
+          error: hint,
+          sms_error: delivery.smsError ?? null,
+        },
         { status: 503 }
       );
     }
@@ -73,6 +91,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       expires_at: expiresAt.toISOString(),
+      delivery_method: delivery.method,
       dev_logged: delivery.devLogged,
       ...(delivery.devLogged && process.env.NODE_ENV !== "production"
         ? { dev_otp: code }
