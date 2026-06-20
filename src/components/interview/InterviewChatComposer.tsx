@@ -26,6 +26,7 @@ interface InterviewChatComposerProps {
   t: UiStrings;
   engagement: EngagementStrings;
   onVoiceTextChange: (text: string) => void;
+  onVoiceSubmit?: (text: string) => void;
 }
 
 export function InterviewChatComposer({
@@ -42,12 +43,14 @@ export function InterviewChatComposer({
   t,
   engagement,
   onVoiceTextChange,
+  onVoiceSubmit,
 }: InterviewChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const canSend = !loading && (input.trim().length > 0 || pendingFiles.length > 0);
 
   return (
     <footer className="border-t border-white/[0.06] bg-[#09090f] px-4 sm:px-6 py-3 shrink-0">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {pendingFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">
             {pendingFiles.map((f) => (
@@ -70,7 +73,7 @@ export function InterviewChatComposer({
         )}
 
         <form onSubmit={onSend}>
-          <div className="flex gap-2 items-end">
+          <div className="flex gap-2 sm:gap-3 items-end">
             <input
               ref={fileInputRef}
               type="file"
@@ -97,56 +100,60 @@ export function InterviewChatComposer({
               )}
             </button>
 
-            <div className="flex-1 relative">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onSend(e);
-                  }
-                }}
-                placeholder={t.typeResponse}
-                disabled={loading}
-                rows={1}
-                className={cn(
-                  "w-full bg-slate-900/80 border border-white/10 rounded-2xl px-4 py-3 pr-12 text-sm",
-                  "focus:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/15",
-                  "disabled:opacity-50 resize-none min-h-[44px] max-h-32"
-                )}
-              />
-              <div className="absolute right-2 bottom-2">
-                <VoiceInputButton
-                  language={language}
-                  baseText={input}
-                  onTextChange={onVoiceTextChange}
-                  disabled={loading || !sessionReady}
-                  labels={{
-                    speakAnswer: engagement.speakAnswer,
-                    listening: engagement.listening,
-                    stopListening: engagement.stopListening,
-                    micUnsupported: engagement.micUnsupported,
-                  }}
-                  compact
-                />
-              </div>
-            </div>
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onSend(e);
+                }
+              }}
+              placeholder={t.typeResponse}
+              disabled={loading}
+              rows={1}
+              className={cn(
+                "flex-1 bg-slate-900/80 border border-white/10 rounded-2xl px-4 py-3 text-sm",
+                "focus:outline-none focus:border-amber-500/40 focus:ring-1 focus:ring-amber-500/15",
+                "disabled:opacity-50 resize-none min-h-[48px] max-h-32"
+              )}
+            />
+
+            <VoiceInputButton
+              language={language}
+              baseText={input}
+              onTextChange={onVoiceTextChange}
+              onUtteranceComplete={(text) => {
+                onVoiceTextChange(text);
+                if (text.trim() && onVoiceSubmit && !loading && sessionReady) {
+                  onVoiceSubmit(text.trim());
+                }
+              }}
+              disabled={loading || !sessionReady}
+              prominent
+              labels={{
+                speakAnswer: engagement.speakAnswer,
+                listening: engagement.listening,
+                stopListening: engagement.stopListening,
+                micUnsupported: engagement.micUnsupported,
+              }}
+            />
 
             <button
               type="submit"
-              disabled={loading || (!input.trim() && pendingFiles.length === 0)}
-              className="shrink-0 w-10 h-10 flex items-center justify-center bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 rounded-xl transition-colors"
+              disabled={!canSend}
+              className="shrink-0 w-12 h-12 flex items-center justify-center bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 rounded-xl transition-colors"
             >
               {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <Send className="w-4 h-4" />
+                <Send className="w-5 h-5" />
               )}
             </button>
           </div>
-          <p className="text-[10px] text-slate-600 text-center mt-2">
-            Tap mic to speak once · Tap Listen to hear the question in your language
+
+          <p className="text-[10px] text-slate-600 text-center mt-2.5">
+            {engagement.voiceOrTypeHint} · {engagement.speakAndSendHint}
           </p>
         </form>
       </div>

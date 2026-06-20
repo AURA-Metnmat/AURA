@@ -53,8 +53,10 @@ interface VoiceInputButtonProps {
   language: Language;
   baseText: string;
   onTextChange: (text: string) => void;
+  onUtteranceComplete?: (text: string) => void;
   disabled?: boolean;
   compact?: boolean;
+  prominent?: boolean;
   labels: {
     speakAnswer: string;
     listening: string;
@@ -67,8 +69,10 @@ export function VoiceInputButton({
   language,
   baseText,
   onTextChange,
+  onUtteranceComplete,
   disabled,
   compact,
+  prominent,
   labels,
 }: VoiceInputButtonProps) {
   const [listening, setListening] = useState(false);
@@ -79,10 +83,15 @@ export function VoiceInputButton({
   const finalTranscriptRef = useRef("");
   const listeningIntentRef = useRef(false);
   const onTextChangeRef = useRef(onTextChange);
+  const onUtteranceCompleteRef = useRef(onUtteranceComplete);
 
   useEffect(() => {
     onTextChangeRef.current = onTextChange;
   }, [onTextChange]);
+
+  useEffect(() => {
+    onUtteranceCompleteRef.current = onUtteranceComplete;
+  }, [onUtteranceComplete]);
 
   const applyTranscript = useCallback(() => {
     const spoken = finalTranscriptRef.current.trim();
@@ -157,6 +166,12 @@ export function VoiceInputButton({
 
     recognition.onend = () => {
       applyTranscript();
+      const spoken = finalTranscriptRef.current.trim();
+      const prefix = baseTextRef.current;
+      const full = prefix ? `${prefix} ${spoken}`.trim() : spoken;
+      if (full) {
+        onUtteranceCompleteRef.current?.(full);
+      }
       listeningIntentRef.current = false;
       setListening(false);
     };
@@ -224,38 +239,43 @@ export function VoiceInputButton({
   }, [language, listening]);
 
   return (
-    <div className={cn("flex flex-col items-center gap-1", compact && "gap-0")}>
+    <div className={cn("flex flex-col items-center gap-1", compact && !prominent && "gap-0")}>
       <button
         type="button"
         disabled={disabled}
         onClick={handleClick}
         className={cn(
-          "shrink-0 flex items-center justify-center rounded-xl border transition-all",
-          compact ? "w-8 h-8" : "w-12 h-12",
+          "shrink-0 flex items-center justify-center rounded-xl border transition-all relative",
+          prominent ? "w-14 h-14" : compact ? "w-8 h-8" : "w-12 h-12",
           listening
-            ? "bg-red-500/20 border-red-500 text-red-400 shadow-md shadow-red-500/15"
-            : "border-slate-600 hover:border-amber-500 hover:bg-amber-500/10 text-slate-300",
+            ? "bg-red-500/20 border-red-500 text-red-400 shadow-lg shadow-red-500/20"
+            : prominent
+              ? "border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:border-amber-400"
+              : "border-slate-600 hover:border-amber-500 hover:bg-amber-500/10 text-slate-300",
           disabled && "opacity-40 cursor-not-allowed"
         )}
         title={listening ? labels.stopListening : labels.speakAnswer}
         aria-pressed={listening}
       >
+        {listening && prominent && (
+          <span className="absolute inset-0 rounded-xl border-2 border-red-400/50 animate-ping" />
+        )}
         {listening ? (
-          <Square className={cn("fill-current", compact ? "w-3.5 h-3.5" : "w-5 h-5")} />
+          <Square className={cn("fill-current relative z-10", prominent ? "w-6 h-6" : compact ? "w-3.5 h-3.5" : "w-5 h-5")} />
         ) : (
-          <Mic className={compact ? "w-3.5 h-3.5" : "w-5 h-5"} />
+          <Mic className={cn("relative z-10", prominent ? "w-6 h-6" : compact ? "w-3.5 h-3.5" : "w-5 h-5")} />
         )}
       </button>
-      {!compact && (
-        <span className="text-[9px] text-slate-500 max-w-[4.5rem] text-center leading-tight">
+      {(prominent || !compact) && (
+        <span className={cn("text-slate-500 text-center leading-tight", prominent ? "text-xs max-w-[8rem]" : "text-[9px] max-w-[4.5rem]")}>
           {listening ? labels.listening : labels.speakAnswer}
         </span>
       )}
-      {!compact && unsupported && (
-        <p className="text-[10px] text-amber-400/80 max-w-[140px] text-center">{labels.micUnsupported}</p>
+      {(prominent || !compact) && unsupported && (
+        <p className="text-[10px] text-amber-400/80 max-w-[180px] text-center">{labels.micUnsupported}</p>
       )}
-      {!compact && error && (
-        <p className="text-[10px] text-red-300/90 max-w-[160px] text-center flex items-start gap-1">
+      {(prominent || !compact) && error && (
+        <p className="text-[10px] text-red-300/90 max-w-[200px] text-center flex items-start gap-1 justify-center">
           <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
           <span>{error}</span>
         </p>

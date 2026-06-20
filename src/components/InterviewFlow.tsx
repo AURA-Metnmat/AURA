@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { PREFERRED_LANGUAGES, UI, SECTION_NAMES, type Language } from "@/lib/aura/i18n";
 import { getEngagement } from "@/lib/aura/engagement";
@@ -423,6 +423,26 @@ export default function InterviewFlow({
     await submitUserAnswer(display);
   }
 
+  async function handleVoiceSubmit(text: string) {
+    if (!sessionId || loading || !text.trim()) return;
+    setInput("");
+    await submitUserAnswer(text.trim());
+  }
+
+  const bilingualMessages = useMemo(
+    () =>
+      messages.map(
+        (msg): BilingualMessage => ({
+          role: msg.role,
+          contentEn: msg.contentEn,
+          contentLocale: msg.contentLocale,
+          interaction: msg.interaction,
+          attachments: msg.attachments?.map(renderAttachment),
+        })
+      ),
+    [messages]
+  );
+
   async function completeInterview() {
     if (!sessionId) return;
     setLoading(true);
@@ -581,7 +601,7 @@ export default function InterviewFlow({
       {step === "chat" && (
         <>
           <div className="border-b border-white/[0.06] px-4 sm:px-6 py-2 bg-[#09090f] shrink-0">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-6xl mx-auto">
               <LanguageBar
                 selected={language}
                 onSelect={changeLanguage}
@@ -592,22 +612,14 @@ export default function InterviewFlow({
             </div>
           </div>
           <main className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-6xl mx-auto">
               {chatError && (
                 <p className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-900/50 rounded-xl px-4 py-3">
                   {chatError}
                 </p>
               )}
               <BilingualChat
-                messages={messages.map(
-                  (msg): BilingualMessage => ({
-                    role: msg.role,
-                    contentEn: msg.contentEn,
-                    contentLocale: msg.contentLocale,
-                    interaction: msg.interaction,
-                    attachments: msg.attachments?.map(renderAttachment),
-                  })
-                )}
+                messages={bilingualMessages}
                 preferredLanguage={language}
                 thinking={loading}
                 thinkingEn={tEn.thinking}
@@ -635,10 +647,11 @@ export default function InterviewFlow({
             t={t}
             engagement={engagement}
             onVoiceTextChange={setInput}
+            onVoiceSubmit={(text) => void handleVoiceSubmit(text)}
           />
 
           {remainingSeconds === 0 && (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-2 shrink-0">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-2 shrink-0">
               <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2 text-center">
                 Your allotted session time has ended. You may finish your current answer and complete the interview.
               </p>
@@ -646,7 +659,7 @@ export default function InterviewFlow({
           )}
 
           {completionPct >= 85 && (
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-3 text-center shrink-0">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-3 text-center shrink-0">
               <button
                 onClick={completeInterview}
                 disabled={loading}

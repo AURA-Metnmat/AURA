@@ -21,6 +21,10 @@ export interface EngagementStrings {
   mcqOrTypeHint: string;
   listenLabel: string;
   welcomeChatHint: string;
+  bilingualLocaleLabel: string;
+  bilingualEnglishLabel: string;
+  voiceOrTypeHint: string;
+  speakAndSendHint: string;
 }
 
 export const ENGAGEMENT: Record<Language, EngagementStrings> = {
@@ -45,6 +49,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     mcqOrTypeHint: "Or type your own answer below",
     listenLabel: "Listen",
     welcomeChatHint: "Tap options, speak, or type — AURA guides you with clear, friendly questions.",
+    bilingualLocaleLabel: "Your language",
+    bilingualEnglishLabel: "English",
+    voiceOrTypeHint: "Type below or tap the mic to speak your answer",
+    speakAndSendHint: "Tap mic · speak once · sends automatically when you finish",
   },
   hi: {
     detailsDesc: "बातचीत शुरू करने के लिए कुछ बुनियादी जानकारी। एक मिनट से कम समय लगेगा।",
@@ -67,6 +75,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     mcqOrTypeHint: "या नीचे अपना उत्तर टाइप करें",
     listenLabel: "सुनें",
     welcomeChatHint: "विकल्प चुनें, बोलें या टाइप करें — AURA स्पष्ट, मित्रवत प्रश्न पूछता है।",
+    bilingualLocaleLabel: "आपकी भाषा",
+    bilingualEnglishLabel: "English",
+    voiceOrTypeHint: "नीचे टाइप करें या माइक टैप करके बोलें",
+    speakAndSendHint: "माइक टैप करें · एक बार बोलें · समाप्त होने पर स्वतः भेजा जाएगा",
   },
   or: {
     detailsDesc: "କଥୋପକଥନ ଆରମ୍ଭ କରିବା ପାଇଁ କିଛି ମୂଳ ତଥ୍ୟ। ଏକ ମିନିଟରୁ କମ ସମୟ।",
@@ -89,6 +101,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     mcqOrTypeHint: "କିମ୍ବା ନିମ୍ନରେ ନିଜ ଉତ୍ତର ଟାଇପ୍ କରନ୍ତୁ",
     listenLabel: "ଶୁଣନ୍ତୁ",
     welcomeChatHint: "option ବାଛନ୍ତୁ, କହନ୍ତୁ କିମ୍ବା ଟାଇପ୍ କରନ୍ତୁ — AURA ସ୍ପଷ୍ଟ ପ୍ରଶ୍ନ ପଚାରେ।",
+    bilingualLocaleLabel: "ଆପଣଙ୍କ ଭାଷା",
+    bilingualEnglishLabel: "English",
+    voiceOrTypeHint: "ନିମ୍ନରେ ଟାଇପ୍ କରନ୍ତୁ କିମ୍ବା ମାଇକ୍ ଟ୍ୟାପ୍ କରି କହନ୍ତୁ",
+    speakAndSendHint: "ମାଇକ୍ ଟ୍ୟାପ୍ · ଥରେ କହନ୍ତୁ · ଶେଷ ହେଲେ ସ୍ୱତଃ ପଠାଯିବ",
   },
   bn: {
     detailsDesc: "কথোপকথন শুরু করতে কয়েকটি মৌলিক তথ্য। এক মিনিটেরও কম সময় লাগবে।",
@@ -111,6 +127,10 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     mcqOrTypeHint: "অথবা নিচে নিজের উত্তর লিখুন",
     listenLabel: "শুনুন",
     welcomeChatHint: "বিকল্প বেছে নিন, বলুন বা লিখুন — AURA স্পষ্ট, বন্ধুত্বপূর্ণ প্রশ্ন করে।",
+    bilingualLocaleLabel: "আপনার ভাষা",
+    bilingualEnglishLabel: "English",
+    voiceOrTypeHint: "নিচে লিখুন বা মাইক ট্যাপ করে বলুন",
+    speakAndSendHint: "মাইক ট্যাপ · একবার বলুন · শেষ হলে স্বয়ংক্রিয়ভাবে পাঠাবে",
   },
 };
 

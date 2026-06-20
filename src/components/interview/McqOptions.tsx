@@ -36,7 +36,9 @@ export function McqOptions({
       </p>
       <div className="flex flex-col gap-2">
         {interaction.options.map((opt, index) => {
-          const label = englishOnly ? opt.en : opt.locale || opt.en;
+          const localeLabel = opt.locale || opt.en;
+          const showDual = !englishOnly && localeLabel !== opt.en;
+
           return (
             <button
               key={opt.id}
@@ -52,10 +54,10 @@ export function McqOptions({
                 disabled && !answered && "opacity-50 cursor-not-allowed"
               )}
             >
-              <span className="inline-flex items-center gap-3">
+              <span className="inline-flex items-start gap-3 w-full">
                 <span
                   className={cn(
-                    "shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold border",
+                    "shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-semibold border mt-0.5",
                     answered
                       ? "border-white/10 text-slate-500"
                       : "border-amber-500/30 text-amber-300 group-hover:bg-amber-500/20"
@@ -63,11 +65,15 @@ export function McqOptions({
                 >
                   {String.fromCharCode(65 + index)}
                 </span>
-                <span className="leading-snug">{label}</span>
+                {showDual ? (
+                  <span className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
+                    <span className="leading-snug text-slate-100">{localeLabel}</span>
+                    <span className="leading-snug text-slate-400 text-[13px]">{opt.en}</span>
+                  </span>
+                ) : (
+                  <span className="leading-snug flex-1">{opt.en}</span>
+                )}
               </span>
-              {!englishOnly && opt.en !== label && (
-                <span className="block mt-1 ml-10 text-[11px] text-slate-500">{opt.en}</span>
-              )}
             </button>
           );
         })}
