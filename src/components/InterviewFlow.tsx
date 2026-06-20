@@ -510,7 +510,7 @@ export default function InterviewFlow({
   }
 
   return (
-    <InterviewShell variant={step === "chat" ? "chat" : step === "language" ? "welcome" : "default"}>
+    <InterviewShell variant={step === "chat" ? "chat" : step === "language" || step === "auth" ? "welcome" : "default"}>
       <header className="border-b border-white/[0.06] px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 bg-[#09090f]/95">
         <div>
           <p className="text-xs uppercase tracking-widest text-amber-400">AURA-METNMAT Interview</p>

@@ -25,7 +25,7 @@ export function AuthSwitch({
   signInTitle = "Sign in",
   signUpTitle = "Create profile",
   signInPanelHeading = "One of us?",
-  signInPanelText = "Welcome back! Sign in with your mobile number to continue your interview.",
+  signInPanelText = "Welcome back! Sign in with your email to continue your interview.",
   signUpPanelHeading = "New here?",
   signUpPanelText = "Register once with your work details — then talk with AURA anytime.",
   className,
@@ -196,6 +196,122 @@ export function AuthSwitch({
 
         .aura-auth-switch .auth-btn:disabled {
           opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .aura-auth-switch .auth-otp-wrap {
+          width: 100%;
+          max-width: 380px;
+          margin: 6px 0;
+        }
+
+        .aura-auth-switch .auth-otp-verified {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          border-radius: 10px;
+          border: 1px solid rgba(34, 197, 94, 0.35);
+          background: rgba(22, 101, 52, 0.2);
+          padding: 0.65rem 0.85rem;
+          font-size: 0.75rem;
+          color: #86efac;
+        }
+
+        .aura-auth-switch .auth-otp-panel {
+          border-radius: 10px;
+          border: 1px solid #333333;
+          background: #141414;
+          padding: 0.75rem;
+          width: 100%;
+        }
+
+        .aura-auth-switch .auth-otp-send {
+          width: 100%;
+          min-height: 44px;
+          border-radius: 10px;
+          border: 1px solid #404040;
+          background: #1c1c1c;
+          color: #e5e5e5;
+          font-size: 0.8rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.4rem;
+          cursor: pointer;
+          transition: 0.2s;
+        }
+
+        .aura-auth-switch .auth-otp-send:hover:not(:disabled) {
+          border-color: #b91c1c;
+          background: #242424;
+        }
+
+        .aura-auth-switch .auth-otp-send:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .aura-auth-switch .auth-otp-input {
+          flex: 1;
+          background: #1c1c1c;
+          border: 1px solid #333333;
+          border-radius: 10px;
+          padding: 0.6rem 0.75rem;
+          text-align: center;
+          font-size: 1rem;
+          letter-spacing: 0.35em;
+          font-family: ui-monospace, monospace;
+          color: #f5f5f5;
+          outline: none;
+        }
+
+        .aura-auth-switch .auth-otp-input:focus {
+          border-color: #b91c1c;
+          box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.18);
+        }
+
+        .aura-auth-switch .auth-otp-verify {
+          min-height: 44px;
+          padding: 0 1rem;
+          border-radius: 10px;
+          border: 1px solid rgba(185, 28, 28, 0.55);
+          background: linear-gradient(135deg, #450a0a, #991b1b);
+          color: #fafafa;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+        }
+
+        .aura-auth-switch .auth-otp-verify:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+
+        .aura-auth-switch .auth-otp-hint {
+          font-size: 0.7rem;
+          color: #737373;
+          text-align: center;
+          margin-bottom: 0.35rem;
+        }
+
+        .aura-auth-switch .auth-otp-resend {
+          font-size: 0.68rem;
+          color: #737373;
+          margin: 0.5rem auto 0;
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          background: none;
+          border: none;
+          cursor: pointer;
+        }
+
+        .aura-auth-switch .auth-otp-resend:hover:not(:disabled) {
+          color: #fca5a5;
+        }
+
+        .aura-auth-switch .auth-otp-resend:disabled {
+          opacity: 0.45;
           cursor: not-allowed;
         }
 
