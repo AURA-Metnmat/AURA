@@ -1,57 +1,92 @@
-import { sendOtpSms } from "./sms-providers";
-
-export type OtpDeliveryMethod = "sms" | "dev";
+export type OtpDeliveryMethod = "email" | "dev";
 
 export interface OtpDeliveryResult {
   delivered: boolean;
   method: OtpDeliveryMethod | null;
   devLogged: boolean;
-  smsError?: string;
-  smsProvider?: string;
+  emailError?: string;
 }
 
-export function buildOtpDeliveryFailureMessage(smsError?: string): string {
-  if (!smsError || smsError === "SMS service is not configured on the server.") {
-    return "SMS OTP is not configured yet. Ask your administrator to set up Fast2SMS or MSG91.";
+function buildOtpEmailHtml(companyName: string, code: string): string {
+  return `
+    <p>Your <strong>${companyName}</strong> AURA verification code is:</p>
+    <p style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:16px 0;">${code}</p>
+    <p>This code expires in 10 minutes. Do not share it with anyone.</p>
+  `.trim();
+}
+
+async function sendEmailResend(
+  to: string,
+  subject: string,
+  html: string
+): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM_EMAIL?.trim() ?? "AURA <onboarding@resend.dev>";
+  if (!apiKey) {
+    return { ok: false, error: "Email service is not configured on the server." };
   }
 
-  const lower = smsError.toLowerCase();
-  if (lower.includes("website verification") || lower.includes("otp message menu")) {
-    return "Fast2SMS needs website verification. Open fast2sms.com → OTP Message and complete verification, then try again.";
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to: [to], subject, html }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("[Resend OTP email failed]", res.status, errText);
+    try {
+      const parsed = JSON.parse(errText) as { message?: string };
+      return { ok: false, error: parsed.message ?? "Email delivery failed." };
+    } catch {
+      return { ok: false, error: "Email delivery failed." };
+    }
   }
 
-  if (lower.includes("unverified")) {
-    return "SMS could not be delivered. Configure Fast2SMS or MSG91 for reliable Indian mobile OTP.";
+  return { ok: true };
+}
+
+export function buildOtpDeliveryFailureMessage(emailError?: string): string {
+  if (!emailError || emailError === "Email service is not configured on the server.") {
+    return "Email OTP is not configured yet. Ask your administrator to set up Resend.";
   }
 
-  if (lower.includes("insufficient") || lower.includes("wallet") || lower.includes("balance")) {
-    return "SMS credits are low on the provider account. Please contact your administrator.";
+  const lower = emailError.toLowerCase();
+  if (lower.includes("only send testing emails to your own email")) {
+    return "Email is in Resend sandbox mode. Verify your domain at resend.com/domains, or use your Resend account email to test.";
   }
 
-  return "Could not send OTP to your mobile number. Please try again in a moment.";
+  if (lower.includes("verify a domain")) {
+    return "Verify your sending domain in Resend before sending OTP emails to employees.";
+  }
+
+  return "Could not send OTP to your email. Please try again in a moment.";
 }
 
 export async function deliverEmployeeOtp(options: {
   companyName: string;
-  mobileNumber: string;
+  email: string;
   code: string;
   purpose: "register" | "login";
 }): Promise<OtpDeliveryResult> {
-  const { companyName, mobileNumber, code, purpose } = options;
+  const { companyName, email, code, purpose } = options;
   const action = purpose === "register" ? "registration" : "sign-in";
 
-  const sms = await sendOtpSms({ mobileNumber, code, companyName });
-  if (sms.ok) {
-    return {
-      delivered: true,
-      method: "sms",
-      devLogged: false,
-      smsProvider: sms.provider,
-    };
+  const emailAttempt = await sendEmailResend(
+    email,
+    `${companyName} — AURA verification code`,
+    buildOtpEmailHtml(companyName, code)
+  );
+
+  if (emailAttempt.ok) {
+    return { delivered: true, method: "email", devLogged: false };
   }
 
   if (process.env.NODE_ENV !== "production") {
-    console.info(`[AURA OTP — dev only] ${action} for +91${mobileNumber}: ${code}`);
+    console.info(`[AURA OTP — dev only] ${action} for ${email}: ${code}`);
     return { delivered: true, method: "dev", devLogged: true };
   }
 
@@ -59,6 +94,6 @@ export async function deliverEmployeeOtp(options: {
     delivered: false,
     method: null,
     devLogged: false,
-    smsError: sms.error,
+    emailError: emailAttempt.error,
   };
 }

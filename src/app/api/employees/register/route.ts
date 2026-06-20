@@ -14,6 +14,7 @@ import {
   isValidDesignation,
   isValidEmail,
   isValidMobileNumber,
+  normalizeEmail,
   normalizeMobileNumber,
   sanitizeDesignation,
   sanitizeEmployeeName,
@@ -37,12 +38,12 @@ export async function POST(request: Request) {
     const designation = sanitizeDesignation(body.designation ?? "");
     const department = sanitizeTextInput(body.department ?? "", 120);
     const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
-    const email = body.email?.trim() ? sanitizeTextInput(body.email, 254) : null;
+    const email = normalizeEmail(body.email ?? "");
     const companyId = body.company_id?.trim();
     const otpToken = body.otp_token?.trim();
 
     if (!otpToken) {
-      return NextResponse.json({ error: "Mobile verification is required." }, { status: 400 });
+      return NextResponse.json({ error: "Email verification is required." }, { status: 400 });
     }
 
     if (!employeeName || employeeName.length < 2) {
@@ -60,17 +61,17 @@ export async function POST(request: Request) {
     if (!isValidMobileNumber(mobileNumber)) {
       return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
     }
-    if (email && !isValidEmail(email)) {
+    if (!isValidEmail(email)) {
       return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
     }
     if (!companyId) {
       return NextResponse.json({ error: "Company context is required." }, { status: 400 });
     }
 
-    const otpVerified = verifyOtpVerificationToken(otpToken, companyId, mobileNumber, "register");
+    const otpVerified = verifyOtpVerificationToken(otpToken, companyId, email, "register");
     if (!otpVerified) {
       return NextResponse.json(
-        { error: "Mobile verification expired. Please verify your number again." },
+        { error: "Email verification expired. Please verify your email again." },
         { status: 401 }
       );
     }
@@ -83,13 +84,20 @@ export async function POST(request: Request) {
     }
 
     const existing = await db.employee.findFirst({
-      where: { companyId, mobileNumber },
+      where: {
+        companyId,
+        OR: [
+          { mobileNumber },
+          { email: { equals: email, mode: "insensitive" } },
+        ],
+      },
     });
     if (existing) {
-      return NextResponse.json(
-        { error: "This mobile number is already registered. Use Sign in with your mobile number." },
-        { status: 409 }
-      );
+      const message =
+        existing.email?.toLowerCase() === email
+          ? "This email is already registered. Use Sign in instead."
+          : "This mobile number is already registered. Use Sign in instead.";
+      return NextResponse.json({ error: message }, { status: 409 });
     }
 
     const username = await generateUniqueUsername(companyId, employeeName);

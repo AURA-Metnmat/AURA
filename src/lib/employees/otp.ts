@@ -2,6 +2,7 @@ import { createHmac, randomInt, timingSafeEqual } from "crypto";
 import bcrypt from "bcryptjs";
 import { env } from "@/lib/env";
 import { db } from "@/lib/db";
+import { normalizeEmail } from "@/lib/employees/validation";
 
 export type OtpPurpose = "register" | "login";
 
@@ -12,7 +13,7 @@ const BCRYPT_ROUNDS = 10;
 
 export interface OtpVerificationPayload {
   companyId: string;
-  mobileNumber: string;
+  email: string;
   purpose: OtpPurpose;
   exp: number;
 }
@@ -23,21 +24,22 @@ function generateOtpCode(): string {
 
 export async function createAndStoreOtp(
   companyId: string,
-  mobileNumber: string,
+  email: string,
   purpose: OtpPurpose
 ): Promise<{ code: string; expiresAt: Date }> {
+  const normalizedEmail = normalizeEmail(email);
   const code = generateOtpCode();
   const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
   const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
   await db.employeeOtp.deleteMany({
-    where: { companyId, mobileNumber, purpose },
+    where: { companyId, email: normalizedEmail, purpose },
   });
 
   await db.employeeOtp.create({
     data: {
       companyId,
-      mobileNumber,
+      email: normalizedEmail,
       codeHash,
       purpose,
       expiresAt,
@@ -49,12 +51,13 @@ export async function createAndStoreOtp(
 
 export async function verifyOtpCode(
   companyId: string,
-  mobileNumber: string,
+  email: string,
   purpose: OtpPurpose,
   code: string
 ): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+  const normalizedEmail = normalizeEmail(email);
   const record = await db.employeeOtp.findFirst({
-    where: { companyId, mobileNumber, purpose },
+    where: { companyId, email: normalizedEmail, purpose },
     orderBy: { createdAt: "desc" },
   });
 
@@ -82,19 +85,19 @@ export async function verifyOtpCode(
   }
 
   await db.employeeOtp.delete({ where: { id: record.id } });
-  const token = createOtpVerificationToken(companyId, mobileNumber, purpose);
+  const token = createOtpVerificationToken(companyId, normalizedEmail, purpose);
   return { ok: true, token };
 }
 
 export function createOtpVerificationToken(
   companyId: string,
-  mobileNumber: string,
+  email: string,
   purpose: OtpPurpose
 ): string {
   const secret = env().sessionSecret;
   const exp = Date.now() + OTP_VERIFY_TTL_MS;
   const payload = Buffer.from(
-    JSON.stringify({ companyId, mobileNumber, purpose, exp })
+    JSON.stringify({ companyId, email: normalizeEmail(email), purpose, exp })
   ).toString("base64url");
   const sig = createHmac("sha256", secret).update(payload).digest("base64url");
   return `${payload}.${sig}`;
@@ -103,7 +106,7 @@ export function createOtpVerificationToken(
 export function verifyOtpVerificationToken(
   token: string,
   expectedCompanyId: string,
-  expectedMobile: string,
+  expectedEmail: string,
   expectedPurpose: OtpPurpose
 ): OtpVerificationPayload | null {
   const secret = env().sessionSecret;
@@ -123,12 +126,12 @@ export function verifyOtpVerificationToken(
     const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as OtpVerificationPayload;
     if (
       typeof data.companyId !== "string" ||
-      typeof data.mobileNumber !== "string" ||
+      typeof data.email !== "string" ||
       typeof data.purpose !== "string" ||
       typeof data.exp !== "number" ||
       data.exp <= Date.now() ||
       data.companyId !== expectedCompanyId ||
-      data.mobileNumber !== expectedMobile ||
+      data.email !== normalizeEmail(expectedEmail) ||
       data.purpose !== expectedPurpose
     ) {
       return null;

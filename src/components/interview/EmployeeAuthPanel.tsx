@@ -57,6 +57,14 @@ function isValidMobile(value: string): boolean {
   return /^\d{10}$/.test(normalizeMobile(value));
 }
 
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
+}
+
 function AuthField({
   icon,
   type = "text",
@@ -97,7 +105,7 @@ function AuthField({
 }
 
 function OtpBlock({
-  mobile,
+  email,
   otpSent,
   otpVerified,
   otpCode,
@@ -110,7 +118,7 @@ function OtpBlock({
   onSendOtp,
   onVerifyOtp,
 }: {
-  mobile: string;
+  email: string;
   otpSent: boolean;
   otpVerified: boolean;
   otpCode: string;
@@ -123,16 +131,16 @@ function OtpBlock({
   onSendOtp: () => void;
   onVerifyOtp: () => void;
 }) {
-  const normalized = normalizeMobile(mobile);
+  const normalized = normalizeEmail(email);
   const canVerify = otpCode.replace(/\D/g, "").length === 6 && !otpLoading;
 
-  if (!isValidMobile(normalized)) return null;
+  if (!isValidEmail(normalized)) return null;
 
   if (otpVerified) {
     return (
       <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-2.5">
         <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-        <p className="text-xs text-emerald-300">+91 {normalized} verified</p>
+        <p className="text-xs text-emerald-300">{normalized} verified</p>
       </div>
     );
   }
@@ -141,7 +149,7 @@ function OtpBlock({
     return (
       <div className="space-y-2">
         <p className="text-xs text-slate-500 px-1">
-          A 6-digit code will be sent to your mobile number via SMS.
+          A 6-digit code will be sent to your email.
         </p>
         <button
           type="button"
@@ -150,7 +158,7 @@ function OtpBlock({
           className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-white/10 text-sm text-slate-200 disabled:opacity-40 transition-colors"
         >
           {otpLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4 text-amber-400" />}
-          Send OTP to +91 {normalized}
+          Send OTP to {normalized}
         </button>
       </div>
     );
@@ -159,11 +167,9 @@ function OtpBlock({
   return (
     <div className="space-y-2 rounded-xl bg-slate-900/40 border border-white/8 p-3">
       <p className="text-xs text-slate-400">
-        {deliveryHint ? (
-          deliveryHint
-        ) : (
+        {deliveryHint ?? (
           <>
-            Enter OTP sent to <span className="text-slate-200">+91 {normalized}</span>
+            Enter OTP sent to <span className="text-slate-200">{normalized}</span>
           </>
         )}
       </p>
@@ -231,9 +237,9 @@ export function EmployeeAuthPanel({
   const [department, setDepartment] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
-  const [loginMobile, setLoginMobile] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
 
-  const activeMobile = mode === "register" ? mobile : loginMobile;
+  const activeEmail = mode === "register" ? email : loginEmail;
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
@@ -257,16 +263,16 @@ export function EmployeeAuthPanel({
     resetOtpState();
   }
 
-  function handleMobileChange(value: string) {
-    if (mode === "register") setMobile(value);
-    else setLoginMobile(value);
+  function handleEmailChange(value: string) {
+    if (mode === "register") setEmail(value);
+    else setLoginEmail(value);
     resetOtpState();
   }
 
   const sendOtp = useCallback(async () => {
-    const normalized = normalizeMobile(activeMobile);
-    if (!isValidMobile(normalized)) {
-      setError("Enter a valid 10-digit mobile number.");
+    const normalized = normalizeEmail(activeEmail);
+    if (!isValidEmail(normalized)) {
+      setError("Enter a valid email address.");
       return;
     }
 
@@ -277,7 +283,7 @@ export function EmployeeAuthPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mobile_number: normalized,
+          email: normalized,
           company_id: companyId,
           purpose: mode,
         }),
@@ -292,8 +298,8 @@ export function EmployeeAuthPanel({
       setResendCooldown(60);
       setDevOtpHint(typeof data.dev_otp === "string" ? data.dev_otp : null);
       setDeliveryHint(
-        data.delivery_method === "sms"
-          ? `Code sent to +91 ${normalized} via SMS.`
+        data.delivery_method === "email"
+          ? `Code sent to ${normalized}. Check your inbox.`
           : null
       );
       autoSendAttempted.current = `${mode}:${normalized}`;
@@ -302,13 +308,13 @@ export function EmployeeAuthPanel({
     } finally {
       setOtpLoading(false);
     }
-  }, [activeMobile, companyId, mode]);
+  }, [activeEmail, companyId, mode]);
 
   useEffect(() => {
     if (mode !== "login") return;
-    const normalized = normalizeMobile(activeMobile);
+    const normalized = normalizeEmail(activeEmail);
     const key = `${mode}:${normalized}`;
-    if (!isValidMobile(normalized) || otpSent || otpVerified || otpLoading) return;
+    if (!isValidEmail(normalized) || otpSent || otpVerified || otpLoading) return;
     if (autoSendAttempted.current === key) return;
 
     const timer = window.setTimeout(() => {
@@ -317,10 +323,10 @@ export function EmployeeAuthPanel({
     }, 600);
 
     return () => window.clearTimeout(timer);
-  }, [activeMobile, mode, otpSent, otpVerified, otpLoading, sendOtp]);
+  }, [activeEmail, mode, otpSent, otpVerified, otpLoading, sendOtp]);
 
   async function verifyOtp() {
-    const normalized = normalizeMobile(activeMobile);
+    const normalized = normalizeEmail(activeEmail);
     const code = otpCode.replace(/\D/g, "");
     if (code.length !== 6) {
       setError("Enter the 6-digit OTP.");
@@ -334,7 +340,7 @@ export function EmployeeAuthPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mobile_number: normalized,
+          email: normalized,
           company_id: companyId,
           purpose: mode,
           code,
@@ -355,7 +361,11 @@ export function EmployeeAuthPanel({
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!otpToken) {
-      setError("Verify your mobile number with OTP first.");
+      setError("Verify your email with OTP first.");
+      return;
+    }
+    if (!isValidMobile(mobile)) {
+      setError("Enter a valid 10-digit mobile number.");
       return;
     }
 
@@ -363,6 +373,7 @@ export function EmployeeAuthPanel({
     setError(null);
     try {
       const normalizedMobile = normalizeMobile(mobile);
+      const normalizedEmail = normalizeEmail(email);
       const res = await fetch("/api/employees/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -371,7 +382,7 @@ export function EmployeeAuthPanel({
           designation,
           department,
           mobile_number: normalizedMobile,
-          email: email || undefined,
+          email: normalizedEmail,
           company_id: companyId,
           otp_token: otpToken,
         }),
@@ -384,7 +395,7 @@ export function EmployeeAuthPanel({
         designation: designation.trim(),
         department: department.trim(),
         mobile: normalizedMobile,
-        email: email.trim(),
+        email: normalizedEmail,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
@@ -396,19 +407,19 @@ export function EmployeeAuthPanel({
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!otpToken) {
-      setError("Verify your mobile number with OTP first.");
+      setError("Verify your email with OTP first.");
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      const normalizedMobile = normalizeMobile(loginMobile);
+      const normalizedEmail = normalizeEmail(loginEmail);
       const res = await fetch("/api/employees/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mobile_number: normalizedMobile,
+          email: normalizedEmail,
           company_id: companyId,
           otp_token: otpToken,
         }),
@@ -421,8 +432,8 @@ export function EmployeeAuthPanel({
           fullName: data.employee_name ?? "",
           designation: data.designation ?? "",
           department: data.department ?? "",
-          mobile: data.mobile_number ?? normalizedMobile,
-          email: data.email ?? "",
+          mobile: data.mobile_number ?? "",
+          email: data.email ?? normalizedEmail,
         },
         activeSession: data.active_session ?? null,
       });
@@ -437,7 +448,7 @@ export function EmployeeAuthPanel({
 
   const otpBlock = (
     <OtpBlock
-      mobile={activeMobile}
+      email={activeEmail}
       otpSent={otpSent}
       otpVerified={otpVerified}
       otpCode={otpCode}
@@ -468,7 +479,7 @@ export function EmployeeAuthPanel({
           <h2 className="text-xl font-semibold text-slate-100">
             {mode === "register" ? "Create your profile" : "Welcome back"}
           </h2>
-          <p className="text-sm text-slate-500">Mobile OTP verification required</p>
+          <p className="text-sm text-slate-500">Email OTP verification required</p>
         </div>
 
         <div className="flex rounded-xl bg-slate-900/60 border border-white/10 p-1">
@@ -504,14 +515,14 @@ export function EmployeeAuthPanel({
               <AuthField icon={<User size={iconSize} />} value={fullName} onChange={setFullName} placeholder="Employee name" required autoComplete="name" />
               <AuthField icon={<Briefcase size={iconSize} />} value={designation} onChange={setDesignation} placeholder="Designation" required autoComplete="organization-title" />
               <AuthField icon={<Building2 size={iconSize} />} value={department} onChange={setDepartment} placeholder="Department" required autoComplete="organization" />
-              <AuthField icon={<Phone size={iconSize} />} type="tel" value={mobile} onChange={handleMobileChange} placeholder="Mobile number" required autoComplete="tel" />
+              <AuthField icon={<Mail size={iconSize} />} type="email" value={email} onChange={handleEmailChange} placeholder="Email address" required autoComplete="email" />
               {otpBlock}
-              <AuthField icon={<Mail size={iconSize} />} type="email" value={email} onChange={setEmail} placeholder="Email (optional)" autoComplete="email" />
+              <AuthField icon={<Phone size={iconSize} />} type="tel" value={mobile} onChange={setMobile} placeholder="Mobile number" required autoComplete="tel" />
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-slate-400 text-center">Sign in with your registered mobile number.</p>
-              <AuthField icon={<Phone size={iconSize} />} type="tel" value={loginMobile} onChange={handleMobileChange} placeholder="Mobile number" required autoComplete="tel" />
+              <p className="text-sm text-slate-400 text-center">Sign in with your registered email address.</p>
+              <AuthField icon={<Mail size={iconSize} />} type="email" value={loginEmail} onChange={handleEmailChange} placeholder="Email address" required autoComplete="email" />
               {otpBlock}
             </div>
           )}

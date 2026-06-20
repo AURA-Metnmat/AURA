@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { verifyOtpCode, type OtpPurpose } from "@/lib/employees/otp";
-import {
-  isValidMobileNumber,
-  normalizeMobileNumber,
-} from "@/lib/employees/validation";
+import { isValidEmail, normalizeEmail } from "@/lib/employees/validation";
 
 interface VerifyOtpBody {
-  mobile_number?: string;
+  email?: string;
   company_id?: string;
   purpose?: OtpPurpose;
   code?: string;
@@ -15,13 +12,13 @@ interface VerifyOtpBody {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as VerifyOtpBody;
-    const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
+    const email = normalizeEmail(body.email ?? "");
     const companyId = body.company_id?.trim();
     const purpose = body.purpose;
     const code = body.code?.trim().replace(/\D/g, "");
 
-    if (!isValidMobileNumber(mobileNumber)) {
-      return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
     }
     if (!companyId) {
       return NextResponse.json({ error: "Company context is required." }, { status: 400 });
@@ -33,7 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Enter the 6-digit OTP." }, { status: 400 });
     }
 
-    const result = await verifyOtpCode(companyId, mobileNumber, purpose, code);
+    const result = await verifyOtpCode(companyId, email, purpose, code);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

@@ -111,16 +111,16 @@ model EmployeeAuthLog {
 }
 
 model EmployeeOtp {
-  id           String   @id @default(cuid())
-  companyId    String
-  mobileNumber String
-  codeHash     String
-  purpose      String
-  expiresAt    DateTime
-  attempts     Int      @default(0)
-  createdAt    DateTime @default(now())
+  id        String   @id @default(cuid())
+  companyId String
+  email     String
+  codeHash  String
+  purpose   String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
 
-  @@index([companyId, mobileNumber, purpose])
+  @@index([companyId, email, purpose])
   @@index([expiresAt])
 }
 

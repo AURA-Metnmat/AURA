@@ -12,8 +12,12 @@ export function isValidMobileNumber(mobile: string): boolean {
   return /^\d{10}$/.test(normalizeMobileNumber(mobile));
 }
 
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export function isValidEmail(email: string): boolean {
-  return EMAIL_RE.test(email.trim());
+  return EMAIL_RE.test(normalizeEmail(email));
 }
 
 export function sanitizeEmployeeName(name: string): string {

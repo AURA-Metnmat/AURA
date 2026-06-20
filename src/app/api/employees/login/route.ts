@@ -7,14 +7,10 @@ import {
 import { logEmployeeAuth } from "@/lib/employees/auth-log";
 import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
 import { verifyOtpVerificationToken } from "@/lib/employees/otp";
-
-import {
-  isValidMobileNumber,
-  normalizeMobileNumber,
-} from "@/lib/employees/validation";
+import { isValidEmail, normalizeEmail } from "@/lib/employees/validation";
 
 interface LoginBody {
-  mobile_number?: string;
+  email?: string;
   company_id?: string;
   otp_token?: string;
 }
@@ -22,36 +18,36 @@ interface LoginBody {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as LoginBody;
-    const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
+    const email = normalizeEmail(body.email ?? "");
     const companyId = body.company_id?.trim();
     const otpToken = body.otp_token?.trim();
 
     if (!otpToken) {
-      return NextResponse.json({ error: "Mobile verification is required." }, { status: 400 });
+      return NextResponse.json({ error: "Email verification is required." }, { status: 400 });
     }
 
-    if (!isValidMobileNumber(mobileNumber)) {
-      return NextResponse.json({ error: "Enter your registered 10-digit mobile number." }, { status: 400 });
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: "Enter your registered email address." }, { status: 400 });
     }
     if (!companyId) {
       return NextResponse.json({ error: "Company context is required." }, { status: 400 });
     }
 
-    const otpVerified = verifyOtpVerificationToken(otpToken, companyId, mobileNumber, "login");
+    const otpVerified = verifyOtpVerificationToken(otpToken, companyId, email, "login");
     if (!otpVerified) {
       return NextResponse.json(
-        { error: "Mobile verification expired. Please verify your number again." },
+        { error: "Email verification expired. Please verify your email again." },
         { status: 401 }
       );
     }
 
     const employee = await db.employee.findFirst({
-      where: { companyId, mobileNumber },
+      where: { companyId, email: { equals: email, mode: "insensitive" } },
     });
 
     if (!employee) {
       return NextResponse.json(
-        { error: "Mobile number not found. Please register first." },
+        { error: "Email not found. Please register first." },
         { status: 404 }
       );
     }
