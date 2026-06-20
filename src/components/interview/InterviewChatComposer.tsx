@@ -3,8 +3,10 @@
 import { useRef } from "react";
 import { Paperclip, Send, Loader2, X } from "lucide-react";
 import { VoiceInputButton } from "@/components/interview/VoiceInputButton";
+import { QuickReplyBar } from "@/components/interview/QuickReplyBar";
 import type { Language, UiStrings } from "@/lib/aura/i18n";
 import type { EngagementStrings } from "@/lib/aura/engagement";
+import type { QuickReplyOption } from "@/lib/aura/quick-replies";
 import { cn } from "@/lib/utils";
 
 interface Attachment {
@@ -27,6 +29,9 @@ interface InterviewChatComposerProps {
   engagement: EngagementStrings;
   onVoiceTextChange: (text: string) => void;
   onVoiceSubmit?: (text: string) => void;
+  quickReplies?: QuickReplyOption[];
+  onQuickSend?: (text: string) => void;
+  onQuickPrefill?: (text: string) => void;
 }
 
 export function InterviewChatComposer({
@@ -44,6 +49,9 @@ export function InterviewChatComposer({
   engagement,
   onVoiceTextChange,
   onVoiceSubmit,
+  quickReplies = [],
+  onQuickSend,
+  onQuickPrefill,
 }: InterviewChatComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canSend = !loading && (input.trim().length > 0 || pendingFiles.length > 0);
@@ -70,6 +78,17 @@ export function InterviewChatComposer({
               </div>
             ))}
           </div>
+        )}
+
+        {quickReplies.length > 0 && onQuickSend && onQuickPrefill && (
+          <QuickReplyBar
+            options={quickReplies}
+            disabled={loading || !sessionReady}
+            hint={engagement.quickRepliesHint}
+            onSend={onQuickSend}
+            onPrefill={onQuickPrefill}
+            onAttach={() => fileInputRef.current?.click()}
+          />
         )}
 
         <form onSubmit={onSend}>
@@ -153,7 +172,7 @@ export function InterviewChatComposer({
           </div>
 
           <p className="text-[10px] text-slate-600 text-center mt-2.5">
-            {engagement.voiceOrTypeHint} · {engagement.speakAndSendHint}
+            {engagement.quickRepliesHint} · {engagement.voiceOrTypeHint}
           </p>
         </form>
       </div>

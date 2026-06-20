@@ -25,6 +25,13 @@ export interface EngagementStrings {
   bilingualEnglishLabel: string;
   voiceOrTypeHint: string;
   speakAndSendHint: string;
+  quickRepliesHint: string;
+  yesGotIt: string;
+  soundsGood: string;
+  notSureYet: string;
+  giveExample: string;
+  repeatQuestion: string;
+  almostDone: string;
 }
 
 export const ENGAGEMENT: Record<Language, EngagementStrings> = {
@@ -53,6 +60,13 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     bilingualEnglishLabel: "English",
     voiceOrTypeHint: "Type below or tap the mic to speak your answer",
     speakAndSendHint: "Tap mic · speak once · sends automatically when you finish",
+    quickRepliesHint: "Quick replies",
+    yesGotIt: "Yes, got it",
+    soundsGood: "Sounds good",
+    notSureYet: "Not sure yet",
+    giveExample: "Give an example",
+    repeatQuestion: "Repeat question",
+    almostDone: "Almost done",
   },
   hi: {
     detailsDesc: "बातचीत शुरू करने के लिए कुछ बुनियादी जानकारी। एक मिनट से कम समय लगेगा।",
@@ -79,6 +93,13 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     bilingualEnglishLabel: "English",
     voiceOrTypeHint: "नीचे टाइप करें या माइक टैप करके बोलें",
     speakAndSendHint: "माइक टैप करें · एक बार बोलें · समाप्त होने पर स्वतः भेजा जाएगा",
+    quickRepliesHint: "त्वरित उत्तर",
+    yesGotIt: "हाँ, समझ गया",
+    soundsGood: "ठीक है",
+    notSureYet: "अभी यकीन नहीं",
+    giveExample: "उदाहरण दें",
+    repeatQuestion: "प्रश्न दोहराएँ",
+    almostDone: "लगभग पूरा",
   },
   or: {
     detailsDesc: "କଥୋପକଥନ ଆରମ୍ଭ କରିବା ପାଇଁ କିଛି ମୂଳ ତଥ୍ୟ। ଏକ ମିନିଟରୁ କମ ସମୟ।",
@@ -105,6 +126,13 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     bilingualEnglishLabel: "English",
     voiceOrTypeHint: "ନିମ୍ନରେ ଟାଇପ୍ କରନ୍ତୁ କିମ୍ବା ମାଇକ୍ ଟ୍ୟାପ୍ କରି କହନ୍ତୁ",
     speakAndSendHint: "ମାଇକ୍ ଟ୍ୟାପ୍ · ଥରେ କହନ୍ତୁ · ଶେଷ ହେଲେ ସ୍ୱତଃ ପଠାଯିବ",
+    quickRepliesHint: "ଶୀଘ୍ର ଉତ୍ତର",
+    yesGotIt: "ହଁ, ବୁଝିଗଲି",
+    soundsGood: "ଠିକ୍ ଅଛି",
+    notSureYet: "ଏପର୍ଯ୍ୟନ୍ତ ନିଶ୍ଚିତ ନୁହେଁ",
+    giveExample: "ଉଦାହରଣ ଦିଅନ୍ତୁ",
+    repeatQuestion: "ପ୍ରଶ୍ନ ପୁନରାବୃତ୍ତି",
+    almostDone: "ପ୍ରାୟ ସମାପ୍ତ",
   },
   bn: {
     detailsDesc: "কথোপকথন শুরু করতে কয়েকটি মৌলিক তথ্য। এক মিনিটেরও কম সময় লাগবে।",
@@ -131,6 +159,13 @@ export const ENGAGEMENT: Record<Language, EngagementStrings> = {
     bilingualEnglishLabel: "English",
     voiceOrTypeHint: "নিচে লিখুন বা মাইক ট্যাপ করে বলুন",
     speakAndSendHint: "মাইক ট্যাপ · একবার বলুন · শেষ হলে স্বয়ংক্রিয়ভাবে পাঠাবে",
+    quickRepliesHint: "দ্রুত উত্তর",
+    yesGotIt: "হ্যাঁ, বুঝেছি",
+    soundsGood: "ঠিক আছে",
+    notSureYet: "এখনো নিশ্চিত নই",
+    giveExample: "উদাহরণ দিন",
+    repeatQuestion: "প্রশ্ন আবার বলুন",
+    almostDone: "প্রায় শেষ",
   },
 };
 

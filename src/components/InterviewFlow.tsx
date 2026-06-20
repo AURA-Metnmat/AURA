@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { PREFERRED_LANGUAGES, UI, SECTION_NAMES, type Language } from "@/lib/aura/i18n";
 import { getEngagement } from "@/lib/aura/engagement";
+import { getQuickReplies } from "@/lib/aura/quick-replies";
 import { resolveMessageLocale } from "@/lib/aura/message-locale";
 import { InterviewWelcome } from "@/components/interview/InterviewWelcome";
 import { InterviewShell } from "@/components/interview/InterviewShell";
@@ -443,6 +444,25 @@ export default function InterviewFlow({
     [messages]
   );
 
+  const hasUnansweredMcq = useMemo(() => {
+    const lastAssistantIdx = [...messages].reverse().findIndex((m) => m.role === "assistant");
+    if (lastAssistantIdx < 0) return false;
+    const idx = messages.length - 1 - lastAssistantIdx;
+    const lastAssistant = messages[idx];
+    if (!lastAssistant?.interaction || lastAssistant.interaction.type !== "mcq") return false;
+    return messages[idx + 1]?.role !== "user";
+  }, [messages]);
+
+  const quickReplies = useMemo(
+    () =>
+      getQuickReplies(language, engagement, {
+        messageCount: messages.length,
+        hasUnansweredMcq,
+        completionPct,
+      }),
+    [language, engagement, messages.length, hasUnansweredMcq, completionPct]
+  );
+
   async function completeInterview() {
     if (!sessionId) return;
     setLoading(true);
@@ -648,6 +668,9 @@ export default function InterviewFlow({
             engagement={engagement}
             onVoiceTextChange={setInput}
             onVoiceSubmit={(text) => void handleVoiceSubmit(text)}
+            quickReplies={quickReplies}
+            onQuickSend={(text) => void handleVoiceSubmit(text)}
+            onQuickPrefill={(text) => setInput(text)}
           />
 
           {remainingSeconds === 0 && (
