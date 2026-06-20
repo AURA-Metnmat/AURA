@@ -6,13 +6,11 @@ import {
 } from "@/lib/auth/employee";
 import { logEmployeeAuth } from "@/lib/employees/auth-log";
 import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
-import { verifyOtpVerificationToken } from "@/lib/employees/otp";
 import { isValidEmail, normalizeEmail } from "@/lib/employees/validation";
 
 interface LoginBody {
   email?: string;
   company_id?: string;
-  otp_token?: string;
 }
 
 export async function POST(request: Request) {
@@ -20,25 +18,12 @@ export async function POST(request: Request) {
     const body = (await request.json()) as LoginBody;
     const email = normalizeEmail(body.email ?? "");
     const companyId = body.company_id?.trim();
-    const otpToken = body.otp_token?.trim();
-
-    if (!otpToken) {
-      return NextResponse.json({ error: "Email verification is required." }, { status: 400 });
-    }
 
     if (!isValidEmail(email)) {
       return NextResponse.json({ error: "Enter your registered email address." }, { status: 400 });
     }
     if (!companyId) {
       return NextResponse.json({ error: "Company context is required." }, { status: 400 });
-    }
-
-    const otpVerified = verifyOtpVerificationToken(otpToken, companyId, email, "login");
-    if (!otpVerified) {
-      return NextResponse.json(
-        { error: "Email verification expired. Please verify your email again." },
-        { status: 401 }
-      );
     }
 
     const employee = await db.employee.findFirst({
