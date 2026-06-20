@@ -141,7 +141,7 @@ function OtpBlock({
     return (
       <div className="space-y-2">
         <p className="text-xs text-slate-500 px-1">
-          Enter email first, then mobile. OTP sends via SMS or email if SMS fails.
+          A 6-digit code will be sent to your mobile number via SMS.
         </p>
         <button
           type="button"
@@ -280,7 +280,6 @@ export function EmployeeAuthPanel({
           mobile_number: normalized,
           company_id: companyId,
           purpose: mode,
-          ...(mode === "register" && email.trim() ? { email: email.trim() } : {}),
         }),
       });
       const data = await res.json();
@@ -293,13 +292,9 @@ export function EmployeeAuthPanel({
       setResendCooldown(60);
       setDevOtpHint(typeof data.dev_otp === "string" ? data.dev_otp : null);
       setDeliveryHint(
-        typeof data.delivery_note === "string"
-          ? data.delivery_note
-          : data.delivery_method === "email"
-            ? `Code sent to ${email.trim()}. Check your inbox.`
-            : data.delivery_method === "sms"
-              ? `Code sent to +91 ${normalized} via SMS.`
-              : null
+        data.delivery_method === "sms"
+          ? `Code sent to +91 ${normalized} via SMS.`
+          : null
       );
       autoSendAttempted.current = `${mode}:${normalized}`;
     } catch (err) {
@@ -307,7 +302,7 @@ export function EmployeeAuthPanel({
     } finally {
       setOtpLoading(false);
     }
-  }, [activeMobile, companyId, mode, email]);
+  }, [activeMobile, companyId, mode]);
 
   useEffect(() => {
     if (mode !== "login") return;
@@ -509,9 +504,9 @@ export function EmployeeAuthPanel({
               <AuthField icon={<User size={iconSize} />} value={fullName} onChange={setFullName} placeholder="Employee name" required autoComplete="name" />
               <AuthField icon={<Briefcase size={iconSize} />} value={designation} onChange={setDesignation} placeholder="Designation" required autoComplete="organization-title" />
               <AuthField icon={<Building2 size={iconSize} />} value={department} onChange={setDepartment} placeholder="Department" required autoComplete="organization" />
-              <AuthField icon={<Mail size={iconSize} />} type="email" value={email} onChange={setEmail} placeholder="Email (for OTP backup)" autoComplete="email" />
               <AuthField icon={<Phone size={iconSize} />} type="tel" value={mobile} onChange={handleMobileChange} placeholder="Mobile number" required autoComplete="tel" />
               {otpBlock}
+              <AuthField icon={<Mail size={iconSize} />} type="email" value={email} onChange={setEmail} placeholder="Email (optional)" autoComplete="email" />
             </div>
           ) : (
             <div className="space-y-3">

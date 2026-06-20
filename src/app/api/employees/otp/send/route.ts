@@ -2,17 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createAndStoreOtp, type OtpPurpose } from "@/lib/employees/otp";
 import { deliverEmployeeOtp, buildOtpDeliveryFailureMessage } from "@/lib/notifications/otp-delivery";
-import {
-  isValidEmail,
-  isValidMobileNumber,
-  normalizeMobileNumber,
-} from "@/lib/employees/validation";
+import { isValidMobileNumber, normalizeMobileNumber } from "@/lib/employees/validation";
 
 interface SendOtpBody {
   mobile_number?: string;
   company_id?: string;
   purpose?: OtpPurpose;
-  email?: string;
 }
 
 export async function POST(request: Request) {
@@ -21,7 +16,6 @@ export async function POST(request: Request) {
     const mobileNumber = normalizeMobileNumber(body.mobile_number ?? "");
     const companyId = body.company_id?.trim();
     const purpose = body.purpose;
-    const requestEmail = body.email?.trim() || null;
 
     if (!isValidMobileNumber(mobileNumber)) {
       return NextResponse.json({ error: "Enter a valid 10-digit mobile number." }, { status: 400 });
@@ -42,7 +36,7 @@ export async function POST(request: Request) {
 
     const existing = await db.employee.findFirst({
       where: { companyId, mobileNumber },
-      select: { email: true },
+      select: { id: true },
     });
 
     if (purpose === "register" && existing) {
@@ -59,33 +53,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const deliveryEmail =
-      purpose === "login"
-        ? existing?.email?.trim() || null
-        : requestEmail && isValidEmail(requestEmail)
-          ? requestEmail
-          : null;
-
     const { code, expiresAt } = await createAndStoreOtp(companyId, mobileNumber, purpose);
     const delivery = await deliverEmployeeOtp({
       companyName: company.name,
       mobileNumber,
       code,
       purpose,
-      email: deliveryEmail,
     });
 
     if (!delivery.delivered) {
-      const hint = buildOtpDeliveryFailureMessage({
-        hasEmail: !!deliveryEmail,
-        smsError: delivery.smsError,
-        emailError: delivery.emailError,
-      });
       return NextResponse.json(
         {
-          error: hint,
+          error: buildOtpDeliveryFailureMessage(delivery.smsError),
           sms_error: delivery.smsError ?? null,
-          email_error: delivery.emailError ?? null,
         },
         { status: 503 }
       );
@@ -95,7 +75,7 @@ export async function POST(request: Request) {
       success: true,
       expires_at: expiresAt.toISOString(),
       delivery_method: delivery.method,
-      delivery_note: delivery.deliveryNote ?? null,
+      sms_provider: delivery.smsProvider ?? null,
       dev_logged: delivery.devLogged,
       ...(delivery.devLogged && process.env.NODE_ENV !== "production"
         ? { dev_otp: code }
