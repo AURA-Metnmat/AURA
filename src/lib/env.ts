@@ -9,6 +9,7 @@ export type AppEnv = {
   isProduction: boolean;
   databaseUrl: string;
   openaiApiKey: string;
+  anthropicApiKey: string | null;
   platformName: string;
   appUrl: string;
   adminPassword: string;
@@ -37,6 +38,7 @@ export function getAppEnv(): AppEnv {
 
   const databaseUrl = require("DATABASE_URL");
   const openaiApiKey = require("OPENAI_API_KEY");
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || null;
   const adminPassword = require("ADMIN_PASSWORD");
   const sessionSecret = require("SESSION_SECRET");
   const supabaseUrl = require("SUPABASE_URL").replace(/\/$/, "");
@@ -66,6 +68,7 @@ export function getAppEnv(): AppEnv {
     isProduction,
     databaseUrl,
     openaiApiKey,
+    anthropicApiKey,
     platformName: process.env.PLATFORM_NAME?.trim() || "AURA-METNMAT",
     appUrl,
     adminPassword,

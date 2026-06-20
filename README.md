@@ -20,9 +20,14 @@ npm run setup      # DB + seed companies + import reference data
 npm run dev        # http://localhost:3000
 ```
 
-## OpenAI
+## OpenAI + Claude
 
-Set `OPENAI_API_KEY` in `.env` for AI-powered conversations and report generation.
+- **Claude (Anthropic)** — primary for interview chat, reports, and knowledge retrieval
+- **OpenAI** — secondary fallback + TTS voice + fast translation
+
+Set in `.env`:
+- `ANTHROPIC_API_KEY` — Claude (required for best experience)
+- `OPENAI_API_KEY` — OpenAI (required for TTS; fallback for chat)
 
 ## Multi-Company Workflow
 

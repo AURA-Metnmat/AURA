@@ -1,0 +1,241 @@
+import { db } from "@/lib/db";
+import { chatJson } from "./chat";
+import { CLAUDE_RETRIEVAL_MODEL } from "./models";
+import type { ChatMessage } from "./providers";
+
+const MAX_CORPUS_CHARS = 24_000;
+const MAX_RETRIEVED_CHARS = 6_000;
+
+export interface KnowledgeChunk {
+  source: string;
+  category: string;
+  content: string;
+}
+
+export interface RetrievedKnowledge {
+  chunks: KnowledgeChunk[];
+  formattedContext: string;
+  provider: "claude" | "openai" | "heuristic" | "none";
+}
+
+async function loadKnowledgeCorpus(companySlug: string): Promise<KnowledgeChunk[]> {
+  const [pdfs, insights, dataFiles] = await Promise.all([
+    db.pdfDocument.findMany({
+      where: { companySlug },
+      select: { fileName: true, content: true, summary: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    db.dataInsight.findMany({
+      where: { file: { companySlug } },
+      select: { title: true, category: true, content: true, priority: true },
+      orderBy: { priority: "asc" },
+      take: 30,
+    }),
+    db.dataFile.findMany({
+      where: { companySlug },
+      select: {
+        fileName: true,
+        category: true,
+        description: true,
+        rowCount: true,
+        sheetCount: true,
+      },
+      orderBy: { importedAt: "desc" },
+      take: 20,
+    }),
+  ]);
+
+  const chunks: KnowledgeChunk[] = [];
+
+  for (const pdf of pdfs) {
+    const body = (pdf.content || pdf.summary || "").trim();
+    if (!body) continue;
+    chunks.push({
+      source: pdf.fileName,
+      category: "pdf",
+      content: body.slice(0, 8000),
+    });
+  }
+
+  for (const insight of insights) {
+    chunks.push({
+      source: insight.title,
+      category: insight.category,
+      content: insight.content.trim(),
+    });
+  }
+
+  for (const file of dataFiles) {
+    const desc = [
+      file.description,
+      `Category: ${file.category}`,
+      `Rows: ${file.rowCount}`,
+      `Sheets: ${file.sheetCount}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    chunks.push({
+      source: file.fileName,
+      category: file.category,
+      content: desc,
+    });
+  }
+
+  return chunks;
+}
+
+function heuristicRetrieve(
+  chunks: KnowledgeChunk[],
+  userMessage: string,
+  sectionName: string
+): RetrievedKnowledge {
+  if (chunks.length === 0) {
+    return { chunks: [], formattedContext: "", provider: "none" };
+  }
+
+  const terms = `${userMessage} ${sectionName}`
+    .toLowerCase()
+    .split(/[^a-z0-9\u0900-\u097F\u0B00-\u0B7F]+/i)
+    .filter((t) => t.length > 3);
+
+  const scored = chunks
+    .map((chunk) => {
+      const hay = `${chunk.source} ${chunk.category} ${chunk.content}`.toLowerCase();
+      const score = terms.reduce((n, term) => (hay.includes(term) ? n + 1 : n), 0);
+      return { chunk, score };
+    })
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  const selected = scored.length > 0 ? scored.map((s) => s.chunk) : chunks.slice(0, 3);
+  const formatted = formatChunks(selected);
+
+  return {
+    chunks: selected,
+    formattedContext: formatted,
+    provider: "heuristic",
+  };
+}
+
+function formatChunks(chunks: KnowledgeChunk[]): string {
+  if (chunks.length === 0) return "";
+  const body = chunks
+    .map(
+      (c) =>
+        `#### ${c.source} (${c.category})\n${c.content.slice(0, 1500)}`
+    )
+    .join("\n\n");
+  return body.length > MAX_RETRIEVED_CHARS
+    ? `${body.slice(0, MAX_RETRIEVED_CHARS)}\n\n[Knowledge truncated]`
+    : body;
+}
+
+async function llmRetrieve(
+  chunks: KnowledgeChunk[],
+  userMessage: string,
+  sectionName: string,
+  designation: string
+): Promise<RetrievedKnowledge | null> {
+  const corpus = chunks
+    .map(
+      (c, i) =>
+        `[${i}] source=${c.source} category=${c.category}\n${c.content.slice(0, 2000)}`
+    )
+    .join("\n\n")
+    .slice(0, MAX_CORPUS_CHARS);
+
+  const messages: ChatMessage[] = [
+    {
+      role: "system",
+      content: `You are a knowledge retrieval engine for AURA interview platform.
+Given employee message, interview section, and company knowledge chunks, return JSON:
+{"indices":[0,2,5],"summary":"2-3 sentence synthesis of what matters for the next question"}
+Pick 0-6 chunk indices most relevant to answer the employee and ask a smart follow-up.
+Prefer operational data, processes, systems, and pain points over generic text.`,
+    },
+    {
+      role: "user",
+      content: `Section: ${sectionName}
+Employee role: ${designation || "not specified"}
+Employee message: ${userMessage}
+
+Knowledge chunks:
+${corpus}`,
+    },
+  ];
+
+  const raw = await chatJson({
+    messages,
+    temperature: 0.2,
+    maxTokens: 500,
+    claudeModel: CLAUDE_RETRIEVAL_MODEL,
+    preferClaude: true,
+  });
+
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as { indices?: number[]; summary?: string };
+    const indices = Array.isArray(parsed.indices)
+      ? parsed.indices.filter((i) => Number.isInteger(i) && i >= 0 && i < chunks.length)
+      : [];
+
+    const selected =
+      indices.length > 0 ? indices.map((i) => chunks[i]!) : chunks.slice(0, 3);
+
+    const summary = parsed.summary?.trim();
+    const formatted = [
+      summary ? `**Retrieved focus:** ${summary}` : "",
+      formatChunks(selected),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return {
+      chunks: selected,
+      formattedContext: formatted,
+      provider: "claude",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dual-model knowledge retrieval: Claude ranks chunks, OpenAI/heuristic fallback.
+ */
+export async function retrieveRelevantKnowledge(params: {
+  companySlug: string;
+  userMessage: string;
+  sectionName: string;
+  designation?: string;
+}): Promise<RetrievedKnowledge> {
+  const chunks = await loadKnowledgeCorpus(params.companySlug);
+  if (chunks.length === 0) {
+    return { chunks: [], formattedContext: "", provider: "none" };
+  }
+
+  const llmResult = await llmRetrieve(
+    chunks,
+    params.userMessage,
+    params.sectionName,
+    params.designation ?? ""
+  );
+  if (llmResult?.formattedContext) return llmResult;
+
+  return heuristicRetrieve(chunks, params.userMessage, params.sectionName);
+}
+
+export async function getCompanyDocumentContext(companySlug: string): Promise<string> {
+  const chunks = await loadKnowledgeCorpus(companySlug);
+  if (chunks.length === 0) return "";
+
+  const combined = chunks
+    .map((c) => `### ${c.source}\n${c.content}`)
+    .join("\n\n");
+
+  return combined.length > 12_000
+    ? `${combined.slice(0, 12_000)}\n\n[Document text truncated for context window]`
+    : combined;
+}

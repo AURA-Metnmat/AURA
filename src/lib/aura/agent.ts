@@ -1,5 +1,10 @@
-import OpenAI from "openai";
-import { env } from "@/lib/env";
+import {
+  chatInterviewJson,
+  chatNormalizeJson,
+  chatReportJson,
+} from "@/lib/ai/chat";
+import { retrieveRelevantKnowledge } from "@/lib/ai/knowledge-retrieval";
+import { hasClaudeProvider, hasOpenAIProvider } from "@/lib/ai/providers";
 import {
   buildSystemPrompt,
   INTERVIEW_SECTIONS,
@@ -54,15 +59,6 @@ export interface AuraResponse {
 
 function getQuestions(lang: Language, section: SectionId): string[] {
   return SECTION_QUESTIONS_I18N[lang][section] ?? SECTION_QUESTIONS_I18N.en[section];
-}
-
-function getOpenAIClient(): OpenAI | null {
-  try {
-    const apiKey = env().openaiApiKey;
-    return new OpenAI({ apiKey });
-  } catch {
-    return null;
-  }
 }
 
 function calculateCompletion(section: SectionId, questionIndex: number): number {
@@ -182,27 +178,20 @@ export async function normalizeUserMessage(
     return { en: text, locale: text };
   }
 
-  const openai = getOpenAIClient();
-  if (!openai) {
+  if (!hasOpenAIProvider() && !hasClaudeProvider()) {
     return { en: text, locale: text };
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
+    const raw =
+      (await chatNormalizeJson([
         {
           role: "system",
           content: `Return JSON only: {"en":"English translation for records","locale":"original or cleaned text in employee language"}
 Employee preferred language: ${preferredLang}. Preserve meaning. If already English, duplicate appropriately in locale only if it was typed in preferred script.`,
         },
         { role: "user", content: text },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 400,
-    });
-    const raw = completion.choices[0]?.message?.content ?? "{}";
+      ])) ?? "{}";
     const parsed = JSON.parse(raw) as { en?: string; locale?: string };
     return {
       en: parsed.en?.trim() || text,
@@ -217,19 +206,34 @@ export async function generateAuraResponse(
   ctx: SessionContext,
   userMessage: string
 ): Promise<AuraResponse> {
-  const openai = getOpenAIClient();
   const lang = ctx.language;
 
-  if (!openai) {
+  if (!hasClaudeProvider() && !hasOpenAIProvider()) {
     return buildFallbackBilingual(ctx, userMessage);
   }
 
   const sectionInfo = INTERVIEW_SECTIONS.find((s) => s.id === ctx.currentSection);
   const questions = getQuestions(lang, ctx.currentSection);
   const enQuestions = getQuestions("en", ctx.currentSection);
-  const systemPrompt = buildSystemPrompt(ctx.company);
-
   const designation = ctx.participant?.designation?.trim() || "not specified";
+
+  let companyWithRetrieval = { ...ctx.company };
+  if (ctx.company.slug) {
+    const retrieved = await retrieveRelevantKnowledge({
+      companySlug: ctx.company.slug,
+      userMessage,
+      sectionName: sectionInfo?.name ?? ctx.currentSection,
+      designation,
+    });
+    if (retrieved.formattedContext) {
+      companyWithRetrieval = {
+        ...ctx.company,
+        retrievedKnowledge: retrieved.formattedContext,
+      };
+    }
+  }
+
+  const systemPrompt = buildSystemPrompt(companyWithRetrieval);
   const department = ctx.participant?.department?.trim() || "not specified";
   const roleFocus = designation !== "not specified"
     ? `Employee role/designation: ${designation}. Department: ${department}.
@@ -254,26 +258,18 @@ Suggested questions: ${enQuestions.join(" | ")}
 Question progress: ${ctx.questionIndex + 1}/${questions.length}
 Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${designation}`;
 
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: systemPrompt },
-    { role: "system", content: sectionPrompt },
+  const messages = [
+    { role: "system" as const, content: systemPrompt },
+    { role: "system" as const, content: sectionPrompt },
     ...ctx.messageHistory.slice(-12).map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
     })),
-    { role: "user", content: userMessage },
+    { role: "user" as const, content: userMessage },
   ];
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages,
-    temperature: 0.55,
-    max_tokens: 700,
-    response_format: { type: "json_object" },
-  });
-
   const raw =
-    completion.choices[0]?.message?.content ??
+    (await chatInterviewJson(messages)) ??
     buildFallbackBilingual(ctx, userMessage).content;
 
   const fallback = buildFallbackBilingual(ctx, userMessage);
@@ -330,25 +326,19 @@ export async function generateInterviewReport(
     .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
     .join("\n\n");
 
-  const openai = getOpenAIClient();
-  if (!openai) {
+  const openai = hasOpenAIProvider();
+  if (!hasClaudeProvider() && !openai) {
     return buildFallbackReport(sessionData, transcript);
   }
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
+  const raw =
+    (await chatReportJson([
       {
         role: "system",
         content: `Generate a comprehensive requirement gathering report for ${companyName} from this AURA-METNMAT interview. Return JSON with keys: executiveSummary, processDocumentation, requirements, painPointsSummary, integrationSummary, reportingSummary, risks, recommendations, architecture, actionItems. Each value should be detailed markdown.`,
       },
       { role: "user", content: transcript },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.4,
-  });
-
-  const raw = completion.choices[0]?.message?.content ?? "{}";
+    ])) ?? "{}";
   try {
     return JSON.parse(raw) as Record<string, string>;
   } catch {

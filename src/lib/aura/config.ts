@@ -2,10 +2,12 @@ export const PLATFORM_NAME = process.env.PLATFORM_NAME ?? "AURA-METNMAT";
 
 export interface CompanyContext {
   name: string;
+  slug?: string;
   industry?: string | null;
   description?: string | null;
   aiContext?: string | null;
   documentContext?: string | null;
+  retrievedKnowledge?: string | null;
 }
 
 export const INTERVIEW_SECTIONS = [
@@ -37,6 +39,11 @@ export function buildSystemPrompt(company: CompanyContext): string {
   }
   if (company.documentContext?.trim()) {
     contextParts.push(`Company documents / PDF knowledge (admin):\n${company.documentContext.trim()}`);
+  }
+  if (company.retrievedKnowledge?.trim()) {
+    contextParts.push(
+      `Retrieved knowledge for this turn (RAG — most relevant to employee's last message):\n${company.retrievedKnowledge.trim()}`
+    );
   }
 
   const companyContext =
