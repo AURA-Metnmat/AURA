@@ -284,6 +284,7 @@ export default function InterviewFlow({
             contentEn: m.contentEn,
             contentLocale: m.contentLocale,
             interaction: m.interaction ?? null,
+            attachments: m.attachments,
           }))
         );
         setLanguage(data.language ?? language);

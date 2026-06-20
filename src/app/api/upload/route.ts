@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { storeInterviewFile } from "@/lib/storage";
 import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
+import { extractAttachmentText } from "@/lib/interview/attachment-processing";
 
 const MAX_SIZE = 10 * 1024 * 1024;
 const ALLOWED_TYPES = [
@@ -54,6 +55,12 @@ export async function POST(request: Request) {
       buffer
     );
 
+    const extractedText = await extractAttachmentText(
+      buffer,
+      file.name,
+      file.type || "application/octet-stream"
+    );
+
     const attachment = await db.messageAttachment.create({
       data: {
         sessionId,
@@ -62,6 +69,7 @@ export async function POST(request: Request) {
         fileSize: file.size,
         filePath: stored.filePath,
         storageKey: stored.storageKey,
+        extractedText,
       },
     });
 

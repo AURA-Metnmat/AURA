@@ -14,6 +14,7 @@ import {
   Link2,
   BarChart3,
   Loader2,
+  Paperclip,
 } from "lucide-react";
 
 interface CompanyRow {
@@ -86,6 +87,17 @@ interface ReferenceData {
   stats: { fileCount: number; recordCount: number; insightCount: number; specCount: number };
 }
 
+interface GatheredAttachment {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  filePath: string;
+  messageId: string | null;
+  extractedTextPreview: string;
+  createdAt: string;
+}
+
 interface GatheredSession {
   id: string;
   status: string;
@@ -102,11 +114,13 @@ interface GatheredSession {
     integrations: number;
     reporting: number;
     approvals: number;
+    attachments: number;
   };
   processes: { id: string; processName: string; objective: string | null }[];
   painPoints: { id: string; title: string; severity: string }[];
   requirements: { id: string; title: string; type: string; priority: string }[];
   integrations: { id: string; systemName: string }[];
+  attachments: GatheredAttachment[];
   report: {
     executiveSummary: string;
     recommendations: string;
@@ -124,6 +138,7 @@ interface GatheredData {
     requirements: number;
     integrations: number;
     reports: number;
+    attachments: number;
   };
 }
 
@@ -444,7 +459,7 @@ export default function CompanyDetailView({
                 <BarChart3 className="w-5 h-5 text-amber-400" />
                 <h3 className="font-semibold text-lg">Interview Gathered Data</h3>
               </div>
-              <p className="text-xs text-slate-500 mt-1">Requirements, pain points, processes & reports from employee interviews</p>
+              <p className="text-xs text-slate-500 mt-1">Requirements, pain points, processes, file uploads & reports from employee interviews</p>
             </div>
             <button
               onClick={exportExcel}
@@ -470,6 +485,7 @@ export default function CompanyDetailView({
                   <StatPill label="Processes" value={gathered.totals.processes} />
                   <StatPill label="Pain Pts" value={gathered.totals.painPoints} />
                   <StatPill label="Requirements" value={gathered.totals.requirements} />
+                  <StatPill label="Files" value={gathered.totals.attachments} />
                   <StatPill label="Reports" value={gathered.totals.reports} />
                 </div>
 
@@ -488,6 +504,7 @@ export default function CompanyDetailView({
                         s.counts.painPoints > 0 ||
                         s.counts.requirements > 0 ||
                         s.counts.integrations > 0 ||
+                        s.counts.attachments > 0 ||
                         !!s.report;
 
                       return (
@@ -530,6 +547,11 @@ export default function CompanyDetailView({
                                 {s.counts.integrations > 0 && (
                                   <span className="text-[10px] bg-purple-950/50 text-purple-300 px-2 py-0.5 rounded flex items-center gap-1">
                                     <Link2 className="w-3 h-3" /> {s.counts.integrations} integrations
+                                  </span>
+                                )}
+                                {s.counts.attachments > 0 && (
+                                  <span className="text-[10px] bg-amber-950/50 text-amber-300 px-2 py-0.5 rounded flex items-center gap-1">
+                                    <Paperclip className="w-3 h-3" /> {s.counts.attachments} files
                                   </span>
                                 )}
                               </div>
@@ -577,6 +599,39 @@ export default function CompanyDetailView({
                                   <ul className="space-y-1">
                                     {s.processes.map((p) => (
                                       <li key={p.id} className="text-xs text-slate-300">• {p.processName}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {s.attachments.length > 0 && (
+                                <div>
+                                  <p className="text-xs text-slate-500 mb-2">Uploaded Files</p>
+                                  <ul className="space-y-2">
+                                    {s.attachments.map((a) => (
+                                      <li
+                                        key={a.id}
+                                        className="text-xs rounded-lg border border-white/10 bg-slate-950/40 p-2.5"
+                                      >
+                                        <div className="flex items-start justify-between gap-2">
+                                          <a
+                                            href={a.filePath}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-amber-400 hover:text-amber-300 font-medium truncate"
+                                          >
+                                            {a.fileName}
+                                          </a>
+                                          <span className="text-slate-600 shrink-0">{formatBytes(a.fileSize)}</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-600 mt-1">
+                                          {a.fileType} · {new Date(a.createdAt).toLocaleString()}
+                                        </p>
+                                        {a.extractedTextPreview && (
+                                          <p className="text-[11px] text-slate-400 mt-1.5 line-clamp-2">
+                                            {a.extractedTextPreview}
+                                          </p>
+                                        )}
+                                      </li>
                                     ))}
                                   </ul>
                                 </div>

@@ -14,6 +14,13 @@ export interface ResumedSessionPayload {
     contentEn: string;
     contentLocale: string;
     interaction?: MessageInteraction | null;
+    attachments?: {
+      id: string;
+      fileName: string;
+      fileType: string;
+      fileSize: number;
+      filePath: string;
+    }[];
   }[];
   participant: {
     fullName: string;
@@ -39,7 +46,7 @@ export async function findActiveSessionForEmployee(
     include: {
       company: true,
       participant: true,
-      messages: { orderBy: { createdAt: "asc" } },
+      messages: { orderBy: { createdAt: "asc" }, include: { attachments: true } },
     },
   });
 
@@ -64,6 +71,16 @@ export async function findActiveSessionForEmployee(
       contentEn: m.content,
       contentLocale: m.contentLocale ?? m.content,
       interaction: parseInteraction(m.metadata),
+      attachments:
+        m.attachments.length > 0
+          ? m.attachments.map((a) => ({
+              id: a.id,
+              fileName: a.fileName,
+              fileType: a.fileType,
+              fileSize: a.fileSize,
+              filePath: a.filePath,
+            }))
+          : undefined,
     })),
     participant: {
       fullName: p?.fullName ?? employee.employeeName,

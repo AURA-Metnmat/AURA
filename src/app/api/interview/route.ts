@@ -300,6 +300,16 @@ export async function POST(request: Request) {
     if (attachments.length > 0) {
       const fileList = attachments.map((a) => `[${a.fileName}]`).join(" ");
       messageContent = `${userMessage}\n\n📎 ${fileList}`;
+
+      const extractedParts = attachments
+        .filter((a) => a.extractedText?.trim())
+        .map(
+          (a) => `--- ${a.fileName} ---\n${a.extractedText!.trim().slice(0, 8000)}`
+        );
+
+      if (extractedParts.length > 0) {
+        messageContent += `\n\n[Attached file contents]\n${extractedParts.join("\n\n")}`;
+      }
     }
 
     const lang = (session.language as Language) || "en";

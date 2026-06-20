@@ -159,17 +159,18 @@ model Message {
 }
 
 model MessageAttachment {
-  id         String           @id @default(cuid())
-  sessionId  String
-  messageId  String?
-  fileName   String
-  fileType   String
-  fileSize   Int
-  filePath   String
-  storageKey String?
-  createdAt  DateTime         @default(now())
-  session    InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  message    Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  id            String           @id @default(cuid())
+  sessionId     String
+  messageId     String?
+  fileName      String
+  fileType      String
+  fileSize      Int
+  filePath      String
+  storageKey    String?
+  extractedText String?
+  createdAt     DateTime         @default(now())
+  session       InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message       Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
 
   @@index([sessionId])
   @@index([messageId])
