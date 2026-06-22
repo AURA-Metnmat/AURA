@@ -10,6 +10,7 @@ import {
   REVIEW_STATUS,
 } from "@/lib/knowledge/review";
 import { SOURCE_TYPE } from "@/lib/knowledge/indexer";
+import { syncKnowledgeChunkReviewToInterviewAnswer } from "@/lib/knowledge/review-sync";
 
 export async function PATCH(
   request: Request,
@@ -71,6 +72,10 @@ export async function PATCH(
       data,
     });
 
+    if (body.reviewStatus !== undefined || body.reviewNotes !== undefined) {
+      await syncKnowledgeChunkReviewToInterviewAnswer(updated);
+    }
+
     const meta = parseChunkMetadata(updated.metadata);
 
     await logAdminAudit({
@@ -117,12 +122,20 @@ export async function POST(
       return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
 
-    const updated = await db.knowledgeChunk.updateMany({
+    const chunk = await db.knowledgeChunk.findFirst({
       where: {
         id: chunkId,
         companySlug: company.slug,
         sourceType: SOURCE_TYPE.EXPERIENCE,
       },
+    });
+
+    if (!chunk) {
+      return NextResponse.json({ error: "Experience record not found" }, { status: 404 });
+    }
+
+    const updated = await db.knowledgeChunk.update({
+      where: { id: chunkId },
       data: {
         reviewStatus: REVIEW_STATUS.VALIDATED,
         reviewedAt: new Date(),
@@ -130,9 +143,7 @@ export async function POST(
       },
     });
 
-    if (updated.count === 0) {
-      return NextResponse.json({ error: "Experience record not found" }, { status: 404 });
-    }
+    await syncKnowledgeChunkReviewToInterviewAnswer(updated);
 
     return NextResponse.json({ success: true, reviewStatus: REVIEW_STATUS.VALIDATED });
   } catch (error) {

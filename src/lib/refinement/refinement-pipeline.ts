@@ -1,5 +1,6 @@
 import { REVIEW_STATUS, type ReviewStatus } from "@/lib/knowledge/review";
 import { db } from "@/lib/db";
+import { syncInterviewAnswerReviewToChunks } from "@/lib/knowledge/review-sync";
 
 export interface AnswerForRefinement {
   id: string;
@@ -262,6 +263,7 @@ export async function runRefinementPipeline(answerId: string): Promise<void> {
       session: {
         include: {
           answers: { orderBy: { createdAt: "asc" } },
+          company: { select: { slug: true } },
         },
       },
     },
@@ -286,4 +288,14 @@ export async function runRefinementPipeline(answerId: string): Promise<void> {
       refinedAt: new Date(),
     },
   });
+
+  const companySlug = answer.session.company.slug;
+  if (companySlug) {
+    await syncInterviewAnswerReviewToChunks({
+      answerId,
+      companySlug,
+      reviewStatus: result.reviewStatus,
+      reviewedAt: new Date(),
+    });
+  }
 }

@@ -21,6 +21,9 @@ interface ChunkInput {
   sourceLabel: string;
   content: string;
   metadata?: Record<string, unknown>;
+  reviewStatus?: string | null;
+  reviewNotes?: string | null;
+  reviewedAt?: Date | null;
 }
 
 const MAX_RECORDS_PER_COMPANY = 8000;
@@ -35,6 +38,9 @@ function toChunkRows(inputs: ChunkInput[]): {
   content: string;
   charCount: number;
   metadata: string | null;
+  reviewStatus: string | null;
+  reviewNotes: string | null;
+  reviewedAt: Date | null;
 }[] {
   const rows: ReturnType<typeof toChunkRows> = [];
 
@@ -52,6 +58,9 @@ function toChunkRows(inputs: ChunkInput[]): {
         content: part,
         charCount: part.length,
         metadata: input.metadata ? JSON.stringify({ ...input.metadata, part: i + 1 }) : null,
+        reviewStatus: input.reviewStatus ?? null,
+        reviewNotes: input.reviewNotes ?? null,
+        reviewedAt: input.reviewedAt ?? null,
       });
     }
   }
@@ -114,13 +123,13 @@ async function replaceChunks(
       ...row,
       contentHash: hash,
       reviewStatus: isExperience
-        ? (preserved?.reviewStatus ?? REVIEW_STATUS.PENDING)
+        ? (preserved?.reviewStatus ?? row.reviewStatus ?? REVIEW_STATUS.PENDING)
         : null,
       topicCategory: isExperience
         ? (preserved?.topicCategory ?? inferTopicCategory(row.sourceKind))
         : null,
-      reviewNotes: isExperience ? (preserved?.reviewNotes ?? null) : null,
-      reviewedAt: isExperience ? (preserved?.reviewedAt ?? null) : null,
+      reviewNotes: isExperience ? (preserved?.reviewNotes ?? row.reviewNotes ?? null) : null,
+      reviewedAt: isExperience ? (preserved?.reviewedAt ?? row.reviewedAt ?? null) : null,
       reviewedBy: isExperience ? (preserved?.reviewedBy ?? null) : null,
     };
   });
@@ -347,6 +356,9 @@ export async function indexExperienceKnowledge(
           confidenceScore: answer.confidenceScore,
           reviewStatus: answer.reviewStatus,
         },
+        reviewStatus: answer.reviewStatus,
+        reviewNotes: answer.reviewNotes,
+        reviewedAt: answer.reviewedAt,
       });
     }
 

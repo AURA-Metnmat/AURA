@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { isReviewStatus, REVIEW_STATUS } from "@/lib/knowledge/review";
+import { syncInterviewAnswerReviewToChunks } from "@/lib/knowledge/review-sync";
 import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 
@@ -19,6 +20,7 @@ export async function PATCH(
 
   const answer = await db.interviewAnswer.findFirst({
     where: { id: answerId, session: { companyId } },
+    include: { session: { select: { company: { select: { slug: true } } } } },
   });
 
   if (!answer) {
@@ -47,6 +49,23 @@ export async function PATCH(
     where: { id: answerId },
     data,
   });
+
+  const companySlug = answer.session.company.slug;
+  if (
+    companySlug &&
+    (body.reviewStatus !== undefined || body.reviewNotes !== undefined)
+  ) {
+    const reviewStatus = updated.reviewStatus;
+    if (reviewStatus && isReviewStatus(reviewStatus)) {
+      await syncInterviewAnswerReviewToChunks({
+        answerId,
+        companySlug,
+        reviewStatus,
+        reviewNotes: updated.reviewNotes,
+        reviewedAt: updated.reviewedAt,
+      });
+    }
+  }
 
   await logAdminAudit({
     action: AUDIT_ACTIONS.ANSWER_REVIEW,
