@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { buildInterviewReportPdf } from "@/lib/reports/interview-report-pdf";
 
 const REPORT_SECTIONS = [
@@ -21,7 +22,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string; sessionId: string }> }
 ) {
   const { id: companyId, sessionId } = await params;
-  const session = await requireCompanyAdmin(request, companyId);
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.EXPORT_DATA);
   if (session instanceof NextResponse) return session;
 
   try {

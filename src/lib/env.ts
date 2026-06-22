@@ -13,6 +13,7 @@ export type AppEnv = {
   platformName: string;
   appUrl: string;
   adminPassword: string;
+  allowLegacyAdminPassword: boolean;
   sessionSecret: string;
   storage: {
     supabaseUrl: string;
@@ -72,6 +73,9 @@ export function getAppEnv(): AppEnv {
     platformName: process.env.PLATFORM_NAME?.trim() || "AURA-METNMAT",
     appUrl,
     adminPassword,
+    allowLegacyAdminPassword:
+      process.env.ALLOW_LEGACY_ADMIN_PASSWORD?.trim().toLowerCase() === "true" ||
+      (!isProduction && process.env.ALLOW_LEGACY_ADMIN_PASSWORD?.trim().toLowerCase() !== "false"),
     sessionSecret,
     storage: { supabaseUrl, supabaseServiceKey, bucket },
     importDataDir: process.env.IMPORT_DATA_DIR?.trim() ?? null,

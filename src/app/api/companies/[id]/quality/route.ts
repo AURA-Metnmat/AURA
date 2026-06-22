@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { getCompanyQualityKpis } from "@/lib/refinement/quality-stats";
 
 export async function GET(
@@ -8,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: companyId } = await params;
-  const session = await requireCompanyAdmin(request, companyId);
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.REVIEW_ANSWERS);
   if (session instanceof NextResponse) return session;
   const company = await db.company.findUnique({ where: { id: companyId }, select: { id: true } });
   if (!company) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import {
   isReviewStatus,
   REVIEW_STATUS,
@@ -14,7 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: companyId } = await params;
-  const session = await requireCompanyAdmin(request, companyId);
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.REVIEW_ANSWERS);
   if (session instanceof NextResponse) return session;
 
   const company = await db.company.findUnique({ where: { id: companyId }, select: { id: true } });
@@ -26,6 +27,7 @@ export async function GET(
   const statusParam = searchParams.get("status");
   const departmentParam = searchParams.get("department");
   const campaignParam = searchParams.get("campaignId");
+  const employeeIdParam = searchParams.get("employeeId");
   const confidenceMin = searchParams.get("confidenceMin");
   const confidenceMax = searchParams.get("confidenceMax");
   const limit = Math.min(Number(searchParams.get("limit") ?? 100), 500);
@@ -37,6 +39,7 @@ export async function GET(
       session: {
         companyId,
         ...(campaignParam ? { campaignId: campaignParam } : {}),
+        ...(employeeIdParam ? { employeeId: employeeIdParam } : {}),
         ...(departmentParam
           ? {
               participant: {
@@ -61,8 +64,10 @@ export async function GET(
               fullName: true,
               department: true,
               designation: true,
+              employeeId: true,
             },
           },
+          employeeId: true,
         },
       },
     },
@@ -93,6 +98,8 @@ export async function GET(
       reviewedAt: a.reviewedAt?.toISOString() ?? null,
       refinedAt: a.refinedAt?.toISOString() ?? null,
       createdAt: a.createdAt.toISOString(),
+      employeeId: a.session.employeeId,
+      employeeCode: a.session.participant?.employeeId ?? null,
       participant: a.session.participant?.fullName ?? null,
       department: a.session.participant?.department ?? null,
       designation: a.session.participant?.designation ?? null,

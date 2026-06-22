@@ -142,12 +142,6 @@ export function InterviewChatComposer({
               language={language}
               baseText={input}
               onTextChange={onVoiceTextChange}
-              onUtteranceComplete={(text) => {
-                onVoiceTextChange(text);
-                if (text.trim() && onVoiceSubmit && !loading && sessionReady) {
-                  onVoiceSubmit(text.trim());
-                }
-              }}
               disabled={loading || !sessionReady}
               prominent
               labels={{

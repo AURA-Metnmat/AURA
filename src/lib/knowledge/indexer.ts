@@ -278,7 +278,9 @@ export async function indexExperienceKnowledge(
     where: { companyId },
     include: {
       participant: true,
+      employee: { select: { id: true, employeeCode: true } },
       messages: { orderBy: { createdAt: "asc" } },
+      answers: { orderBy: { createdAt: "asc" } },
       painPoints: true,
       requirements: true,
       processes: true,
@@ -295,6 +297,58 @@ export async function indexExperienceKnowledge(
     const role = [session.participant?.designation, session.participant?.department]
       .filter(Boolean)
       .join(", ");
+    const baseMeta = {
+      sessionId: session.id,
+      participant: person,
+      employeeId: session.employeeId,
+      employeeCode: session.employee?.employeeCode ?? session.participant?.employeeId ?? null,
+      status: session.status,
+    };
+
+    const assistantIds = session.answers
+      .map((a) => a.assistantMsgId)
+      .filter((id): id is string => Boolean(id));
+    const assistantMap =
+      assistantIds.length > 0
+        ? new Map(
+            (
+              await db.message.findMany({
+                where: { id: { in: assistantIds } },
+                select: { id: true, content: true },
+              })
+            ).map((m) => [m.id, m.content])
+          )
+        : new Map<string, string>();
+
+    for (const answer of session.answers) {
+      if (answer.reviewStatus === "REJECTED" || answer.rawText.trim().length < 8) continue;
+      const question = answer.assistantMsgId
+        ? assistantMap.get(answer.assistantMsgId)
+        : null;
+      inputs.push({
+        companySlug,
+        sourceType: SOURCE_TYPE.EXPERIENCE,
+        sourceKind: "interview_answer",
+        sourceId: answer.id,
+        sourceLabel: `${person} — ${answer.interactionType} answer`,
+        content: [
+          question ? `Question: ${question}` : null,
+          `Answer: ${answer.rawText}`,
+          answer.structuredJson ? `Structured: ${answer.structuredJson}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        metadata: {
+          ...baseMeta,
+          answerId: answer.id,
+          interactionType: answer.interactionType,
+          section: answer.section,
+          qualityScore: answer.qualityScore,
+          confidenceScore: answer.confidenceScore,
+          reviewStatus: answer.reviewStatus,
+        },
+      });
+    }
 
     const userMessages = session.messages
       .filter((m) => m.role === "user" && m.content.trim().length > 8)
@@ -313,9 +367,7 @@ export async function indexExperienceKnowledge(
           sourceLabel: `${person} — conversation excerpt`,
           content: `${header}\n\n${batch.map((m, idx) => `Q/A ${i + idx + 1}: ${m}`).join("\n\n")}`,
           metadata: {
-            sessionId: session.id,
-            participant: person,
-            status: session.status,
+            ...baseMeta,
           },
         });
       }
@@ -329,7 +381,7 @@ export async function indexExperienceKnowledge(
         sourceId: pp.id,
         sourceLabel: `${person} — pain point: ${pp.title}`,
         content: `Pain point (${pp.severity}): ${pp.title}\n${pp.description ?? ""}`.trim(),
-        metadata: { sessionId: session.id, severity: pp.severity },
+        metadata: { ...baseMeta, severity: pp.severity },
       });
     }
 
@@ -341,7 +393,7 @@ export async function indexExperienceKnowledge(
         sourceId: req.id,
         sourceLabel: `${person} — requirement: ${req.title}`,
         content: `Requirement [${req.type}/${req.priority}]: ${req.title}\n${req.description ?? ""}`.trim(),
-        metadata: { sessionId: session.id },
+        metadata: { ...baseMeta },
       });
     }
 
@@ -360,7 +412,7 @@ export async function indexExperienceKnowledge(
         ]
           .filter(Boolean)
           .join("\n"),
-        metadata: { sessionId: session.id },
+        metadata: { ...baseMeta },
       });
     }
 
@@ -372,7 +424,7 @@ export async function indexExperienceKnowledge(
         sourceId: integ.id,
         sourceLabel: `${person} — integration: ${integ.systemName}`,
         content: `System: ${integ.systemName}\n${integ.purpose ?? ""}`.trim(),
-        metadata: { sessionId: session.id },
+        metadata: { ...baseMeta },
       });
     }
 
@@ -390,7 +442,7 @@ export async function indexExperienceKnowledge(
         ]
           .filter(Boolean)
           .join("\n"),
-        metadata: { sessionId: session.id },
+        metadata: { ...baseMeta },
       });
     }
 
@@ -404,7 +456,7 @@ export async function indexExperienceKnowledge(
         sourceId: att.id,
         sourceLabel: `${person} — uploaded file: ${att.fileName}`,
         content: `File: ${att.fileName}\n\n${text}`,
-        metadata: { sessionId: session.id, fileType: att.fileType },
+        metadata: { ...baseMeta, fileType: att.fileType },
       });
     }
 
@@ -428,7 +480,7 @@ export async function indexExperienceKnowledge(
           sourceId: session.id,
           sourceLabel: `${person} — interview report`,
           content: sections.map(([title, body]) => `## ${title}\n${body}`).join("\n\n"),
-          metadata: { sessionId: session.id, status: session.status },
+          metadata: { ...baseMeta, status: session.status },
         });
       }
     }

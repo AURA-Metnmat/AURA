@@ -70,6 +70,8 @@ export async function buildCompanyInterviewWorkbook(companyId: string): Promise<
 
   const summaryRows = company.sessions.map((s) => ({
     sessionId: s.id,
+    employeeId: s.employeeId ?? "",
+    employeeCode: s.participant?.employeeId ?? "",
     employee: s.participant?.fullName ?? "",
     designation: s.participant?.designation ?? "",
     department: s.participant?.department ?? "",

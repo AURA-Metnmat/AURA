@@ -9,21 +9,27 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const companySlug = searchParams.get("companySlug");
+    const companySlug = searchParams.get("companySlug")?.trim();
 
-    if (companySlug) {
-      const company = await db.company.findUnique({
-        where: { slug: companySlug },
-        select: { id: true },
-      });
-      if (!company) {
-        return NextResponse.json({ error: "Company not found" }, { status: 404 });
-      }
-      const accessDenied = assertCompanyAccess(session, company.id);
-      if (accessDenied) return accessDenied;
+    if (!companySlug) {
+      return NextResponse.json(
+        { error: "companySlug query parameter is required" },
+        { status: 400 }
+      );
     }
 
-    const fileWhere = companySlug ? { companySlug } : {};
+    const company = await db.company.findUnique({
+      where: { slug: companySlug },
+      select: { id: true },
+    });
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    const accessDenied = assertCompanyAccess(session, company.id);
+    if (accessDenied) return accessDenied;
+
+    const fileWhere = { companySlug };
 
     const [files, insights, furnaceSpecs, pdfs, stats] = await Promise.all([
       db.dataFile.findMany({
@@ -32,27 +38,27 @@ export async function GET(request: Request) {
         take: 50,
       }),
       db.dataInsight.findMany({
-        where: companySlug ? { file: { companySlug } } : {},
+        where: { file: { companySlug } },
         orderBy: { priority: "asc" },
         take: 50,
       }),
       db.furnaceSpec.findMany({
-        where: companySlug ? { companySlug } : {},
+        where: { companySlug },
         orderBy: { parameter: "asc" },
       }),
       db.pdfDocument.findMany({
-        where: companySlug ? { companySlug } : {},
+        where: { companySlug },
       }),
       Promise.all([
         db.dataFile.count({ where: fileWhere }),
         db.dataRecord.count({
-          where: companySlug ? { file: { companySlug } } : {},
+          where: { file: { companySlug } },
         }),
         db.dataInsight.count({
-          where: companySlug ? { file: { companySlug } } : {},
+          where: { file: { companySlug } },
         }),
         db.furnaceSpec.count({
-          where: companySlug ? { companySlug } : {},
+          where: { companySlug },
         }),
       ]),
     ]);

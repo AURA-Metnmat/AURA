@@ -11,6 +11,7 @@ import {
   recordAdminLoginFailure,
 } from "@/lib/auth/admin-rate-limit";
 import { getClientIp } from "@/lib/auth/client-ip";
+import { env } from "@/lib/env";
 import { verifyPassword } from "@/lib/auth/employee";
 import { ADMIN_ROLES } from "@/lib/auth/admin-rbac";
 import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
@@ -18,7 +19,7 @@ import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const allowed = checkAdminLoginAllowed(ip);
+    const allowed = await checkAdminLoginAllowed(ip);
     if (!allowed.allowed) {
       return NextResponse.json(
         {
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!sessionPayload && verifyAdminPassword(password)) {
+    if (!sessionPayload && env().allowLegacyAdminPassword && verifyAdminPassword(password)) {
       sessionPayload = {
         adminUserId: null,
         email: email || null,
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
     }
 
     if (!sessionPayload) {
-      recordAdminLoginFailure(ip);
+      await recordAdminLoginFailure(ip);
       await logAdminAudit({
         action: AUDIT_ACTIONS.ADMIN_LOGIN_FAILED,
         request,
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    clearAdminLoginSuccess(ip);
+    await clearAdminLoginSuccess(ip);
     const token = createAdminSessionToken(sessionPayload);
     const response = NextResponse.json({
       success: true,

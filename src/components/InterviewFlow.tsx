@@ -721,6 +721,7 @@ export default function InterviewFlow({
       {step === "consent" && (
         <ConsentScreen
           companyName={companyName}
+          language={language}
           loading={loading}
           onAccept={() => void startInterview()}
           onDecline={() => {
@@ -794,7 +795,7 @@ export default function InterviewFlow({
             </div>
           )}
 
-          {completionPct >= 85 && (
+          {completionPct >= 70 && (
             <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-3 text-center shrink-0">
               <button
                 onClick={completeInterview}

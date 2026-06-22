@@ -18,9 +18,23 @@ function getSupabaseAdmin() {
   });
 }
 
-function buildPublicUrl(key: string): string {
+/** Opaque path stored in DB — not a public URL. */
+function buildPrivatePath(storageKey: string): string {
+  return `storage://${storageKey}`;
+}
+
+export async function createSignedStorageUrl(
+  storageKey: string,
+  expiresInSeconds = 3600
+): Promise<string | null> {
+  if (!storageKey?.trim()) return null;
   const { storage } = env();
-  return `${storage.supabaseUrl}/storage/v1/object/public/${storage.bucket}/${key}`;
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.storage
+    .from(storage.bucket!)
+    .createSignedUrl(storageKey, expiresInSeconds);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
 }
 
 export async function storeInterviewFile(
@@ -41,7 +55,20 @@ export async function storeInterviewFile(
   });
   if (error) throw new Error(error.message);
 
-  return { filePath: buildPublicUrl(key), storageKey: key };
+  return { filePath: buildPrivatePath(key), storageKey: key };
+}
+
+export async function resolveAttachmentDownloadUrl(
+  storageKey: string | null | undefined,
+  legacyFilePath?: string | null
+): Promise<string | null> {
+  if (storageKey) {
+    return createSignedStorageUrl(storageKey, 3600);
+  }
+  if (legacyFilePath?.startsWith("http")) {
+    return legacyFilePath;
+  }
+  return null;
 }
 
 export async function deleteStoredFile(storageKey: string): Promise<void> {

@@ -20,7 +20,7 @@ model Company {
   industry                   String?
   description                String?
   aiContext                  String?
-  interviewDurationMinutes   Int                @default(5)
+  interviewDurationMinutes   Int                @default(15)
   contactName                String?
   contactEmail               String?
   contactPhone               String?
@@ -669,4 +669,16 @@ model KnowledgeChunk {
   @@index([companySlug, topicCategory])
   @@index([sourceKind])
   @@index([contentHash])
+}
+
+model RateLimitBucket {
+  id          String    @id @default(cuid())
+  bucketKey   String    @unique
+  hitCount    Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([bucketKey])
 }

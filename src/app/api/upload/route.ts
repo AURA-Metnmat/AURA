@@ -79,7 +79,7 @@ export async function POST(request: Request) {
         fileName: attachment.fileName,
         fileType: attachment.fileType,
         fileSize: attachment.fileSize,
-        filePath: attachment.filePath,
+        filePath: `/api/attachments/${attachment.id}`,
       },
     });
   } catch (error) {

@@ -15,15 +15,15 @@ export function DesktopOnlyGate({ companyName }: DesktopOnlyGateProps) {
           <Laptop className="w-10 h-10" />
           <Monitor className="w-10 h-10" />
         </div>
-        <h2 className="text-xl font-semibold text-white mb-3">Desktop or laptop required</h2>
+        <h2 className="text-xl font-semibold text-white mb-3">Larger screen required</h2>
         <p className="text-sm text-slate-400 leading-relaxed mb-4">
-          This interview for <span className="text-slate-200 font-medium">{companyName}</span> is
-          designed for laptop or computer use only. It uses structured questions, file uploads, and a
-          focused layout that does not work well on mobile phones.
+          This interview for <span className="text-slate-200 font-medium">{companyName}</span> works
+          best on a laptop, desktop, or tablet in landscape. Voice input, structured questions, and
+          file uploads need a comfortable screen size.
         </p>
         <p className="text-sm text-amber-200/90 bg-amber-950/30 border border-amber-900/40 rounded-xl px-4 py-3">
-          Please open this link on a desktop or laptop (screen width at least {DESKTOP_MIN_WIDTH_PX}
-          px) for the best experience.
+          Please use a device with screen width at least {DESKTOP_MIN_WIDTH_PX}px (tablet landscape
+          or computer).
         </p>
       </div>
     </div>

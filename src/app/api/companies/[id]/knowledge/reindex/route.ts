@@ -17,7 +17,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: companyId } = await params;
-  const session = await requireCompanyAdmin(request, companyId);
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.REVIEW_KNOWLEDGE);
   if (session instanceof NextResponse) return session;
 
   try {

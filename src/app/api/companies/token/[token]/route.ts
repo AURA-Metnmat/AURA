@@ -1,22 +1,11 @@
 import { NextResponse } from "next/server";
 import { getClientIp } from "@/lib/auth/client-ip";
+import { checkRateLimitBucket } from "@/lib/auth/db-rate-limit";
 import { resolveInterviewAccessByToken } from "@/lib/campaigns/resolve";
 
 const TOKEN_LOOKUP_LIMIT = 60;
-const tokenLookupByIp = new Map<string, { count: number; resetAt: number }>();
-
-function checkTokenLookupRate(ip: string): boolean {
-  const now = Date.now();
-  const hourMs = 60 * 60 * 1000;
-  const state = tokenLookupByIp.get(ip);
-  if (!state || now > state.resetAt) {
-    tokenLookupByIp.set(ip, { count: 1, resetAt: now + hourMs });
-    return true;
-  }
-  if (state.count >= TOKEN_LOOKUP_LIMIT) return false;
-  state.count += 1;
-  return true;
-}
+const TOKEN_WINDOW_MS = 60 * 60 * 1000;
+const TOKEN_LOCKOUT_MS = 15 * 60 * 1000;
 
 export async function GET(
   request: Request,
@@ -25,8 +14,17 @@ export async function GET(
   const { token } = await params;
 
   const ip = getClientIp(request);
-  if (!checkTokenLookupRate(ip)) {
-    return NextResponse.json({ error: "Too many requests. Try again later." }, { status: 429 });
+  const rate = await checkRateLimitBucket(
+    `invite_token:${ip}`,
+    TOKEN_LOOKUP_LIMIT,
+    TOKEN_WINDOW_MS,
+    TOKEN_LOCKOUT_MS
+  );
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests. Try again later." },
+      { status: 429 }
+    );
   }
 
   const access = await resolveInterviewAccessByToken(token);

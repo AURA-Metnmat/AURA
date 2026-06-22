@@ -1,44 +1,46 @@
+import { db } from "@/lib/db";
+import { AUDIT_ACTIONS } from "@/lib/auth/admin-audit";
+import { clearRateLimitBucket } from "@/lib/auth/db-rate-limit";
+
 const MAX_FAILURES = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 
-interface AttemptState {
-  failures: number;
-  lockedUntil: number | null;
-}
+export async function checkAdminLoginAllowed(
+  ip: string
+): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+  const since = new Date(Date.now() - LOCKOUT_MS);
+  const failures = await db.adminAuditLog.count({
+    where: {
+      action: AUDIT_ACTIONS.ADMIN_LOGIN_FAILED,
+      ipAddress: ip,
+      createdAt: { gte: since },
+    },
+  });
 
-const attemptsByIp = new Map<string, AttemptState>();
+  if (failures < MAX_FAILURES) {
+    return { allowed: true };
+  }
 
-function getState(ip: string): AttemptState {
-  const existing = attemptsByIp.get(ip);
-  if (existing) return existing;
-  const state = { failures: 0, lockedUntil: null };
-  attemptsByIp.set(ip, state);
-  return state;
-}
+  const latest = await db.adminAuditLog.findFirst({
+    where: { action: AUDIT_ACTIONS.ADMIN_LOGIN_FAILED, ipAddress: ip },
+    orderBy: { createdAt: "desc" },
+  });
 
-export function checkAdminLoginAllowed(ip: string): { allowed: boolean; retryAfterSeconds?: number } {
-  const state = getState(ip);
-  if (state.lockedUntil && Date.now() < state.lockedUntil) {
+  const lockedUntil = (latest?.createdAt.getTime() ?? Date.now()) + LOCKOUT_MS;
+  if (Date.now() < lockedUntil) {
     return {
       allowed: false,
-      retryAfterSeconds: Math.ceil((state.lockedUntil - Date.now()) / 1000),
+      retryAfterSeconds: Math.ceil((lockedUntil - Date.now()) / 1000),
     };
   }
-  if (state.lockedUntil && Date.now() >= state.lockedUntil) {
-    state.failures = 0;
-    state.lockedUntil = null;
-  }
+
   return { allowed: true };
 }
 
-export function recordAdminLoginFailure(ip: string): void {
-  const state = getState(ip);
-  state.failures += 1;
-  if (state.failures >= MAX_FAILURES) {
-    state.lockedUntil = Date.now() + LOCKOUT_MS;
-  }
+export async function recordAdminLoginFailure(_ip: string): Promise<void> {
+  // Failures are recorded via logAdminAudit in the login route.
 }
 
-export function clearAdminLoginSuccess(ip: string): void {
-  attemptsByIp.delete(ip);
+export async function clearAdminLoginSuccess(ip: string): Promise<void> {
+  await clearRateLimitBucket(`admin_login:${ip}`);
 }

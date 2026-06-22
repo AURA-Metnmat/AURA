@@ -42,16 +42,17 @@ describe("API auth guard integration", () => {
     assert.equal(result.status, 403);
   });
 
-  it("allows reviewer company access for analytics guard", async () => {
+  it("blocks reviewer from analytics export permission", async () => {
     const result = await requireCompanyAdmin(
       bearerRequest("/api/companies/co-mine/analytics", {
         role: ADMIN_ROLES.REVIEWER,
         companyId: "co-mine",
         email: "reviewer@mine.com",
       }),
-      "co-mine"
+      "co-mine",
+      PERMISSIONS.EXPORT_DATA
     );
-    assert.ok(!(result instanceof NextResponse));
-    assert.equal(result.role, ADMIN_ROLES.REVIEWER);
+    assert.ok(result instanceof NextResponse);
+    assert.equal(result.status, 403);
   });
 });

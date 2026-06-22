@@ -116,8 +116,48 @@ export default function AnswerReviewPanel({ companyId, glassCard }: AnswerReview
   const departments = [...new Set(kpis?.byDepartment.map((d) => d.department) ?? [])];
   const campaigns = kpis?.byCampaign.filter((c) => c.campaignId !== "none") ?? [];
 
+  async function exportAnswers() {
+    const params = new URLSearchParams();
+    if (statusFilter) params.set("status", statusFilter);
+    if (departmentFilter) params.set("department", departmentFilter);
+    if (campaignFilter) params.set("campaignId", campaignFilter);
+    if (confidenceMax) params.set("confidenceMax", confidenceMax);
+    params.set("format", "jsonl");
+
+    const res = await fetch(`/api/companies/${companyId}/answers/export?${params}`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? "Export failed");
+      return;
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get("Content-Disposition");
+    const match = disposition?.match(/filename="([^"]+)"/);
+    const fileName = match?.[1] ?? `answers-export.jsonl`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-400">
+          Review captured answers with quality scores — export Q/A pairs for model training.
+        </p>
+        <button
+          type="button"
+          onClick={() => void exportAnswers()}
+          className="text-xs px-3 py-2 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-200"
+        >
+          Export Q/A (JSONL)
+        </button>
+      </div>
       {kpis && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
           <div className={`${glassCard} p-4`}>

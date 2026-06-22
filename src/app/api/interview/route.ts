@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdminSession } from "@/lib/auth/admin";
+import { assertCompanyAccess, companyScopeFilter } from "@/lib/auth/admin-rbac";
 import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
 import { getOpeningQuestion1, getOpeningQuestion2 } from "@/lib/aura/opening-questions";
 import { serializeInteraction } from "@/lib/aura/interaction";
@@ -262,6 +263,23 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Session not found" }, { status: 404 });
       }
 
+      if (fullSession.completionPct < 60) {
+        return NextResponse.json(
+          { error: "Please continue the interview — you have not reached enough progress to finish." },
+          { status: 400 }
+        );
+      }
+
+      const answerCount = await db.interviewAnswer.count({
+        where: { sessionId: session.id },
+      });
+      if (answerCount < 3) {
+        return NextResponse.json(
+          { error: "Please answer at least a few questions before finishing." },
+          { status: 400 }
+        );
+      }
+
       const reportData = await generateInterviewReport({
         company: fullSession.company
           ? {
@@ -403,7 +421,8 @@ export async function POST(request: Request) {
     await extractStructuredData(
       session.id,
       session.currentSection as SectionId,
-      userMessage
+      userMessage,
+      Boolean(structuredAnswer?.interactionType)
     );
 
     const updatedHistory = [
@@ -560,11 +579,31 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get("sessionId");
+  const companyIdParam = searchParams.get("companyId");
+  const scope = companyScopeFilter(adminSession);
+
+  if (scope.id === "__none__") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const companyId =
+    companyIdParam ?? (scope.id && scope.id !== "__none__" ? scope.id : null);
+
+  if (!companyId) {
+    return NextResponse.json(
+      { error: "companyId query parameter is required" },
+      { status: 400 }
+    );
+  }
+
+  const denied = assertCompanyAccess(adminSession, companyId);
+  if (denied) return denied;
 
   if (!sessionId) {
     const sessions = await db.interviewSession.findMany({
+      where: { companyId },
       orderBy: { startedAt: "desc" },
-      take: 20,
+      take: 50,
       include: { participant: true, company: true, report: true },
     });
     return NextResponse.json({ sessions });
@@ -590,7 +629,7 @@ export async function GET(request: Request) {
     },
   });
 
-  if (!interviewSession) {
+  if (!interviewSession || interviewSession.companyId !== companyId) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
@@ -600,8 +639,13 @@ export async function GET(request: Request) {
 async function extractStructuredData(
   sessionId: string,
   section: SectionId,
-  message: string
+  message: string,
+  hadStructuredAnswer: boolean
 ): Promise<void> {
+  if (hadStructuredAnswer || message.trim().length < 40) {
+    return;
+  }
+
   const lower = message.toLowerCase();
 
   if (section === "E" && (lower.includes("delay") || lower.includes("problem") || lower.includes("issue") || lower.includes("bottleneck") || lower.includes("समस्या") || lower.includes("ସମସ୍ୟା") || lower.includes("সমস্যা"))) {

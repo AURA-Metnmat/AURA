@@ -22,12 +22,21 @@ export interface MlExportRecord {
   sourceLabel: string;
   sourceId: string | null;
   sessionId: string | null;
+  employeeId: string | null;
+  employeeCode: string | null;
   participant: string | null;
+  qualityScore: number | null;
+  confidenceScore: number | null;
   charCount: number;
   reviewedAt: string | null;
   reviewedBy: string | null;
   reviewNotes: string | null;
   createdAt: string;
+}
+
+export interface MlExportQuery {
+  filter?: MlExportFilter;
+  category?: TopicCategoryId;
 }
 
 function statusFilter(filter: MlExportFilter): ReviewStatus[] | undefined {
@@ -47,7 +56,8 @@ function statusFilter(filter: MlExportFilter): ReviewStatus[] | undefined {
 
 export async function fetchExperienceForExport(
   companySlug: string,
-  filter: MlExportFilter = "validated"
+  filter: MlExportFilter = "validated",
+  category?: TopicCategoryId
 ): Promise<MlExportRecord[]> {
   const statuses = statusFilter(filter);
 
@@ -56,6 +66,7 @@ export async function fetchExperienceForExport(
       companySlug,
       sourceType: SOURCE_TYPE.EXPERIENCE,
       ...(statuses ? { reviewStatus: { in: statuses } } : {}),
+      ...(category ? { topicCategory: category } : {}),
     },
     orderBy: [{ reviewStatus: "asc" }, { updatedAt: "desc" }],
   });
@@ -72,7 +83,11 @@ export async function fetchExperienceForExport(
       sourceLabel: c.sourceLabel,
       sourceId: c.sourceId,
       sessionId: typeof meta.sessionId === "string" ? meta.sessionId : null,
+      employeeId: typeof meta.employeeId === "string" ? meta.employeeId : null,
+      employeeCode: typeof meta.employeeCode === "string" ? meta.employeeCode : null,
       participant: typeof meta.participant === "string" ? meta.participant : null,
+      qualityScore: typeof meta.qualityScore === "number" ? meta.qualityScore : null,
+      confidenceScore: typeof meta.confidenceScore === "number" ? meta.confidenceScore : null,
       charCount: c.charCount,
       reviewedAt: c.reviewedAt?.toISOString() ?? null,
       reviewedBy: c.reviewedBy,
@@ -93,7 +108,11 @@ export function buildMlJsonl(records: MlExportRecord[]): string {
         source_kind: r.sourceKind,
         source_label: r.sourceLabel,
         session_id: r.sessionId,
+        employee_id: r.employeeId,
+        employee_code: r.employeeCode,
         participant: r.participant,
+        quality_score: r.qualityScore,
+        confidence_score: r.confidenceScore,
         metadata: {
           id: r.id,
           reviewed_at: r.reviewedAt,
@@ -118,7 +137,11 @@ export function buildMlWorkbook(records: MlExportRecord[], companySlug: string):
       "Source Kind": r.sourceKind,
       "Source Label": r.sourceLabel,
       Participant: r.participant ?? "",
+      "Employee ID": r.employeeId ?? "",
+      "Employee Code": r.employeeCode ?? "",
       "Session ID": r.sessionId ?? "",
+      "Quality Score": r.qualityScore ?? "",
+      "Confidence Score": r.confidenceScore ?? "",
       "Char Count": r.charCount,
       "Review Notes": r.reviewNotes ?? "",
       "Reviewed By": r.reviewedBy ?? "",

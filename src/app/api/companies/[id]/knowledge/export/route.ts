@@ -10,6 +10,7 @@ import {
   fetchExperienceForExport,
   filterLabel,
   normalizeExportFilter,
+  normalizeTopicFilter,
 } from "@/lib/knowledge/ml-export";
 
 export async function GET(
@@ -32,8 +33,9 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format") ?? "xlsx";
     const filter = normalizeExportFilter(searchParams.get("filter"));
+    const category = normalizeTopicFilter(searchParams.get("category"));
 
-    const records = await fetchExperienceForExport(company.slug, filter);
+    const records = await fetchExperienceForExport(company.slug, filter, category);
 
     await logAdminAudit({
       action: AUDIT_ACTIONS.KNOWLEDGE_EXPORT,

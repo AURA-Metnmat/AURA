@@ -4,6 +4,7 @@ import type { AdminSession } from "@/lib/auth/admin-rbac";
 export const EXPORT_TYPES = {
   INTERVIEW: "interview",
   KNOWLEDGE_ML: "knowledge_ml",
+  ANSWERS_ML: "answers_ml",
 } as const;
 
 export type ExportType = (typeof EXPORT_TYPES)[keyof typeof EXPORT_TYPES];
@@ -11,6 +12,7 @@ export type ExportType = (typeof EXPORT_TYPES)[keyof typeof EXPORT_TYPES];
 export const EXPORT_TYPE_LABELS: Record<ExportType, string> = {
   interview: "Interview workbook",
   knowledge_ml: "Experience / ML export",
+  answers_ml: "Structured Q/A export",
 };
 
 export interface RecordDataExportInput {
