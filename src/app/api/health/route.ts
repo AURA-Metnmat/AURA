@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { hasClaudeProvider, hasOpenAIProvider } from "@/lib/ai/providers";
+import { isDualModelActive } from "@/lib/ai/ai-config";
 
 export async function GET() {
   const started = Date.now();
@@ -18,8 +19,16 @@ export async function GET() {
       dbLatencyMs,
       ai: {
         primary: claude ? "claude" : openai ? "openai" : "none",
+        dual: isDualModelActive(),
         claude,
         openai,
+        strategy: isDualModelActive()
+          ? "dual (Claude draft + OpenAI refine)"
+          : claude
+            ? "claude-primary"
+            : openai
+              ? "openai-only"
+              : "none",
       },
       timestamp: new Date().toISOString(),
     });

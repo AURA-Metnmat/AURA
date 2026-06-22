@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { hasClaudeProvider, hasOpenAIProvider } from "@/lib/ai/providers";
+import { isDualModelActive } from "@/lib/ai/ai-config";
 import { AUDIT_ACTIONS } from "@/lib/auth/admin-audit";
 import { REINDEX_JOB_STATUS } from "@/lib/knowledge/reindex-job-types";
 import { recoverStaleReindexJobs } from "@/lib/knowledge/reindex-jobs";
@@ -57,6 +58,7 @@ export async function getPlatformSystemStatus(): Promise<SystemOpsSnapshot> {
     ai: {
       claude: hasClaudeProvider(),
       openai: hasOpenAIProvider(),
+      dual: isDualModelActive(),
       primary: hasClaudeProvider() ? "claude" : hasOpenAIProvider() ? "openai" : "none",
     },
   };

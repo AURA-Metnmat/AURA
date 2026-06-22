@@ -4,6 +4,7 @@ export interface SystemHealthSnapshot {
   ai: {
     claude: boolean;
     openai: boolean;
+    dual?: boolean;
     primary: string;
   };
 }

@@ -9,6 +9,12 @@ import {
   CLAUDE_REPORT_MODEL,
   OPENAI_CHAT_MODEL,
 } from "./models";
+import {
+  INTERVIEW_REFINE_SYSTEM,
+  isDualModelActive,
+  mergeReportFields,
+  REPORT_ENHANCE_SYSTEM,
+} from "./ai-config";
 
 export interface ChatJsonOptions {
   messages: ChatMessage[];
@@ -114,43 +120,153 @@ export async function chatJson(options: ChatJsonOptions): Promise<string | null>
 }
 
 /**
- * Interview turns — Claude Sonnet for depth, OpenAI mini as fallback.
+ * Interview turns — dual-model when both keys: Claude drafts, OpenAI refines; else fallback chain.
  */
 export async function chatInterviewJson(messages: ChatMessage[]): Promise<string | null> {
-  return chatJson({
-    messages,
+  const baseOptions = {
     temperature: 0.55,
     maxTokens: 900,
     claudeModel: CLAUDE_INTERVIEW_MODEL,
+  };
+
+  if (!isDualModelActive()) {
+    return chatJson({
+      messages,
+      ...baseOptions,
+      preferClaude: true,
+    });
+  }
+
+  const claudeDraft = await chatJson({
+    messages,
+    ...baseOptions,
     preferClaude: true,
   });
+
+  if (!claudeDraft) {
+    return chatJson({
+      messages,
+      ...baseOptions,
+      preferClaude: false,
+    });
+  }
+
+  const refined = await chatJson({
+    messages: [
+      { role: "system", content: INTERVIEW_REFINE_SYSTEM },
+      { role: "user", content: claudeDraft },
+    ],
+    temperature: 0.35,
+    maxTokens: 900,
+    claudeModel: CLAUDE_INTERVIEW_MODEL,
+    preferClaude: false,
+  });
+
+  return refined || claudeDraft;
 }
 
 /**
- * Final reports — Claude Sonnet primary.
+ * Final reports — dual-model: Claude full draft, OpenAI enhances executive sections.
  */
 export async function chatReportJson(messages: ChatMessage[]): Promise<string | null> {
-  return chatJson({
-    messages,
+  const baseOptions = {
     temperature: 0.4,
     maxTokens: 4096,
     claudeModel: CLAUDE_REPORT_MODEL,
+  };
+
+  if (!isDualModelActive()) {
+    return chatJson({
+      messages,
+      ...baseOptions,
+      preferClaude: true,
+    });
+  }
+
+  const claudeDraft = await chatJson({
+    messages,
+    ...baseOptions,
     preferClaude: true,
   });
+
+  if (!claudeDraft) {
+    return chatJson({
+      messages,
+      ...baseOptions,
+      preferClaude: false,
+    });
+  }
+
+  let baseReport: Record<string, string>;
+  try {
+    baseReport = JSON.parse(claudeDraft) as Record<string, string>;
+  } catch {
+    return claudeDraft;
+  }
+
+  const enhancedRaw = await chatJson({
+    messages: [
+      { role: "system", content: REPORT_ENHANCE_SYSTEM },
+      { role: "user", content: claudeDraft },
+    ],
+    temperature: 0.3,
+    maxTokens: 4096,
+    claudeModel: CLAUDE_REPORT_MODEL,
+    preferClaude: false,
+  });
+
+  if (!enhancedRaw) return claudeDraft;
+
+  try {
+    const enhanced = JSON.parse(enhancedRaw) as Record<string, string>;
+    return JSON.stringify(mergeReportFields(baseReport, enhanced));
+  } catch {
+    return claudeDraft;
+  }
 }
 
 /**
- * Fast translation / normalization — OpenAI first (cheaper/latency), Claude fallback.
+ * Fast translation / normalization — dual-model: OpenAI draft, Claude polishes locale script.
  */
 export async function chatNormalizeJson(messages: ChatMessage[]): Promise<string | null> {
-  const openaiRaw = await chatJsonOpenAI(messages, 0.2, 400);
-  if (openaiRaw) return openaiRaw;
+  if (!isDualModelActive()) {
+    const openaiRaw = await chatJsonOpenAI(messages, 0.2, 400);
+    if (openaiRaw) return openaiRaw;
 
-  return chatJson({
-    messages,
+    return chatJson({
+      messages,
+      temperature: 0.2,
+      maxTokens: 400,
+      claudeModel: CLAUDE_INTERVIEW_MODEL,
+      preferClaude: true,
+    });
+  }
+
+  const openaiDraft = await chatJsonOpenAI(messages, 0.2, 400);
+  if (!openaiDraft) {
+    return chatJson({
+      messages,
+      temperature: 0.2,
+      maxTokens: 400,
+      claudeModel: CLAUDE_INTERVIEW_MODEL,
+      preferClaude: true,
+    });
+  }
+
+  const polished = await chatJson({
+    messages: [
+      {
+        role: "system",
+        content:
+          "Polish bilingual JSON for accuracy and native script quality in locale field. Return valid JSON only with keys en and locale.",
+      },
+      { role: "user", content: openaiDraft },
+    ],
     temperature: 0.2,
     maxTokens: 400,
     claudeModel: CLAUDE_INTERVIEW_MODEL,
     preferClaude: true,
   });
+
+  return polished || openaiDraft;
 }

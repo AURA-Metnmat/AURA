@@ -3,6 +3,11 @@ import { chatJson } from "./chat";
 import { CLAUDE_RETRIEVAL_MODEL } from "./models";
 import type { ChatMessage } from "./providers";
 import { SOURCE_TYPE } from "@/lib/knowledge/indexer";
+import {
+  isDualModelActive,
+  mergeRetrievalIndices,
+  RETRIEVAL_OPENAI_SYSTEM,
+} from "./ai-config";
 
 const MAX_CORPUS_CHARS = 24_000;
 const MAX_RETRIEVED_CHARS = 6_000;
@@ -16,7 +21,7 @@ export interface RetrievalChunk {
 export interface RetrievedKnowledge {
   chunks: RetrievalChunk[];
   formattedContext: string;
-  provider: "claude" | "openai" | "heuristic" | "none";
+  provider: "claude" | "openai" | "dual" | "heuristic" | "none";
 }
 
 async function loadLegacyCorpus(companySlug: string): Promise<RetrievalChunk[]> {
@@ -163,12 +168,13 @@ function formatChunks(chunks: RetrievalChunk[]): string {
     : body;
 }
 
-async function llmRetrieve(
+async function llmRetrieveWithProvider(
   chunks: RetrievalChunk[],
   userMessage: string,
   sectionName: string,
-  designation: string
-): Promise<RetrievedKnowledge | null> {
+  designation: string,
+  preferClaude: boolean
+): Promise<{ indices: number[]; summary: string } | null> {
   const corpus = chunks
     .map(
       (c, i) =>
@@ -180,12 +186,7 @@ async function llmRetrieve(
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: `You are a knowledge retrieval engine for AURA interview platform.
-Given employee message, interview section, and company knowledge chunks, return JSON:
-{"indices":[0,2,5],"summary":"2-3 sentence synthesis of what matters for the next question"}
-Pick 0-6 chunk indices most relevant to answer the employee and ask a smart follow-up.
-Prefer reference chunks (imported docs, Excel data) for factual/operational questions.
-Prefer experience chunks (interview transcripts, pain points, reports) for tacit knowledge and workflows.`,
+      content: RETRIEVAL_OPENAI_SYSTEM,
     },
     {
       role: "user",
@@ -203,7 +204,7 @@ ${corpus}`,
     temperature: 0.2,
     maxTokens: 500,
     claudeModel: CLAUDE_RETRIEVAL_MODEL,
-    preferClaude: true,
+    preferClaude,
   });
 
   if (!raw) return null;
@@ -213,30 +214,76 @@ ${corpus}`,
     const indices = Array.isArray(parsed.indices)
       ? parsed.indices.filter((i) => Number.isInteger(i) && i >= 0 && i < chunks.length)
       : [];
-
-    const selected =
-      indices.length > 0 ? indices.map((i) => chunks[i]!) : chunks.slice(0, 3);
-
-    const summary = parsed.summary?.trim();
-    const formatted = [
-      summary ? `**Retrieved focus:** ${summary}` : "",
-      formatChunks(selected),
-    ]
-      .filter(Boolean)
-      .join("\n\n");
-
-    return {
-      chunks: selected,
-      formattedContext: formatted,
-      provider: "claude",
-    };
+    return { indices, summary: parsed.summary?.trim() ?? "" };
   } catch {
     return null;
   }
 }
 
+function buildRetrievalResult(
+  chunks: RetrievalChunk[],
+  indices: number[],
+  summary: string,
+  provider: RetrievedKnowledge["provider"]
+): RetrievedKnowledge {
+  const selected =
+    indices.length > 0 ? indices.map((i) => chunks[i]!) : chunks.slice(0, 3);
+  const formatted = [
+    summary ? `**Retrieved focus:** ${summary}` : "",
+    formatChunks(selected),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return {
+    chunks: selected,
+    formattedContext: formatted,
+    provider,
+  };
+}
+
+async function llmRetrieve(
+  chunks: RetrievalChunk[],
+  userMessage: string,
+  sectionName: string,
+  designation: string
+): Promise<RetrievedKnowledge | null> {
+  if (isDualModelActive()) {
+    const [claudeRank, openaiRank] = await Promise.all([
+      llmRetrieveWithProvider(chunks, userMessage, sectionName, designation, true),
+      llmRetrieveWithProvider(chunks, userMessage, sectionName, designation, false),
+    ]);
+
+    if (claudeRank || openaiRank) {
+      const mergedIndices = mergeRetrievalIndices(
+        claudeRank?.indices ?? [],
+        openaiRank?.indices ?? [],
+        6
+      );
+      const summary = [claudeRank?.summary, openaiRank?.summary].filter(Boolean).join(" ");
+      return buildRetrievalResult(chunks, mergedIndices, summary, "dual");
+    }
+    return null;
+  }
+
+  const single = await llmRetrieveWithProvider(
+    chunks,
+    userMessage,
+    sectionName,
+    designation,
+    true
+  );
+  if (!single) return null;
+  return buildRetrievalResult(
+    chunks,
+    single.indices,
+    single.summary,
+    "claude"
+  );
+}
+
 /**
- * Dual-model knowledge retrieval: Claude ranks chunks, OpenAI/heuristic fallback.
+ * Knowledge retrieval — dual-model ranks with Claude + OpenAI when both keys are set.
  */
 export async function retrieveRelevantKnowledge(params: {
   companySlug: string;
