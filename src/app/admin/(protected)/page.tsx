@@ -8,6 +8,7 @@ import { PLATFORM_NAME, DEFAULT_GAPS } from "@/lib/aura/config";
 import { COMPANY_CATEGORIES } from "@/lib/aura/company-utils";
 import ConfirmDeleteModal from "@/components/admin/ConfirmDeleteModal";
 import CompanyDetailView from "@/components/admin/CompanyDetailView";
+import AdminRbacPanel from "@/components/admin/AdminRbacPanel";
 
 interface CompanyRow {
   id: string;
@@ -44,7 +45,19 @@ interface SessionRow {
   hasReport: boolean;
 }
 
-type AdminView = "dashboard" | "onboard" | "company-detail" | "session-detail";
+type AdminView = "dashboard" | "onboard" | "company-detail" | "session-detail" | "admin-settings";
+
+interface AdminMe {
+  email: string | null;
+  role: string;
+  roleLabel: string;
+  legacy: boolean;
+  companyId: string | null;
+  permissions: {
+    manageCompanies: boolean;
+    manageAdminUsers: boolean;
+  };
+}
 
 interface SessionDetail {
   id: string;
@@ -132,6 +145,7 @@ export default function AdminPage() {
   });
 
   const [knowledgeFiles, setKnowledgeFiles] = useState<File[]>([]);
+  const [adminMe, setAdminMe] = useState<AdminMe | null>(null);
 
   function showNotice(message: string, type: Notice["type"] = "success") {
     setNotice({ type, message });
@@ -161,6 +175,15 @@ export default function AdminPage() {
 
   useEffect(() => {
     loadCompanies();
+    fetch("/api/admin/me", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d: AdminMe) => {
+        setAdminMe(d);
+        if (d.role === "COMPANY_ADMIN" && d.companyId) {
+          void loadCompanyDetail(d.companyId);
+        }
+      })
+      .catch(() => setAdminMe(null));
   }, [loadCompanies]);
 
   async function loadCompanyDetail(id: string) {
@@ -451,6 +474,21 @@ export default function AdminPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {adminMe && (
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] uppercase text-slate-500">{adminMe.roleLabel}</p>
+              <p className="text-xs text-slate-400">{adminMe.email ?? (adminMe.legacy ? "Legacy session" : "Admin")}</p>
+            </div>
+          )}
+          {adminMe?.permissions.manageAdminUsers && (
+            <button
+              type="button"
+              onClick={() => setView("admin-settings")}
+              className="text-sm text-slate-400 hover:text-white border border-white/10 bg-slate-900/40 backdrop-blur-sm px-3 py-2 rounded-lg transition-colors"
+            >
+              Admin & audit
+            </button>
+          )}
           <button
             onClick={async () => {
               await fetch("/api/admin/logout", { method: "POST", credentials: "include" });
@@ -462,7 +500,8 @@ export default function AdminPage() {
           </button>
           <button
             onClick={() => { setView("onboard"); setOnboardStep(0); setCreatedLink(null); }}
-            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm shadow-lg shadow-amber-500/20 transition-colors"
+            className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold px-4 py-2 rounded-lg text-sm shadow-lg shadow-amber-500/20 transition-colors disabled:opacity-40"
+            disabled={adminMe != null && !adminMe.permissions.manageCompanies}
           >
             + Onboard New Company
           </button>
@@ -827,6 +866,18 @@ export default function AdminPage() {
               ))}
             </div>
           </section>
+        </main>
+      )}
+
+      {view === "admin-settings" && adminMe?.permissions.manageAdminUsers && (
+        <main className="max-w-5xl mx-auto px-6 py-8">
+          <button
+            onClick={() => setView("dashboard")}
+            className="text-sm text-slate-400 hover:text-white mb-6"
+          >
+            ← Back to dashboard
+          </button>
+          <AdminRbacPanel />
         </main>
       )}
       </div>

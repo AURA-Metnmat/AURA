@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { getInterviewLink } from "@/lib/aura/company-utils";
 import {
   ensureDefaultCampaign,
@@ -49,10 +50,10 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId } = await params;
+  const session = await requireCompanyAdmin(request, companyId);
+  if (session instanceof NextResponse) return session;
+
   const company = await db.company.findUnique({
     where: { id: companyId },
     select: { id: true, inviteToken: true },
@@ -78,10 +79,10 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_CAMPAIGNS);
+  if (session instanceof NextResponse) return session;
+
   const company = await db.company.findUnique({ where: { id: companyId } });
   if (!company) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });

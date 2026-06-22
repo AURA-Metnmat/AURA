@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string; campaignId: string; linkId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, campaignId, linkId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_CAMPAIGNS);
+  if (session instanceof NextResponse) return session;
 
   const campaign = await db.interviewCampaign.findFirst({
     where: { id: campaignId, companyId },

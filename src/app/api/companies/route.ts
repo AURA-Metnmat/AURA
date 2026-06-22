@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/client";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdminSession } from "@/lib/auth/admin";
 import { generateInviteToken, getInterviewLink, slugifyCompanyName } from "@/lib/aura/company-utils";
 import { ensureDefaultCampaign } from "@/lib/campaigns/resolve";
+import { companyScopeFilter, PERMISSIONS, requirePermission } from "@/lib/auth/admin-rbac";
+import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 
 async function resolveUniqueSlug(baseSlug: string): Promise<string> {
   if (!baseSlug) return baseSlug;
@@ -20,14 +22,15 @@ async function resolveUniqueSlug(baseSlug: string): Promise<string> {
 }
 
 export async function GET(request: Request) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const session = await requireAdminSession(request);
+  if (session instanceof NextResponse) return session;
 
   const { searchParams } = new URL(request.url);
   const category = searchParams.get("category");
 
   const companies = await db.company.findMany({
     where: {
+      ...companyScopeFilter(session),
       ...(category ? { category } : {}),
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
@@ -66,8 +69,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const session = await requireAdminSession(request);
+  if (session instanceof NextResponse) return session;
+
+  const permDenied = requirePermission(session, PERMISSIONS.MANAGE_COMPANIES);
+  if (permDenied) return permDenied;
 
   try {
     const body = (await request.json()) as {
@@ -123,6 +129,16 @@ export async function POST(request: Request) {
     await ensureDefaultCampaign(company.id, company.inviteToken);
 
     const interviewLink = getInterviewLink(company.inviteToken, request);
+
+    await logAdminAudit({
+      action: AUDIT_ACTIONS.COMPANY_CREATE,
+      request,
+      session,
+      companyId: company.id,
+      resourceType: "company",
+      resourceId: company.id,
+      metadata: { name: company.name, slug: company.slug },
+    });
 
     return NextResponse.json(
       {

@@ -1,14 +1,27 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdminSession } from "@/lib/auth/admin";
+import { assertCompanyAccess } from "@/lib/auth/admin-rbac";
 
 export async function GET(request: Request) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const session = await requireAdminSession(request);
+  if (session instanceof NextResponse) return session;
 
   try {
     const { searchParams } = new URL(request.url);
     const companySlug = searchParams.get("companySlug");
+
+    if (companySlug) {
+      const company = await db.company.findUnique({
+        where: { slug: companySlug },
+        select: { id: true },
+      });
+      if (!company) {
+        return NextResponse.json({ error: "Company not found" }, { status: 404 });
+      }
+      const accessDenied = assertCompanyAccess(session, company.id);
+      if (accessDenied) return accessDenied;
+    }
 
     const fileWhere = companySlug ? { companySlug } : {};
 

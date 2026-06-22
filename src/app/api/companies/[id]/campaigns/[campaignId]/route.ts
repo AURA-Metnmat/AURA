@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { getInterviewLink } from "@/lib/aura/company-utils";
 import { generateCampaignInviteToken } from "@/lib/campaigns/resolve";
 import { getEffectiveCampaignStatus } from "@/lib/campaigns/status";
@@ -9,10 +10,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; campaignId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, campaignId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_CAMPAIGNS);
+  if (session instanceof NextResponse) return session;
+
   const body = (await request.json()) as {
     name?: string;
     description?: string | null;
@@ -84,10 +85,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string; campaignId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, campaignId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_CAMPAIGNS);
+  if (session instanceof NextResponse) return session;
 
   const existing = await db.interviewCampaign.findFirst({
     where: { id: campaignId, companyId },

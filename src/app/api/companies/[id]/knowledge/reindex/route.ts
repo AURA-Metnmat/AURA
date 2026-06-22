@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const { id } = await params;
+  const session = await requireCompanyAdmin(request, id, PERMISSIONS.REVIEW_KNOWLEDGE);
+  if (session instanceof NextResponse) return session;
 
   try {
-    const { id } = await params;
     const company = await db.company.findUnique({
       where: { id },
       select: { id: true, slug: true },

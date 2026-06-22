@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdminSession } from "@/lib/auth/admin";
+import { assertCompanyAccess } from "@/lib/auth/admin-rbac";
 import {
   runReferenceImport,
   runReferenceImportFromUploads,
@@ -8,8 +9,8 @@ import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
 import { db } from "@/lib/db";
 
 export async function POST(request: Request) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const session = await requireAdminSession(request);
+  if (session instanceof NextResponse) return session;
 
   try {
     const contentType = request.headers.get("content-type") ?? "";
@@ -21,6 +22,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "companySlug required" }, { status: 400 });
       }
 
+      const company = await db.company.findUnique({
+        where: { slug: companySlug },
+        select: { id: true },
+      });
+      if (!company) {
+        return NextResponse.json({ error: "Company not found" }, { status: 404 });
+      }
+      const accessDenied = assertCompanyAccess(session, company.id);
+      if (accessDenied) return accessDenied;
+
       const uploads: { fileName: string; buffer: Buffer }[] = [];
       for (const entry of formData.getAll("files")) {
         if (entry instanceof File && entry.size > 0) {
@@ -30,14 +41,11 @@ export async function POST(request: Request) {
       }
 
       const stats = await runReferenceImportFromUploads(companySlug, uploads);
-      const company = await db.company.findUnique({ where: { slug: companySlug }, select: { id: true } });
-      if (company) {
-        await reindexCompanyKnowledge({
-          companySlug,
-          companyId: company.id,
-          scope: "reference",
-        });
-      }
+      await reindexCompanyKnowledge({
+        companySlug,
+        companyId: company.id,
+        scope: "reference",
+      });
       return NextResponse.json({
         success: true,
         message: `Imported ${uploads.length} file(s) for ${companySlug}`,
@@ -51,15 +59,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "companySlug required" }, { status: 400 });
     }
 
-    const stats = await runReferenceImport(companySlug);
-    const company = await db.company.findUnique({ where: { slug: companySlug }, select: { id: true } });
-    if (company) {
-      await reindexCompanyKnowledge({
-        companySlug,
-        companyId: company.id,
-        scope: "reference",
-      });
+    const company = await db.company.findUnique({
+      where: { slug: companySlug },
+      select: { id: true },
+    });
+    if (!company) {
+      return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
+    const accessDenied = assertCompanyAccess(session, company.id);
+    if (accessDenied) return accessDenied;
+
+    const stats = await runReferenceImport(companySlug);
+    await reindexCompanyKnowledge({
+      companySlug,
+      companyId: company.id,
+      scope: "reference",
+    });
     return NextResponse.json({
       success: true,
       message: `Reference data imported from server folder for ${companySlug}`,

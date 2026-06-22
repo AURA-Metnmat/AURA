@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { getCompanyGatheredData } from "@/lib/companies/company-interview-export";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id } = await params;
+  const session = await requireCompanyAdmin(request, id);
+  if (session instanceof NextResponse) return session;
 
   try {
     const data = await getCompanyGatheredData(id);

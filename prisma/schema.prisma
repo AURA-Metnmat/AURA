@@ -38,10 +38,54 @@ model Company {
   otpAuditLogs               EmployeeOtpAuditLog[]
   campaigns                  InterviewCampaign[]
   questionBank               QuestionBank[]
+  adminUsers                 AdminUser[]
+  adminAuditLogs             AdminAuditLog[]
 
   @@index([isActive])
   @@index([category])
   @@index([inviteToken])
+}
+
+// ─── Admin RBAC & audit ───────────────────────────────────────────────────────
+
+model AdminUser {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String
+  name         String?
+  role         String          @default("COMPANY_ADMIN")
+  companyId    String?
+  isActive     Boolean         @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  company      Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  auditLogs    AdminAuditLog[]
+
+  @@index([companyId])
+  @@index([role])
+  @@index([isActive])
+}
+
+model AdminAuditLog {
+  id           String     @id @default(cuid())
+  adminUserId  String?
+  actorEmail   String?
+  action       String
+  resourceType String?
+  resourceId   String?
+  companyId    String?
+  ipAddress    String?
+  userAgent    String?
+  metadata     String?
+  createdAt    DateTime   @default(now())
+  adminUser    AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  company      Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([adminUserId])
 }
 
 model InterviewSession {

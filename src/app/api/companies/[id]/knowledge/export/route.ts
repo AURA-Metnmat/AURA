@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
+import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 import {
   buildMlJsonl,
   buildMlWorkbook,
@@ -13,11 +15,11 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const { id } = await params;
+  const session = await requireCompanyAdmin(request, id, PERMISSIONS.EXPORT_DATA);
+  if (session instanceof NextResponse) return session;
 
   try {
-    const { id } = await params;
     const company = await db.company.findUnique({
       where: { id },
       select: { slug: true, name: true },
@@ -31,6 +33,16 @@ export async function GET(
     const filter = normalizeExportFilter(searchParams.get("filter"));
 
     const records = await fetchExperienceForExport(company.slug, filter);
+
+    await logAdminAudit({
+      action: AUDIT_ACTIONS.KNOWLEDGE_EXPORT,
+      request,
+      session,
+      companyId: id,
+      resourceType: "knowledge_export",
+      metadata: { format, filter, count: records.length },
+    });
+
     const slug = company.slug.replace(/[^a-z0-9-_]/gi, "-");
     const suffix = filterLabel(filter);
 

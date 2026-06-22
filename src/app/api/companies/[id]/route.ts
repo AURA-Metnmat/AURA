@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdminSession } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { generateInviteToken, getInterviewLink } from "@/lib/aura/company-utils";
 import { ensureDefaultCampaign } from "@/lib/campaigns/resolve";
 import {
   deleteCompanyCompletely,
   getDeleteCompanySummary,
 } from "@/lib/companies/delete-company";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
+import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id } = await params;
+  const denied = await requireCompanyAdmin(request, id);
+  if (denied instanceof NextResponse) return denied;
+
   const { searchParams } = new URL(request.url);
 
   if (searchParams.get("deletePreview") === "true") {
@@ -81,10 +84,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id } = await params;
+  const session = await requireCompanyAdmin(request, id);
+  if (session instanceof NextResponse) return session;
+
   const body = (await request.json()) as {
     name?: string;
     category?: string;
@@ -132,6 +135,16 @@ export async function PATCH(
     await ensureDefaultCampaign(company.id, company.inviteToken);
   }
 
+  await logAdminAudit({
+    action: AUDIT_ACTIONS.COMPANY_UPDATE,
+    request,
+    session,
+    companyId: company.id,
+    resourceType: "company",
+    resourceId: company.id,
+    metadata: { regenerateInviteToken: !!body.regenerateInviteToken },
+  });
+
   return NextResponse.json({
     company: {
       ...company,
@@ -147,10 +160,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id } = await params;
+  const session = await requireCompanyAdmin(request, id, PERMISSIONS.MANAGE_COMPANIES);
+  if (session instanceof NextResponse) return session;
 
   try {
     const body = (await request.json().catch(() => ({}))) as { confirmName?: string };
@@ -168,6 +180,16 @@ export async function DELETE(
     }
 
     const deleted = await deleteCompanyCompletely(id);
+
+    await logAdminAudit({
+      action: AUDIT_ACTIONS.COMPANY_DELETE,
+      request,
+      session,
+      companyId: id,
+      resourceType: "company",
+      resourceId: id,
+      metadata: { companyName: deleted.companyName },
+    });
 
     return NextResponse.json({
       success: true,

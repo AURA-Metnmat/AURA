@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { isReviewStatus, REVIEW_STATUS } from "@/lib/knowledge/review";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
+import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; answerId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, answerId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.REVIEW_ANSWERS);
+  if (session instanceof NextResponse) return session;
   const body = (await request.json()) as {
     reviewStatus?: string;
     reviewNotes?: string | null;
@@ -45,6 +46,16 @@ export async function PATCH(
   const updated = await db.interviewAnswer.update({
     where: { id: answerId },
     data,
+  });
+
+  await logAdminAudit({
+    action: AUDIT_ACTIONS.ANSWER_REVIEW,
+    request,
+    session,
+    companyId,
+    resourceType: "interview_answer",
+    resourceId: answerId,
+    metadata: { reviewStatus: updated.reviewStatus },
   });
 
   return NextResponse.json({

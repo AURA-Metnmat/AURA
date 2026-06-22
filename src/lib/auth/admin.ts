@@ -2,37 +2,79 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import {
+  ADMIN_ROLES,
+  type AdminRole,
+  type AdminSession,
+  isAdminRole,
+} from "@/lib/auth/admin-rbac";
 
 const COOKIE_NAME = "aura_admin_session";
 const SESSION_MS = 24 * 60 * 60 * 1000;
 
-export function createAdminSessionToken(): string {
+interface SessionTokenPayload {
+  exp: number;
+  sub?: string | null;
+  email?: string | null;
+  role?: AdminRole;
+  companyId?: string | null;
+  legacy?: boolean;
+}
+
+export function createAdminSessionToken(session: {
+  adminUserId?: string | null;
+  email?: string | null;
+  role?: AdminRole;
+  companyId?: string | null;
+  legacy?: boolean;
+}): string {
   const secret = env().sessionSecret;
   const exp = Date.now() + SESSION_MS;
-  const payload = Buffer.from(JSON.stringify({ exp })).toString("base64url");
+  const payload = Buffer.from(
+    JSON.stringify({
+      exp,
+      sub: session.adminUserId ?? null,
+      email: session.email ?? null,
+      role: session.role ?? ADMIN_ROLES.SUPER_ADMIN,
+      companyId: session.companyId ?? null,
+      legacy: session.legacy ?? false,
+    } satisfies SessionTokenPayload)
+  ).toString("base64url");
   const sig = createHmac("sha256", secret).update(payload).digest("base64url");
   return `${payload}.${sig}`;
 }
 
-export function verifyAdminSessionToken(token: string): boolean {
+export function verifyAdminSessionToken(token: string): AdminSession | null {
   const secret = env().sessionSecret;
   const [payload, sig] = token.split(".");
-  if (!payload || !sig) return false;
+  if (!payload || !sig) return null;
 
   const expected = createHmac("sha256", secret).update(payload).digest("base64url");
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   } catch {
-    return false;
+    return null;
   }
 
   try {
-    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as { exp?: number };
-    return typeof data.exp === "number" && data.exp > Date.now();
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString()) as SessionTokenPayload;
+    if (typeof data.exp !== "number" || data.exp <= Date.now()) return null;
+
+    const role =
+      data.role && isAdminRole(data.role) ? data.role : ADMIN_ROLES.SUPER_ADMIN;
+
+    return {
+      adminUserId: data.sub ?? null,
+      email: data.email ?? null,
+      role,
+      companyId: data.companyId ?? null,
+      legacy: data.legacy ?? !data.sub,
+      exp: data.exp,
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -60,14 +102,7 @@ export function verifyAdminPassword(password: string): boolean {
   return password === env().adminPassword;
 }
 
-export async function isAdminAuthenticated(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-  if (!token) return false;
-  return verifyAdminSessionToken(token);
-}
-
-export async function requireAdmin(request?: Request): Promise<NextResponse | null> {
+async function readSessionToken(request?: Request): Promise<string | undefined> {
   const cookieStore = await cookies();
   let token = cookieStore.get(COOKIE_NAME)?.value;
 
@@ -78,10 +113,35 @@ export async function requireAdmin(request?: Request): Promise<NextResponse | nu
     }
   }
 
-  if (!token || !verifyAdminSessionToken(token)) {
+  return token;
+}
+
+export async function getAdminSession(request?: Request): Promise<AdminSession | null> {
+  const token = await readSessionToken(request);
+  if (!token) return null;
+  return verifyAdminSessionToken(token);
+}
+
+export async function isAdminAuthenticated(): Promise<boolean> {
+  return (await getAdminSession()) !== null;
+}
+
+export async function requireAdmin(request?: Request): Promise<NextResponse | null> {
+  const session = await getAdminSession(request);
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return null;
+}
+
+export async function requireAdminSession(
+  request?: Request
+): Promise<AdminSession | NextResponse> {
+  const session = await getAdminSession(request);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return session;
 }
 
 export { COOKIE_NAME };

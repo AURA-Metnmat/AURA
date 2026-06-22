@@ -1,18 +1,26 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
+import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 import { buildCompanyInterviewWorkbook } from "@/lib/companies/company-interview-export";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id } = await params;
+  const session = await requireCompanyAdmin(request, id, PERMISSIONS.EXPORT_DATA);
+  if (session instanceof NextResponse) return session;
 
   try {
     const { buffer, fileName } = await buildCompanyInterviewWorkbook(id);
+    await logAdminAudit({
+      action: AUDIT_ACTIONS.KNOWLEDGE_EXPORT,
+      request,
+      session,
+      companyId: id,
+      metadata: { format: "xlsx", type: "interview", fileName },
+    });
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {

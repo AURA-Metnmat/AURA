@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { parseInteraction } from "@/lib/aura/interaction";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; bankId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, bankId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_QUESTION_BANK);
+  if (session instanceof NextResponse) return session;
   const body = (await request.json()) as {
     title?: string;
     section?: string | null;
@@ -129,10 +129,9 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string; bankId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, bankId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_QUESTION_BANK);
+  if (session instanceof NextResponse) return session;
 
   const bank = await db.questionBank.findFirst({
     where: { id: bankId, companyId },

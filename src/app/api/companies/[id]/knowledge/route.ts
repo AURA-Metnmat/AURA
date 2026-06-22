@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { getKnowledgeStats, SOURCE_TYPE } from "@/lib/knowledge/indexer";
 import {
   isReviewStatus,
@@ -13,11 +13,11 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const { id } = await params;
+  const session = await requireCompanyAdmin(request, id);
+  if (session instanceof NextResponse) return session;
 
   try {
-    const { id } = await params;
     const company = await db.company.findUnique({ where: { id }, select: { slug: true } });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });

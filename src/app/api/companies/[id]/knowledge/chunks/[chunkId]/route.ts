@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
+import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 import {
   isReviewStatus,
   isTopicCategory,
@@ -13,11 +15,11 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; chunkId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const { id, chunkId } = await params;
+  const session = await requireCompanyAdmin(request, id, PERMISSIONS.REVIEW_KNOWLEDGE);
+  if (session instanceof NextResponse) return session;
 
   try {
-    const { id, chunkId } = await params;
     const company = await db.company.findUnique({ where: { id }, select: { slug: true } });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
@@ -71,6 +73,16 @@ export async function PATCH(
 
     const meta = parseChunkMetadata(updated.metadata);
 
+    await logAdminAudit({
+      action: AUDIT_ACTIONS.KNOWLEDGE_REVIEW,
+      request,
+      session,
+      companyId: id,
+      resourceType: "knowledge_chunk",
+      resourceId: chunkId,
+      metadata: { reviewStatus: updated.reviewStatus, topicCategory: updated.topicCategory },
+    });
+
     return NextResponse.json({
       id: updated.id,
       reviewStatus: updated.reviewStatus,
@@ -90,11 +102,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; chunkId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const { id, chunkId } = await params;
+  const session = await requireCompanyAdmin(request, id, PERMISSIONS.REVIEW_KNOWLEDGE);
+  if (session instanceof NextResponse) return session;
 
   try {
-    const { id, chunkId } = await params;
     const company = await db.company.findUnique({ where: { id }, select: { slug: true } });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });

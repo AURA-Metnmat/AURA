@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdminSession } from "@/lib/auth/admin";
 import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
 import { getOpeningQuestion1, getOpeningQuestion2 } from "@/lib/aura/opening-questions";
 import { serializeInteraction } from "@/lib/aura/interaction";
@@ -555,8 +555,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
+  const session = await requireAdminSession(request);
+  if (session instanceof NextResponse) return session;
 
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get("sessionId");

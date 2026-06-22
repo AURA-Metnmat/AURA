@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { parseInteraction } from "@/lib/aura/interaction";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string; campaignId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, campaignId } = await params;
+  const session = await requireCompanyAdmin(request, companyId);
+  if (session instanceof NextResponse) return session;
 
   const campaign = await db.interviewCampaign.findFirst({
     where: { id: campaignId, companyId },
@@ -59,10 +59,10 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string; campaignId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, campaignId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_CAMPAIGNS);
+  if (session instanceof NextResponse) return session;
+
   const body = (await request.json()) as {
     questionBankId?: string;
     questionVersionId?: string;
@@ -136,10 +136,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string; campaignId: string }> }
 ) {
-  const denied = await requireAdmin(request);
-  if (denied) return denied;
-
   const { id: companyId, campaignId } = await params;
+  const session = await requireCompanyAdmin(request, companyId, PERMISSIONS.MANAGE_CAMPAIGNS);
+  if (session instanceof NextResponse) return session;
+
   const body = (await request.json()) as { orderedIds?: string[] };
 
   if (!Array.isArray(body.orderedIds) || body.orderedIds.length === 0) {
