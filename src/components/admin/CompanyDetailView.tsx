@@ -23,8 +23,10 @@ import {
   BookOpen,
   Layers,
   Megaphone,
+  ShieldCheck,
 } from "lucide-react";
 import CampaignsPanel from "@/components/admin/CampaignsPanel";
+import AnswerReviewPanel from "@/components/admin/AnswerReviewPanel";
 
 interface CompanyRow {
   id: string;
@@ -179,7 +181,7 @@ interface GatheredData {
   };
 }
 
-type TabId = "overview" | "reference" | "experience" | "interviews" | "campaigns";
+type TabId = "overview" | "reference" | "experience" | "interviews" | "campaigns" | "quality";
 
 interface CompanyDetailViewProps {
   company: CompanyRow;
@@ -247,6 +249,7 @@ const TABS: { id: TabId; label: string; icon: typeof Database }[] = [
   { id: "reference", label: "Reference Knowledge", icon: BookOpen },
   { id: "experience", label: "Experience Vault & ML", icon: Brain },
   { id: "campaigns", label: "Campaigns", icon: Megaphone },
+  { id: "quality", label: "Data Quality", icon: ShieldCheck },
   { id: "interviews", label: "Live Interviews", icon: Users },
 ];
 
@@ -582,6 +585,13 @@ export default function CompanyDetailView({
             >
               View experience vault →
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("quality")}
+              className="mt-4 text-sm text-sky-400 hover:text-sky-300 font-medium"
+            >
+              Review answer quality →
+            </button>
           </section>
 
           <section className={`lg:col-span-2 ${glassPanel} rounded-2xl p-5 border border-white/5`}>
@@ -806,6 +816,13 @@ export default function CompanyDetailView({
             glassCard={glassCard}
             onCopyLink={onCopyLink}
           />
+        </div>
+      )}
+
+      {/* Data quality tab */}
+      {activeTab === "quality" && (
+        <div className={`${glassPanel} rounded-2xl p-5 border border-white/5`}>
+          <AnswerReviewPanel companyId={company.id} glassCard={glassCard} />
         </div>
       )}
 

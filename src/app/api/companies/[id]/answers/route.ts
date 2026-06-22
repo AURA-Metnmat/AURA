@@ -1,0 +1,99 @@
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth/admin";
+import {
+  isReviewStatus,
+  REVIEW_STATUS,
+  REVIEW_STATUS_LABELS,
+} from "@/lib/knowledge/review";
+import { parseConfidenceFilter } from "@/lib/refinement/quality-stats";
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
+
+  const { id: companyId } = await params;
+  const company = await db.company.findUnique({ where: { id: companyId }, select: { id: true } });
+  if (!company) {
+    return NextResponse.json({ error: "Company not found" }, { status: 404 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const statusParam = searchParams.get("status");
+  const departmentParam = searchParams.get("department");
+  const campaignParam = searchParams.get("campaignId");
+  const confidenceMin = searchParams.get("confidenceMin");
+  const confidenceMax = searchParams.get("confidenceMax");
+  const limit = Math.min(Number(searchParams.get("limit") ?? 100), 500);
+
+  const confidenceFilter = parseConfidenceFilter(confidenceMin, confidenceMax);
+
+  const answers = await db.interviewAnswer.findMany({
+    where: {
+      session: {
+        companyId,
+        ...(campaignParam ? { campaignId: campaignParam } : {}),
+        ...(departmentParam
+          ? {
+              participant: {
+                department: { equals: departmentParam, mode: "insensitive" },
+              },
+            }
+          : {}),
+      },
+      ...(statusParam && isReviewStatus(statusParam) ? { reviewStatus: statusParam } : {}),
+      ...(confidenceFilter ? { confidenceScore: confidenceFilter } : {}),
+    },
+    orderBy: [{ reviewStatus: "asc" }, { confidenceScore: "asc" }, { createdAt: "desc" }],
+    take: limit,
+    include: {
+      session: {
+        select: {
+          id: true,
+          campaignId: true,
+          campaign: { select: { id: true, name: true } },
+          participant: {
+            select: {
+              fullName: true,
+              department: true,
+              designation: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  return NextResponse.json({
+    answers: answers.map((a) => ({
+      id: a.id,
+      sessionId: a.sessionId,
+      interactionType: a.interactionType,
+      rawText: a.rawText,
+      section: a.section,
+      qualityScore: a.qualityScore,
+      confidenceScore: a.confidenceScore,
+      reviewStatus: a.reviewStatus ?? REVIEW_STATUS.PENDING,
+      reviewStatusLabel:
+        REVIEW_STATUS_LABELS[
+          isReviewStatus(a.reviewStatus ?? "") ? a.reviewStatus : REVIEW_STATUS.PENDING
+        ],
+      duplicateOfId: a.duplicateOfId,
+      contradictionFlags: a.contradictionFlags
+        ? (JSON.parse(a.contradictionFlags) as unknown[])
+        : [],
+      reviewNotes: a.reviewNotes,
+      reviewedAt: a.reviewedAt?.toISOString() ?? null,
+      refinedAt: a.refinedAt?.toISOString() ?? null,
+      createdAt: a.createdAt.toISOString(),
+      participant: a.session.participant?.fullName ?? null,
+      department: a.session.participant?.department ?? null,
+      designation: a.session.participant?.designation ?? null,
+      campaignId: a.session.campaignId,
+      campaignName: a.session.campaign?.name ?? null,
+    })),
+  });
+}

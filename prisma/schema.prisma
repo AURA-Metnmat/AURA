@@ -294,21 +294,31 @@ model Message {
 }
 
 model InterviewAnswer {
-  id               String           @id @default(cuid())
-  sessionId        String
-  messageId        String?          @unique
-  assistantMsgId   String?
-  interactionType  String
-  rawText          String
-  rawTextLocale    String?
-  structuredJson   String?
-  section          String?
-  createdAt        DateTime         @default(now())
-  session          InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  message          Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  id                 String           @id @default(cuid())
+  sessionId          String
+  messageId          String?          @unique
+  assistantMsgId     String?
+  interactionType    String
+  rawText            String
+  rawTextLocale      String?
+  structuredJson     String?
+  section            String?
+  qualityScore       Float?
+  confidenceScore    Float?
+  reviewStatus       String           @default("PENDING")
+  duplicateOfId      String?
+  contradictionFlags String?
+  reviewNotes        String?
+  reviewedAt         DateTime?
+  refinedAt          DateTime?
+  createdAt          DateTime         @default(now())
+  session            InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message            Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
 
   @@index([sessionId])
   @@index([interactionType])
+  @@index([reviewStatus])
+  @@index([confidenceScore])
 }
 
 model MessageAttachment {

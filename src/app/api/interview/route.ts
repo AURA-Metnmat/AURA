@@ -12,7 +12,7 @@ import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
 import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
 import { sanitizeUserInput, containsPromptInjectionSignals } from "@/lib/ai/safety";
 import { CONSENT_VERSION, type DeviceType } from "@/lib/interview/consent";
-import { saveInterviewAnswer, findLastAssistantMessageId } from "@/lib/interview/answer-capture";
+import { captureUserAnswer, findLastAssistantMessageId } from "@/lib/interview/answer-capture";
 import type { StructuredAnswerPayload } from "@/lib/aura/interaction";
 import { resolveCampaignForCompany } from "@/lib/campaigns/resolve";
 import { getNextCampaignQuestion } from "@/lib/campaigns/question-runner";
@@ -382,24 +382,23 @@ export async function POST(request: Request) {
     }
 
     const structuredAnswer = "structuredAnswer" in body ? body.structuredAnswer : undefined;
-    if (structuredAnswer?.interactionType) {
-      const assistantMessageId = findLastAssistantMessageId(
-        session.messages.map((m) => ({
-          id: m.id,
-          role: m.role,
-          metadata: m.metadata,
-        }))
-      );
-      await saveInterviewAnswer({
-        sessionId: session.id,
-        messageId: userMsg.id,
-        assistantMessageId,
-        section: session.currentSection,
-        rawText: userBilingual.en,
-        rawTextLocale: userBilingual.locale,
-        structured: structuredAnswer,
-      });
-    }
+    const assistantMessageId = findLastAssistantMessageId(
+      session.messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        metadata: m.metadata,
+      }))
+    );
+
+    await captureUserAnswer({
+      sessionId: session.id,
+      messageId: userMsg.id,
+      assistantMessageId,
+      section: session.currentSection,
+      rawText: userBilingual.en,
+      rawTextLocale: userBilingual.locale,
+      structured: structuredAnswer?.interactionType ? structuredAnswer : null,
+    });
 
     await extractStructuredData(
       session.id,
