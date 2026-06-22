@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import ExperienceVaultPanel from "@/components/admin/ExperienceVaultPanel";
 import {
   FileSpreadsheet,
   FileText,
@@ -109,6 +110,13 @@ interface KnowledgeData {
     total: number;
     lastIndexedAt: string | null;
     byKind: Record<string, number>;
+    review?: {
+      pending: number;
+      validated: number;
+      needsAttention: number;
+      rejected: number;
+    };
+    validatedByCategory?: Record<string, number>;
   };
   referencePreview: KnowledgeChunkPreview[];
   experiencePreview: KnowledgeChunkPreview[];
@@ -235,7 +243,7 @@ function KindBadge({ kind }: { kind: string }) {
 const TABS: { id: TabId; label: string; icon: typeof Database }[] = [
   { id: "overview", label: "Overview", icon: Layers },
   { id: "reference", label: "Reference Knowledge", icon: BookOpen },
-  { id: "experience", label: "Experience Vault", icon: Brain },
+  { id: "experience", label: "Experience Vault & ML", icon: Brain },
   { id: "interviews", label: "Live Interviews", icon: Users },
 ];
 
@@ -555,13 +563,12 @@ export default function CompanyDetailView({
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard label="Sessions" value={gathered?.totals.sessions ?? 0} accent="emerald" />
-                <StatCard label="Pain points" value={gathered?.totals.painPoints ?? 0} accent="emerald" />
-                <StatCard label="Requirements" value={gathered?.totals.requirements ?? 0} accent="emerald" />
+                <StatCard label="Pending review" value={knowledge?.stats.review?.pending ?? 0} accent="emerald" />
+                <StatCard label="Validated" value={knowledge?.stats.review?.validated ?? 0} accent="emerald" />
                 <StatCard
-                  label="Indexed chunks"
-                  value={knowledge?.stats.experience ?? 0}
+                  label="Needs attention"
+                  value={knowledge?.stats.review?.needsAttention ?? 0}
                   accent="emerald"
-                  sub="RAG-ready"
                 />
               </div>
             )}
@@ -595,27 +602,35 @@ export default function CompanyDetailView({
               imports or when interviews complete.
             </p>
             {knowledge ? (
-              <div className="flex flex-wrap gap-4 text-sm">
-                <p>
-                  <span className="text-slate-500">Total chunks:</span>{" "}
-                  <span className="font-semibold text-white">{knowledge.stats.total}</span>
-                </p>
-                <p>
-                  <span className="text-slate-500">Reference:</span>{" "}
-                  <span className="text-indigo-400 font-medium">{knowledge.stats.reference}</span>
-                </p>
-                <p>
-                  <span className="text-slate-500">Experience:</span>{" "}
-                  <span className="text-emerald-400 font-medium">{knowledge.stats.experience}</span>
-                </p>
-                <p>
-                  <span className="text-slate-500">Last indexed:</span>{" "}
-                  <span className="text-slate-300">
-                    {knowledge.stats.lastIndexedAt
-                      ? new Date(knowledge.stats.lastIndexedAt).toLocaleString()
-                      : "Not yet indexed — click Rebuild"}
-                  </span>
-                </p>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <p>
+                    <span className="text-slate-500">Total chunks:</span>{" "}
+                    <span className="font-semibold text-white">{knowledge.stats.total}</span>
+                  </p>
+                  <p>
+                    <span className="text-slate-500">Reference:</span>{" "}
+                    <span className="text-indigo-400 font-medium">{knowledge.stats.reference}</span>
+                  </p>
+                  <p>
+                    <span className="text-slate-500">Experience:</span>{" "}
+                    <span className="text-emerald-400 font-medium">{knowledge.stats.experience}</span>
+                  </p>
+                  <p>
+                    <span className="text-slate-500">Validated for ML:</span>{" "}
+                    <span className="text-emerald-400 font-medium">
+                      {knowledge.stats.review?.validated ?? 0}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-slate-500">Last indexed:</span>{" "}
+                    <span className="text-slate-300">
+                      {knowledge.stats.lastIndexedAt
+                        ? new Date(knowledge.stats.lastIndexedAt).toLocaleString()
+                        : "Not yet indexed — click Rebuild"}
+                    </span>
+                  </p>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-slate-500">Knowledge index not loaded.</p>
@@ -759,87 +774,24 @@ export default function CompanyDetailView({
 
       {/* Experience tab */}
       {activeTab === "experience" && (
-        <div className={`${glassPanel} rounded-2xl overflow-hidden border border-white/5`}>
-          <div className="p-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Brain className="w-5 h-5 text-emerald-400" />
-                <h3 className="font-semibold text-lg">Experience Vault</h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Tacit knowledge from employee interviews — indexed separately from reference documents
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => reindexKnowledge("experience")}
-              disabled={reindexing}
-              className="flex items-center gap-2 text-sm border border-emerald-500/30 text-emerald-300 px-3 py-2 rounded-lg hover:bg-emerald-950/30 disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${reindexing ? "animate-spin" : ""}`} />
-              Re-index experience
-            </button>
-          </div>
-
-          <div className="p-5 space-y-5">
-            {loadingKnowledge || loadingData ? (
-              <div className="flex items-center justify-center py-12 text-slate-500">
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                Loading experience vault...
-              </div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <StatCard label="Sessions" value={gathered?.totals.sessions ?? 0} accent="emerald" />
-                  <StatCard label="Completed" value={gathered?.totals.completed ?? 0} accent="emerald" />
-                  <StatCard label="Pain points" value={gathered?.totals.painPoints ?? 0} accent="emerald" />
-                  <StatCard label="Reports" value={gathered?.totals.reports ?? 0} accent="emerald" />
-                  <StatCard label="RAG chunks" value={knowledge?.stats.experience ?? 0} accent="emerald" />
-                </div>
-
-                {knowledge && Object.keys(knowledge.stats.byKind).length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(knowledge.stats.byKind)
-                      .filter(([k]) => !["pdf", "excel_row", "insight", "furnace", "document", "excel_meta"].includes(k))
-                      .map(([kind, count]) => (
-                        <span
-                          key={kind}
-                          className="text-xs px-2.5 py-1 rounded-full bg-emerald-950/40 text-emerald-300 border border-emerald-800/40"
-                        >
-                          {kind.replace(/_/g, " ")}: {count}
-                        </span>
-                      ))}
-                  </div>
-                )}
-
-                {knowledge && knowledge.experiencePreview.length > 0 ? (
-                  <ul className="space-y-2">
-                    {knowledge.experiencePreview.map((c) => (
-                      <li key={c.id} className="rounded-xl p-4 bg-slate-950/40 border border-emerald-500/10">
-                        <div className="flex items-center gap-2 mb-2">
-                          <KindBadge kind={c.sourceKind} />
-                          <p className="text-sm font-medium text-emerald-200">{c.sourceLabel}</p>
-                          <span className="text-[10px] text-slate-600 ml-auto">
-                            {c.charCount.toLocaleString()} chars
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{c.preview}</p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-center py-16 border border-dashed border-white/10 rounded-xl">
-                    <Brain className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-slate-400">No experience knowledge indexed yet</p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                      Complete employee interviews or click &quot;Re-index experience&quot; to extract tacit
-                      knowledge from existing sessions.
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+        <div className={`${glassPanel} rounded-2xl p-5 border border-white/5`}>
+          <ExperienceVaultPanel
+            companyId={company.id}
+            companySlug={company.slug}
+            glassCard={glassCard}
+            gatheredTotals={
+              gathered
+                ? {
+                    sessions: gathered.totals.sessions,
+                    completed: gathered.totals.completed,
+                    painPoints: gathered.totals.painPoints,
+                    reports: gathered.totals.reports,
+                  }
+                : undefined
+            }
+            onOpenSession={onOpenSession}
+            onReindexComplete={loadKnowledge}
+          />
         </div>
       )}
 

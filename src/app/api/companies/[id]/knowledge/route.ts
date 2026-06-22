@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { getKnowledgeStats, SOURCE_TYPE } from "@/lib/knowledge/indexer";
+import {
+  isReviewStatus,
+  isTopicCategory,
+  parseChunkMetadata,
+  REVIEW_STATUS,
+} from "@/lib/knowledge/review";
 
 export async function GET(
   request: Request,
@@ -18,9 +24,30 @@ export async function GET(
     }
 
     const { searchParams } = new URL(request.url);
+    const listExperience = searchParams.get("list") === "experience";
+    const statusParam = searchParams.get("status");
+    const categoryParam = searchParams.get("category");
     const previewLimit = Math.min(Number(searchParams.get("preview") ?? 15), 50);
+    const listLimit = Math.min(Number(searchParams.get("limit") ?? 100), 500);
 
-    const [stats, referencePreview, experiencePreview] = await Promise.all([
+    const experienceWhere: {
+      companySlug: string;
+      sourceType: string;
+      reviewStatus?: string;
+      topicCategory?: string;
+    } = {
+      companySlug: company.slug,
+      sourceType: SOURCE_TYPE.EXPERIENCE,
+    };
+
+    if (statusParam && isReviewStatus(statusParam)) {
+      experienceWhere.reviewStatus = statusParam;
+    }
+    if (categoryParam && isTopicCategory(categoryParam)) {
+      experienceWhere.topicCategory = categoryParam;
+    }
+
+    const [stats, referencePreview, experiencePreview, experienceList] = await Promise.all([
       getKnowledgeStats(company.slug),
       db.knowledgeChunk.findMany({
         where: { companySlug: company.slug, sourceType: SOURCE_TYPE.REFERENCE },
@@ -35,20 +62,80 @@ export async function GET(
           updatedAt: true,
         },
       }),
-      db.knowledgeChunk.findMany({
-        where: { companySlug: company.slug, sourceType: SOURCE_TYPE.EXPERIENCE },
-        orderBy: { updatedAt: "desc" },
-        take: previewLimit,
-        select: {
-          id: true,
-          sourceKind: true,
-          sourceLabel: true,
-          content: true,
-          charCount: true,
-          updatedAt: true,
-        },
-      }),
+      listExperience
+        ? Promise.resolve([])
+        : db.knowledgeChunk.findMany({
+            where: experienceWhere,
+            orderBy: { updatedAt: "desc" },
+            take: previewLimit,
+            select: {
+              id: true,
+              sourceKind: true,
+              sourceLabel: true,
+              content: true,
+              charCount: true,
+              updatedAt: true,
+              reviewStatus: true,
+              topicCategory: true,
+              reviewNotes: true,
+              metadata: true,
+            },
+          }),
+      listExperience
+        ? db.knowledgeChunk.findMany({
+            where: experienceWhere,
+            orderBy: [{ reviewStatus: "asc" }, { updatedAt: "desc" }],
+            take: listLimit,
+            select: {
+              id: true,
+              sourceKind: true,
+              sourceLabel: true,
+              content: true,
+              charCount: true,
+              updatedAt: true,
+              reviewStatus: true,
+              topicCategory: true,
+              reviewNotes: true,
+              reviewedAt: true,
+              reviewedBy: true,
+              metadata: true,
+            },
+          })
+        : Promise.resolve([]),
     ]);
+
+    function mapExperienceChunk(c: {
+      id: string;
+      sourceKind: string;
+      sourceLabel: string;
+      content: string;
+      charCount: number;
+      updatedAt: Date;
+      reviewStatus: string | null;
+      topicCategory: string | null;
+      reviewNotes: string | null;
+      reviewedAt?: Date | null;
+      reviewedBy?: string | null;
+      metadata: string | null;
+    }) {
+      const meta = parseChunkMetadata(c.metadata);
+      return {
+        id: c.id,
+        sourceKind: c.sourceKind,
+        sourceLabel: c.sourceLabel,
+        content: c.content,
+        preview: c.content.slice(0, 280),
+        charCount: c.charCount,
+        reviewStatus: c.reviewStatus ?? REVIEW_STATUS.PENDING,
+        topicCategory: c.topicCategory ?? "other",
+        reviewNotes: c.reviewNotes,
+        reviewedAt: c.reviewedAt?.toISOString() ?? null,
+        reviewedBy: c.reviewedBy ?? null,
+        sessionId: typeof meta.sessionId === "string" ? meta.sessionId : null,
+        participant: typeof meta.participant === "string" ? meta.participant : null,
+        updatedAt: c.updatedAt.toISOString(),
+      };
+    }
 
     return NextResponse.json({
       companySlug: company.slug,
@@ -58,11 +145,8 @@ export async function GET(
         preview: c.content.slice(0, 280),
         updatedAt: c.updatedAt.toISOString(),
       })),
-      experiencePreview: experiencePreview.map((c) => ({
-        ...c,
-        preview: c.content.slice(0, 280),
-        updatedAt: c.updatedAt.toISOString(),
-      })),
+      experiencePreview: experiencePreview.map(mapExperienceChunk),
+      experienceList: experienceList.map(mapExperienceChunk),
     });
   } catch (error) {
     console.error("Knowledge API error:", error);

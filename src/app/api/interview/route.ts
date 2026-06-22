@@ -534,4 +534,54 @@ async function extractStructuredData(
       },
     });
   }
+
+  if (
+    section === "C" &&
+    message.length > 40 &&
+    (lower.includes("process") ||
+      lower.includes("step") ||
+      lower.includes("workflow") ||
+      lower.includes("procedure") ||
+      lower.includes("प्रक्रिया") ||
+      lower.includes("ପ୍ରକ୍ରିୟା"))
+  ) {
+    const existing = await db.processRecord.count({ where: { sessionId } });
+    if (existing < 12) {
+      await db.processRecord.create({
+        data: {
+          sessionId,
+          processName: message.slice(0, 120),
+          objective: message,
+          steps: message,
+        },
+      });
+    }
+  }
+
+  if (
+    section === "G" &&
+    (lower.includes("report") ||
+      lower.includes("kpi") ||
+      lower.includes("dashboard") ||
+      lower.includes("metric") ||
+      lower.includes("रिपोर्ट"))
+  ) {
+    const existing = await db.reportingReq.count({ where: { sessionId } });
+    if (existing < 8) {
+      await db.reportingReq.create({
+        data: {
+          sessionId,
+          reportName: message.slice(0, 100),
+          kpis: message,
+          frequency: lower.includes("daily")
+            ? "daily"
+            : lower.includes("weekly")
+              ? "weekly"
+              : lower.includes("monthly")
+                ? "monthly"
+                : "as_needed",
+        },
+      });
+    }
+  }
 }

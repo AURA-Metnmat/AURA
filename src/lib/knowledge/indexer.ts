@@ -1,5 +1,10 @@
 import { db } from "@/lib/db";
 import { splitTextIntoChunks } from "./chunk-text";
+import {
+  REVIEW_STATUS,
+  chunkContentHash,
+  inferTopicCategory,
+} from "./review";
 
 export const SOURCE_TYPE = {
   REFERENCE: "REFERENCE",
@@ -59,10 +64,73 @@ async function replaceChunks(
   sourceType: SourceType,
   inputs: ChunkInput[]
 ): Promise<number> {
-  await db.knowledgeChunk.deleteMany({ where: { companySlug, sourceType } });
+  const baseRows = toChunkRows(inputs);
+  const isExperience = sourceType === SOURCE_TYPE.EXPERIENCE;
 
-  const rows = toChunkRows(inputs);
-  if (rows.length === 0) return 0;
+  let reviewByHash = new Map<
+    string,
+    {
+      reviewStatus: string | null;
+      topicCategory: string | null;
+      reviewNotes: string | null;
+      reviewedAt: Date | null;
+      reviewedBy: string | null;
+    }
+  >();
+
+  if (isExperience) {
+    const existing = await db.knowledgeChunk.findMany({
+      where: { companySlug, sourceType: SOURCE_TYPE.EXPERIENCE },
+      select: {
+        contentHash: true,
+        reviewStatus: true,
+        topicCategory: true,
+        reviewNotes: true,
+        reviewedAt: true,
+        reviewedBy: true,
+      },
+    });
+    reviewByHash = new Map(
+      existing
+        .filter((e) => e.contentHash)
+        .map((e) => [
+          e.contentHash!,
+          {
+            reviewStatus: e.reviewStatus,
+            topicCategory: e.topicCategory,
+            reviewNotes: e.reviewNotes,
+            reviewedAt: e.reviewedAt,
+            reviewedBy: e.reviewedBy,
+          },
+        ])
+    );
+  }
+
+  const rows = baseRows.map((row) => {
+    const hash = chunkContentHash(row.content, row.sourceKind, row.sourceId);
+    const preserved = isExperience ? reviewByHash.get(hash) : undefined;
+
+    return {
+      ...row,
+      contentHash: hash,
+      reviewStatus: isExperience
+        ? (preserved?.reviewStatus ?? REVIEW_STATUS.PENDING)
+        : null,
+      topicCategory: isExperience
+        ? (preserved?.topicCategory ?? inferTopicCategory(row.sourceKind))
+        : null,
+      reviewNotes: isExperience ? (preserved?.reviewNotes ?? null) : null,
+      reviewedAt: isExperience ? (preserved?.reviewedAt ?? null) : null,
+      reviewedBy: isExperience ? (preserved?.reviewedBy ?? null) : null,
+    };
+  });
+
+  if (rows.length === 0) {
+    await db.knowledgeChunk.deleteMany({ where: { companySlug, sourceType } });
+    return 0;
+  }
+
+  await db.knowledgeChunk.deleteMany({ where: { companySlug, sourceType } });
 
   const batchSize = 100;
   for (let i = 0; i < rows.length; i += batchSize) {
@@ -214,6 +282,8 @@ export async function indexExperienceKnowledge(
       painPoints: true,
       requirements: true,
       processes: true,
+      integrations: true,
+      reporting: true,
       attachments: true,
       report: true,
     },
@@ -294,6 +364,36 @@ export async function indexExperienceKnowledge(
       });
     }
 
+    for (const integ of session.integrations) {
+      inputs.push({
+        companySlug,
+        sourceType: SOURCE_TYPE.EXPERIENCE,
+        sourceKind: "integration",
+        sourceId: integ.id,
+        sourceLabel: `${person} — integration: ${integ.systemName}`,
+        content: `System: ${integ.systemName}\n${integ.purpose ?? ""}`.trim(),
+        metadata: { sessionId: session.id },
+      });
+    }
+
+    for (const rep of session.reporting) {
+      inputs.push({
+        companySlug,
+        sourceType: SOURCE_TYPE.EXPERIENCE,
+        sourceKind: "reporting",
+        sourceId: rep.id,
+        sourceLabel: `${person} — reporting: ${rep.reportName}`,
+        content: [
+          `Report: ${rep.reportName}`,
+          rep.kpis ? `KPIs: ${rep.kpis}` : "",
+          rep.frequency ? `Frequency: ${rep.frequency}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        metadata: { sessionId: session.id },
+      });
+    }
+
     for (const att of session.attachments) {
       const text = att.extractedText?.trim();
       if (!text || text.length < 20) continue;
@@ -357,7 +457,8 @@ export async function reindexCompanyKnowledge(params: {
 }
 
 export async function getKnowledgeStats(companySlug: string) {
-  const [reference, experience, byKind, latest] = await Promise.all([
+  const [reference, experience, byKind, latest, reviewCounts, categoryCounts] =
+    await Promise.all([
     db.knowledgeChunk.count({ where: { companySlug, sourceType: SOURCE_TYPE.REFERENCE } }),
     db.knowledgeChunk.count({ where: { companySlug, sourceType: SOURCE_TYPE.EXPERIENCE } }),
     db.knowledgeChunk.groupBy({
@@ -370,7 +471,25 @@ export async function getKnowledgeStats(companySlug: string) {
       orderBy: { updatedAt: "desc" },
       select: { updatedAt: true },
     }),
+    db.knowledgeChunk.groupBy({
+      by: ["reviewStatus"],
+      where: { companySlug, sourceType: SOURCE_TYPE.EXPERIENCE },
+      _count: { id: true },
+    }),
+    db.knowledgeChunk.groupBy({
+      by: ["topicCategory"],
+      where: {
+        companySlug,
+        sourceType: SOURCE_TYPE.EXPERIENCE,
+        reviewStatus: REVIEW_STATUS.VALIDATED,
+      },
+      _count: { id: true },
+    }),
   ]);
+
+  const byReviewStatus = Object.fromEntries(
+    reviewCounts.map((r) => [r.reviewStatus ?? REVIEW_STATUS.PENDING, r._count.id])
+  );
 
   return {
     reference,
@@ -378,5 +497,14 @@ export async function getKnowledgeStats(companySlug: string) {
     total: reference + experience,
     lastIndexedAt: latest?.updatedAt?.toISOString() ?? null,
     byKind: Object.fromEntries(byKind.map((k) => [k.sourceKind, k._count.id])),
+    review: {
+      pending: byReviewStatus[REVIEW_STATUS.PENDING] ?? 0,
+      validated: byReviewStatus[REVIEW_STATUS.VALIDATED] ?? 0,
+      needsAttention: byReviewStatus[REVIEW_STATUS.NEEDS_ATTENTION] ?? 0,
+      rejected: byReviewStatus[REVIEW_STATUS.REJECTED] ?? 0,
+    },
+    validatedByCategory: Object.fromEntries(
+      categoryCounts.map((c) => [c.topicCategory ?? "other", c._count.id])
+    ),
   };
 }
