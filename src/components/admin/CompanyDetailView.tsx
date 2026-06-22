@@ -29,6 +29,8 @@ import CampaignsPanel from "@/components/admin/CampaignsPanel";
 import AnswerReviewPanel from "@/components/admin/AnswerReviewPanel";
 import InterviewAnalyticsPanel from "@/components/admin/InterviewAnalyticsPanel";
 import ExportHistoryPanel from "@/components/admin/ExportHistoryPanel";
+import RegistrationPolicyPanel from "@/components/admin/RegistrationPolicyPanel";
+import { useReindexJob } from "@/hooks/use-reindex-job";
 
 interface CompanyRow {
   id: string;
@@ -285,7 +287,8 @@ export default function CompanyDetailView({
   const [loadingKnowledge, setLoadingKnowledge] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportHistoryKey, setExportHistoryKey] = useState(0);
-  const [reindexing, setReindexing] = useState(false);
+  const { startReindex, running: reindexing, statusMessage: reindexStatus } =
+    useReindexJob(company.id);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
   const loadReference = useCallback(async () => {
@@ -361,21 +364,11 @@ export default function CompanyDetailView({
   }
 
   async function reindexKnowledge(scope: "all" | "reference" | "experience" = "all") {
-    setReindexing(true);
     try {
-      const res = await fetch(`/api/companies/${company.id}/knowledge/reindex`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Reindex failed");
+      await startReindex(scope);
       await loadKnowledge();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Reindex failed");
-    } finally {
-      setReindexing(false);
     }
   }
 
@@ -600,6 +593,10 @@ export default function CompanyDetailView({
           </section>
 
           <section className={`lg:col-span-2 ${glassPanel} rounded-2xl p-5 border border-white/5`}>
+            <RegistrationPolicyPanel companyId={company.id} glassCard={glassCard} />
+          </section>
+
+          <section className={`lg:col-span-2 ${glassPanel} rounded-2xl p-5 border border-white/5`}>
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
                 <Database className="w-5 h-5 text-amber-400" />
@@ -619,6 +616,9 @@ export default function CompanyDetailView({
               Chunks power interactive interview questions via retrieval-augmented generation. Rebuild after
               imports or when interviews complete.
             </p>
+            {reindexStatus && (
+              <p className="text-xs text-amber-400/90 mb-3">{reindexStatus}</p>
+            )}
             {knowledge ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-4 text-sm">

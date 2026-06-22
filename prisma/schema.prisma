@@ -41,6 +41,7 @@ model Company {
   adminUsers                 AdminUser[]
   adminAuditLogs             AdminAuditLog[]
   dataExportLogs             DataExportLog[]
+  reindexJobs                KnowledgeReindexJob[]
 
   @@index([isActive])
   @@index([category])
@@ -106,6 +107,26 @@ model DataExportLog {
 
   @@index([companyId])
   @@index([exportType])
+  @@index([createdAt])
+}
+
+model KnowledgeReindexJob {
+  id              String    @id @default(cuid())
+  companyId       String
+  scope           String    @default("all")
+  status          String    @default("pending")
+  referenceCount  Int?
+  experienceCount Int?
+  errorMessage    String?
+  actorEmail      String?
+  adminUserId     String?
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  company         Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
   @@index([createdAt])
 }
 

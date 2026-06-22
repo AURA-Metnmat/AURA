@@ -555,8 +555,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const session = await requireAdminSession(request);
-  if (session instanceof NextResponse) return session;
+  const adminSession = await requireAdminSession(request);
+  if (adminSession instanceof NextResponse) return adminSession;
 
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get("sessionId");
@@ -570,7 +570,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ sessions });
   }
 
-  const session = await db.interviewSession.findUnique({
+  const interviewSession = await db.interviewSession.findUnique({
     where: { id: sessionId },
     include: {
       company: true,
@@ -590,11 +590,11 @@ export async function GET(request: Request) {
     },
   });
 
-  if (!session) {
+  if (!interviewSession) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ session });
+  return NextResponse.json({ session: interviewSession });
 }
 
 async function extractStructuredData(

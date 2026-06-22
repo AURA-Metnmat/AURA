@@ -5,6 +5,7 @@ import {
   isReviewStatus,
   REVIEW_STATUS,
   REVIEW_STATUS_LABELS,
+  type ReviewStatus,
 } from "@/lib/knowledge/review";
 import { parseConfidenceFilter } from "@/lib/refinement/quality-stats";
 
@@ -68,7 +69,13 @@ export async function GET(
   });
 
   return NextResponse.json({
-    answers: answers.map((a) => ({
+    answers: answers.map((a) => {
+      const reviewStatus: ReviewStatus =
+        a.reviewStatus && isReviewStatus(a.reviewStatus)
+          ? a.reviewStatus
+          : REVIEW_STATUS.PENDING;
+
+      return {
       id: a.id,
       sessionId: a.sessionId,
       interactionType: a.interactionType,
@@ -76,11 +83,8 @@ export async function GET(
       section: a.section,
       qualityScore: a.qualityScore,
       confidenceScore: a.confidenceScore,
-      reviewStatus: a.reviewStatus ?? REVIEW_STATUS.PENDING,
-      reviewStatusLabel:
-        REVIEW_STATUS_LABELS[
-          isReviewStatus(a.reviewStatus ?? "") ? a.reviewStatus : REVIEW_STATUS.PENDING
-        ],
+      reviewStatus,
+      reviewStatusLabel: REVIEW_STATUS_LABELS[reviewStatus],
       duplicateOfId: a.duplicateOfId,
       contradictionFlags: a.contradictionFlags
         ? (JSON.parse(a.contradictionFlags) as unknown[])
@@ -94,6 +98,7 @@ export async function GET(
       designation: a.session.participant?.designation ?? null,
       campaignId: a.session.campaignId,
       campaignName: a.session.campaign?.name ?? null,
-    })),
+    };
+    }),
   });
 }

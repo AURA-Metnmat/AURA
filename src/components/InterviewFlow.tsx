@@ -21,6 +21,7 @@ import {
 } from "@/lib/interview/consent";
 import type { StructuredSelection } from "@/components/interview/StructuredInteractionInput";
 import type { MessageInteraction } from "@/lib/aura/interaction";
+import type { PublicRegistrationPolicy } from "@/lib/companies/registration-policy";
 
 interface Attachment {
   id: string;
@@ -54,6 +55,7 @@ interface InterviewFlowProps {
   campaignId?: string;
   interviewDurationMinutes?: number;
   showCompanyBadge?: boolean;
+  registrationPolicy?: PublicRegistrationPolicy;
 }
 
 function formatRemaining(seconds: number): string {
@@ -72,6 +74,7 @@ export default function InterviewFlow({
   campaignId,
   interviewDurationMinutes: initialDurationMinutes = 5,
   showCompanyBadge = true,
+  registrationPolicy,
 }: InterviewFlowProps) {
   const [step, setStep] = useState<FlowStep>("language");
   const [language, setLanguage] = useState<Language>("en");
@@ -708,6 +711,7 @@ export default function InterviewFlow({
           companySlug={companySlug}
           companyId={companyId}
           inviteToken={inviteToken}
+          registrationPolicy={registrationPolicy}
           onBack={() => setStep("language")}
           onRegistered={handleRegistered}
           onLoggedIn={handleLoggedIn}

@@ -23,6 +23,8 @@ import {
   type ReviewStatus,
 } from "@/lib/knowledge/review";
 import ExportHistoryPanel from "@/components/admin/ExportHistoryPanel";
+import ReindexJobHistory from "@/components/admin/ReindexJobHistory";
+import { useReindexJob } from "@/hooks/use-reindex-job";
 
 export interface ExperienceItem {
   id: string;
@@ -96,7 +98,9 @@ export default function ExperienceVaultPanel({
   const [items, setItems] = useState<ExperienceItem[]>([]);
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [reindexing, setReindexing] = useState(false);
+  const [reindexHistoryKey, setReindexHistoryKey] = useState(0);
+  const { startReindex, running: reindexing, statusMessage: reindexStatus } =
+    useReindexJob(companyId);
   const [exporting, setExporting] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<ReviewStatus | "ALL">("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
@@ -130,24 +134,13 @@ export default function ExperienceVaultPanel({
   }, [loadItems]);
 
   async function reindexExperience() {
-    setReindexing(true);
     try {
-      const res = await fetch(`/api/companies/${companyId}/knowledge/reindex`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: "experience" }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Reindex failed");
-      }
+      await startReindex("experience");
       await loadItems();
       onReindexComplete?.();
+      setReindexHistoryKey((k) => k + 1);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Reindex failed");
-    } finally {
-      setReindexing(false);
     }
   }
 
@@ -274,6 +267,10 @@ export default function ExperienceVaultPanel({
             </button>
           </div>
         </div>
+
+        {reindexStatus && (
+          <p className="text-xs text-amber-400/90 mt-3">{reindexStatus}</p>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mt-5">
           <div className="rounded-lg bg-slate-950/50 border border-white/5 px-3 py-2 text-center">
@@ -542,6 +539,12 @@ export default function ExperienceVaultPanel({
         companyId={companyId}
         glassCard={glassCard}
         refreshKey={exportHistoryKey}
+      />
+
+      <ReindexJobHistory
+        companyId={companyId}
+        glassCard={glassCard}
+        refreshKey={reindexHistoryKey}
       />
     </div>
   );

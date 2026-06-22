@@ -10,6 +10,26 @@ import {
 } from "@/lib/companies/delete-company";
 import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
+import {
+  parseRegistrationPolicyUpdate,
+  toPublicRegistrationPolicy,
+  type RegistrationPolicyFields,
+} from "@/lib/companies/registration-policy";
+import type { RegistrationMode } from "@/lib/auth/employee-otp/types";
+
+function formatRegistrationPolicy(company: {
+  allowEmployeeSelfRegistration: boolean;
+  requireMobileOtpForEmployeeLogin: boolean;
+  allowedEmailDomains: string | null;
+  registrationMode: string;
+}): RegistrationPolicyFields {
+  return {
+    allowEmployeeSelfRegistration: company.allowEmployeeSelfRegistration,
+    requireMobileOtpForEmployeeLogin: company.requireMobileOtpForEmployeeLogin,
+    allowedEmailDomains: company.allowedEmailDomains,
+    registrationMode: (company.registrationMode as RegistrationMode) || "OPEN",
+  };
+}
 
 export async function GET(
   request: Request,
@@ -65,6 +85,7 @@ export async function GET(
       interviewLink: getInterviewLink(company.inviteToken, request),
       sessionCount: company._count.sessions,
       createdAt: company.createdAt,
+      registrationPolicy: formatRegistrationPolicy(company),
     },
     sessions: company.sessions.map((s) => ({
       id: s.id,
@@ -101,11 +122,32 @@ export async function PATCH(
     location?: string;
     isActive?: boolean;
     regenerateInviteToken?: boolean;
+    allowEmployeeSelfRegistration?: boolean;
+    requireMobileOtpForEmployeeLogin?: boolean;
+    allowedEmailDomains?: string | null;
+    registrationMode?: string;
   };
 
   const existing = await db.company.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
+  }
+
+  const policyUpdate = parseRegistrationPolicyUpdate({
+    allowEmployeeSelfRegistration: body.allowEmployeeSelfRegistration,
+    requireMobileOtpForEmployeeLogin: body.requireMobileOtpForEmployeeLogin,
+    allowedEmailDomains: body.allowedEmailDomains,
+    registrationMode: body.registrationMode,
+  });
+  if (
+    body.allowEmployeeSelfRegistration !== undefined ||
+    body.requireMobileOtpForEmployeeLogin !== undefined ||
+    body.allowedEmailDomains !== undefined ||
+    body.registrationMode !== undefined
+  ) {
+    if (!policyUpdate.ok) {
+      return NextResponse.json({ error: policyUpdate.error }, { status: 400 });
+    }
   }
 
   const company = await db.company.update({
@@ -128,6 +170,7 @@ export async function PATCH(
       ...(body.location !== undefined && { location: body.location }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
       ...(body.regenerateInviteToken && { inviteToken: generateInviteToken() }),
+      ...(policyUpdate.ok ? policyUpdate.data : {}),
     },
   });
 
@@ -142,13 +185,19 @@ export async function PATCH(
     companyId: company.id,
     resourceType: "company",
     resourceId: company.id,
-    metadata: { regenerateInviteToken: !!body.regenerateInviteToken },
+    metadata: {
+      regenerateInviteToken: !!body.regenerateInviteToken,
+      ...(policyUpdate.ok && Object.keys(policyUpdate.data).length > 0
+        ? { registrationPolicy: policyUpdate.data }
+        : {}),
+    },
   });
 
   return NextResponse.json({
     company: {
       ...company,
       interviewLink: getInterviewLink(company.inviteToken, request),
+      registrationPolicy: formatRegistrationPolicy(company),
     },
     ...(body.regenerateInviteToken
       ? { message: "Interview link regenerated. Previous links are now invalid." }

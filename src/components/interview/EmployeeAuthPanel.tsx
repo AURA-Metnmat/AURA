@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Loader2,
   ArrowLeft,
@@ -20,6 +20,11 @@ import {
 } from "@/components/ui/auth-switch";
 import { RegistrationCredentialsWelcome } from "@/components/interview/RegistrationCredentialsWelcome";
 import type { Language } from "@/lib/aura/i18n";
+import type { PublicRegistrationPolicy } from "@/lib/companies/registration-policy";
+import {
+  canRegisterWithPublicPolicy,
+  validateEmailAgainstPolicy,
+} from "@/lib/companies/registration-policy";
 
 type AuthMode = "register" | "signIn";
 type AuthStep = "form" | "welcome";
@@ -59,6 +64,7 @@ interface EmployeeAuthPanelProps {
   companySlug: string;
   companyId: string;
   inviteToken?: string;
+  registrationPolicy?: PublicRegistrationPolicy;
   onBack: () => void;
   onRegistered: (form: EmployeeProfileForm) => void;
   onLoggedIn: (payload: {
@@ -112,11 +118,16 @@ export function EmployeeAuthPanel({
   companyName,
   companySlug,
   inviteToken,
+  registrationPolicy,
   onBack,
   onRegistered,
   onLoggedIn,
 }: EmployeeAuthPanelProps) {
-  const [mode, setMode] = useState<AuthMode>("register");
+  const registrationAllowed = registrationPolicy
+    ? canRegisterWithPublicPolicy(registrationPolicy, Boolean(inviteToken))
+    : true;
+
+  const [mode, setMode] = useState<AuthMode>(registrationAllowed ? "register" : "signIn");
   const [step, setStep] = useState<AuthStep>("form");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +150,12 @@ export function EmployeeAuthPanel({
 
   const MIN_PASSWORD_LENGTH = 6;
 
+  useEffect(() => {
+    if (!registrationAllowed && mode === "register") {
+      setMode("signIn");
+    }
+  }, [registrationAllowed, mode]);
+
   function switchMode(next: AuthMode) {
     setMode(next);
     setError(null);
@@ -152,6 +169,13 @@ export function EmployeeAuthPanel({
     }
     if (!isValidEmail(email)) {
       setError("Enter a valid email address.");
+      return;
+    }
+    if (
+      registrationPolicy?.allowedEmailDomains &&
+      !validateEmailAgainstPolicy(normalizeEmail(email), registrationPolicy.allowedEmailDomains)
+    ) {
+      setError(registrationPolicy.domainHint ?? "This email domain is not allowed for registration.");
       return;
     }
     if (!isValidMobile(mobile)) {
@@ -397,21 +421,35 @@ export function EmployeeAuthPanel({
           <p className="text-xs uppercase tracking-[0.18em] text-slate-200 font-semibold">
             {companyName}
           </p>
-          <p className="text-sm text-slate-400">Create an account or sign in with your password</p>
+          <p className="text-sm text-slate-400">
+            {registrationAllowed
+              ? "Create an account or sign in with your password"
+              : "Sign in with your existing account to continue"}
+          </p>
+          {registrationPolicy?.domainHint && registrationAllowed && (
+            <p className="text-xs text-amber-300/90">{registrationPolicy.domainHint}</p>
+          )}
         </div>
 
-        <AuthSwitch
-          isSignUp={mode === "register"}
-          onModeChange={(signUp) => switchMode(signUp ? "register" : "signIn")}
-          signInTitle="Welcome back"
-          signUpTitle="Create your profile"
-          signUpPanelHeading="New here?"
-          signUpPanelText={`Join ${companyName} on AURA — register once and start your AI interview in seconds.`}
-          signInPanelHeading="One of us?"
-          signInPanelText="Welcome back! Sign in with your mobile or email and password."
-          signInForm={signInForm}
-          signUpForm={signUpForm}
-        />
+        {registrationAllowed ? (
+          <AuthSwitch
+            isSignUp={mode === "register"}
+            onModeChange={(signUp) => switchMode(signUp ? "register" : "signIn")}
+            signInTitle="Welcome back"
+            signUpTitle="Create your profile"
+            signUpPanelHeading="New here?"
+            signUpPanelText={`Join ${companyName} on AURA — register once and start your AI interview in seconds.`}
+            signInPanelHeading="One of us?"
+            signInPanelText="Welcome back! Sign in with your mobile or email and password."
+            signInForm={signInForm}
+            signUpForm={signUpForm}
+          />
+        ) : (
+          <div className="w-full max-w-md mx-auto space-y-4">
+            <h2 className="text-lg font-semibold text-center text-slate-100">Welcome back</h2>
+            {signInForm}
+          </div>
+        )}
 
         <button
           type="button"

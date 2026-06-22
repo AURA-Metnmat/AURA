@@ -9,6 +9,7 @@ import { COMPANY_CATEGORIES } from "@/lib/aura/company-utils";
 import ConfirmDeleteModal from "@/components/admin/ConfirmDeleteModal";
 import CompanyDetailView from "@/components/admin/CompanyDetailView";
 import AdminRbacPanel from "@/components/admin/AdminRbacPanel";
+import AdminSystemPanel from "@/components/admin/AdminSystemPanel";
 
 interface CompanyRow {
   id: string;
@@ -924,7 +925,13 @@ export default function AdminPage() {
           >
             ← Back to dashboard
           </button>
-          <AdminRbacPanel />
+          <div className="space-y-10">
+            <AdminSystemPanel glassCard={glassCard} />
+            <AdminRbacPanel
+              glassCard={glassCard}
+              companies={companies.map((c) => ({ id: c.id, name: c.name }))}
+            />
+          </div>
         </main>
       )}
       </div>

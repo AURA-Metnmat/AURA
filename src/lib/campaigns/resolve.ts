@@ -5,6 +5,9 @@ import {
   isCampaignJoinable,
   type CampaignStatus,
 } from "@/lib/campaigns/status";
+import { toPublicRegistrationPolicy } from "@/lib/companies/registration-policy";
+import type { RegistrationMode } from "@/lib/auth/employee-otp/types";
+import type { PublicRegistrationPolicy } from "@/lib/companies/registration-policy";
 
 export interface ResolvedCampaign {
   id: string;
@@ -23,6 +26,7 @@ export interface ResolvedInterviewAccess {
     industry: string | null;
     description: string | null;
     interviewDurationMinutes: number;
+    registrationPolicy: PublicRegistrationPolicy;
   };
   campaign: ResolvedCampaign;
 }
@@ -37,7 +41,41 @@ const companySelect = {
   interviewDurationMinutes: true,
   inviteToken: true,
   isActive: true,
+  allowEmployeeSelfRegistration: true,
+  allowedEmailDomains: true,
+  registrationMode: true,
 } as const;
+
+function formatResolvedCompany(
+  company: {
+    id: string;
+    name: string;
+    slug: string;
+    category: string | null;
+    industry: string | null;
+    description: string | null;
+    interviewDurationMinutes: number;
+    allowEmployeeSelfRegistration: boolean;
+    allowedEmailDomains: string | null;
+    registrationMode: string;
+  }
+) {
+  return {
+    id: company.id,
+    name: company.name,
+    slug: company.slug,
+    category: company.category,
+    industry: company.industry,
+    description: company.description,
+    interviewDurationMinutes: company.interviewDurationMinutes,
+    registrationPolicy: toPublicRegistrationPolicy({
+      allowEmployeeSelfRegistration: company.allowEmployeeSelfRegistration,
+      requireMobileOtpForEmployeeLogin: false,
+      allowedEmailDomains: company.allowedEmailDomains,
+      registrationMode: (company.registrationMode as RegistrationMode) || "OPEN",
+    }),
+  };
+}
 
 export async function ensureDefaultCampaign(companyId: string, companyInviteToken: string) {
   const existing = await db.interviewCampaign.findFirst({
@@ -105,15 +143,7 @@ export async function resolveInterviewAccessByToken(
     const status = getEffectiveCampaignStatus(campaignByToken);
     if (!isCampaignJoinable(status)) return null;
     return {
-      company: {
-        id: campaignByToken.company.id,
-        name: campaignByToken.company.name,
-        slug: campaignByToken.company.slug,
-        category: campaignByToken.company.category,
-        industry: campaignByToken.company.industry,
-        description: campaignByToken.company.description,
-        interviewDurationMinutes: campaignByToken.company.interviewDurationMinutes,
-      },
+      company: formatResolvedCompany(campaignByToken.company),
       campaign: {
         id: campaignByToken.id,
         name: campaignByToken.name,
@@ -136,15 +166,7 @@ export async function resolveInterviewAccessByToken(
   if (!isCampaignJoinable(status)) return null;
 
   return {
-    company: {
-      id: company.id,
-      name: company.name,
-      slug: company.slug,
-      category: company.category,
-      industry: company.industry,
-      description: company.description,
-      interviewDurationMinutes: company.interviewDurationMinutes,
-    },
+    company: formatResolvedCompany(company),
     campaign: {
       id: defaultCampaign.id,
       name: defaultCampaign.name,

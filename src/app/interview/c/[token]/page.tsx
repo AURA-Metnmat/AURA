@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import InterviewFlow from "@/components/InterviewFlow";
+import type { PublicRegistrationPolicy } from "@/lib/companies/registration-policy";
 
 export default function CompanyInterviewPage({
   params,
@@ -14,6 +15,7 @@ export default function CompanyInterviewPage({
     name: string;
     slug: string;
     interviewDurationMinutes?: number;
+    registrationPolicy?: PublicRegistrationPolicy;
   } | null>(null);
   const [campaignId, setCampaignId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export default function CompanyInterviewPage({
       inviteToken={token ?? undefined}
       campaignId={campaignId}
       interviewDurationMinutes={company.interviewDurationMinutes ?? 5}
+      registrationPolicy={company.registrationPolicy}
     />
   );
 }

@@ -103,17 +103,19 @@ export function verifyAdminPassword(password: string): boolean {
 }
 
 async function readSessionToken(request?: Request): Promise<string | undefined> {
-  const cookieStore = await cookies();
-  let token = cookieStore.get(COOKIE_NAME)?.value;
-
-  if (!token && request) {
+  if (request) {
     const auth = request.headers.get("authorization");
     if (auth?.startsWith("Bearer ")) {
-      token = auth.slice(7);
+      return auth.slice(7);
     }
   }
 
-  return token;
+  try {
+    const cookieStore = await cookies();
+    return cookieStore.get(COOKIE_NAME)?.value;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getAdminSession(request?: Request): Promise<AdminSession | null> {
