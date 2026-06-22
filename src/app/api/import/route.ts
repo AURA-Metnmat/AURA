@@ -4,6 +4,8 @@ import {
   runReferenceImport,
   runReferenceImportFromUploads,
 } from "@/lib/import/reference-import";
+import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
+import { db } from "@/lib/db";
 
 export async function POST(request: Request) {
   const denied = await requireAdmin(request);
@@ -28,6 +30,14 @@ export async function POST(request: Request) {
       }
 
       const stats = await runReferenceImportFromUploads(companySlug, uploads);
+      const company = await db.company.findUnique({ where: { slug: companySlug }, select: { id: true } });
+      if (company) {
+        await reindexCompanyKnowledge({
+          companySlug,
+          companyId: company.id,
+          scope: "reference",
+        });
+      }
       return NextResponse.json({
         success: true,
         message: `Imported ${uploads.length} file(s) for ${companySlug}`,
@@ -42,6 +52,14 @@ export async function POST(request: Request) {
     }
 
     const stats = await runReferenceImport(companySlug);
+    const company = await db.company.findUnique({ where: { slug: companySlug }, select: { id: true } });
+    if (company) {
+      await reindexCompanyKnowledge({
+        companySlug,
+        companyId: company.id,
+        scope: "reference",
+      });
+    }
     return NextResponse.json({
       success: true,
       message: `Reference data imported from server folder for ${companySlug}`,

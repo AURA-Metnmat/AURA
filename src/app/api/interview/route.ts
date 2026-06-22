@@ -9,6 +9,7 @@ import { loadFullCompanyContext } from "@/lib/companies/company-knowledge";
 import { requireEmployeeSession } from "@/lib/auth/employee";
 import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
 import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
+import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
@@ -275,6 +276,14 @@ export async function POST(request: Request) {
         where: { id: session.id },
         data: { status: "completed", completedAt: new Date(), completionPct: 100 },
       });
+
+      if (fullSession.company) {
+        void reindexCompanyKnowledge({
+          companySlug: fullSession.company.slug,
+          companyId: fullSession.company.id,
+          scope: "experience",
+        }).catch((err) => console.error("Experience knowledge reindex failed:", err));
+      }
 
       return NextResponse.json({ sessionId: session.id, report: reportData, completed: true });
     }

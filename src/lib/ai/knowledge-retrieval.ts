@@ -2,23 +2,24 @@ import { db } from "@/lib/db";
 import { chatJson } from "./chat";
 import { CLAUDE_RETRIEVAL_MODEL } from "./models";
 import type { ChatMessage } from "./providers";
+import { SOURCE_TYPE } from "@/lib/knowledge/indexer";
 
 const MAX_CORPUS_CHARS = 24_000;
 const MAX_RETRIEVED_CHARS = 6_000;
 
-export interface KnowledgeChunk {
+export interface RetrievalChunk {
   source: string;
   category: string;
   content: string;
 }
 
 export interface RetrievedKnowledge {
-  chunks: KnowledgeChunk[];
+  chunks: RetrievalChunk[];
   formattedContext: string;
   provider: "claude" | "openai" | "heuristic" | "none";
 }
 
-async function loadKnowledgeCorpus(companySlug: string): Promise<KnowledgeChunk[]> {
+async function loadLegacyCorpus(companySlug: string): Promise<RetrievalChunk[]> {
   const [pdfs, insights, dataFiles] = await Promise.all([
     db.pdfDocument.findMany({
       where: { companySlug },
@@ -45,7 +46,7 @@ async function loadKnowledgeCorpus(companySlug: string): Promise<KnowledgeChunk[
     }),
   ]);
 
-  const chunks: KnowledgeChunk[] = [];
+  const chunks: RetrievalChunk[] = [];
 
   for (const pdf of pdfs) {
     const body = (pdf.content || pdf.summary || "").trim();
@@ -84,8 +85,39 @@ async function loadKnowledgeCorpus(companySlug: string): Promise<KnowledgeChunk[
   return chunks;
 }
 
+async function loadIndexedCorpus(companySlug: string): Promise<RetrievalChunk[]> {
+  const indexed = await db.knowledgeChunk.findMany({
+    where: { companySlug },
+    orderBy: { updatedAt: "desc" },
+    take: 180,
+    select: {
+      sourceLabel: true,
+      sourceType: true,
+      sourceKind: true,
+      content: true,
+    },
+  });
+
+  if (indexed.length === 0) {
+    return loadLegacyCorpus(companySlug);
+  }
+
+  return indexed.map((c) => ({
+    source: c.sourceLabel,
+    category:
+      c.sourceType === SOURCE_TYPE.EXPERIENCE
+        ? `experience:${c.sourceKind}`
+        : `reference:${c.sourceKind}`,
+    content: c.content,
+  }));
+}
+
+async function loadKnowledgeCorpus(companySlug: string): Promise<RetrievalChunk[]> {
+  return loadIndexedCorpus(companySlug);
+}
+
 function heuristicRetrieve(
-  chunks: KnowledgeChunk[],
+  chunks: RetrievalChunk[],
   userMessage: string,
   sectionName: string
 ): RetrievedKnowledge {
@@ -118,7 +150,7 @@ function heuristicRetrieve(
   };
 }
 
-function formatChunks(chunks: KnowledgeChunk[]): string {
+function formatChunks(chunks: RetrievalChunk[]): string {
   if (chunks.length === 0) return "";
   const body = chunks
     .map(
@@ -132,7 +164,7 @@ function formatChunks(chunks: KnowledgeChunk[]): string {
 }
 
 async function llmRetrieve(
-  chunks: KnowledgeChunk[],
+  chunks: RetrievalChunk[],
   userMessage: string,
   sectionName: string,
   designation: string
@@ -152,7 +184,8 @@ async function llmRetrieve(
 Given employee message, interview section, and company knowledge chunks, return JSON:
 {"indices":[0,2,5],"summary":"2-3 sentence synthesis of what matters for the next question"}
 Pick 0-6 chunk indices most relevant to answer the employee and ask a smart follow-up.
-Prefer operational data, processes, systems, and pain points over generic text.`,
+Prefer reference chunks (imported docs, Excel data) for factual/operational questions.
+Prefer experience chunks (interview transcripts, pain points, reports) for tacit knowledge and workflows.`,
     },
     {
       role: "user",

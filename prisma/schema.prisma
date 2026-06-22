@@ -442,3 +442,23 @@ model PdfDocument {
 
   @@index([companySlug])
 }
+
+// ─── Indexed knowledge (RAG corpus) ─────────────────────────────────────────
+
+model KnowledgeChunk {
+  id          String   @id @default(cuid())
+  companySlug String
+  sourceType  String
+  sourceKind  String
+  sourceId    String?
+  sourceLabel String
+  content     String   @db.Text
+  charCount   Int      @default(0)
+  metadata    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companySlug])
+  @@index([companySlug, sourceType])
+  @@index([sourceKind])
+}
