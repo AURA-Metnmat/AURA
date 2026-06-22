@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 interface AudioPlayButtonProps {
   text: string;
   language: Language;
+  sessionId?: string | null;
   className?: string;
   label?: string;
   autoPlay?: boolean;
@@ -18,6 +19,7 @@ interface AudioPlayButtonProps {
 export function AudioPlayButton({
   text,
   language,
+  sessionId,
   className,
   label = "Audio",
   autoPlay = false,
@@ -84,7 +86,7 @@ export function AudioPlayButton({
     const res = await fetch("/api/interview/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, language }),
+      body: JSON.stringify({ text, language, sessionId }),
       signal: controller.signal,
     });
 
@@ -117,7 +119,7 @@ export function AudioPlayButton({
     await audio.play();
     setPlaying(true);
     setError(null);
-  }, [language, startBrowserPlayback, stop, text]);
+  }, [language, sessionId, startBrowserPlayback, stop, text]);
 
   const togglePlayback = useCallback(async () => {
     if (!text.trim()) return;

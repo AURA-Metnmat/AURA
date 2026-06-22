@@ -4,13 +4,37 @@ import { env } from "@/lib/env";
 import type { Language } from "@/lib/aura/i18n";
 import { generateSpeechAudio } from "@/lib/aura/tts";
 import { TTS_MAX_CHARS } from "@/lib/aura/tts-config";
+import { db } from "@/lib/db";
+import { requireEmployeeSession } from "@/lib/auth/employee";
+import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
+import { sanitizeUserInput } from "@/lib/ai/safety";
 
 const VALID_LANGUAGES: Language[] = ["en", "hi", "or", "bn"];
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { text?: string; language?: Language };
-    const text = body.text?.trim();
+    const body = (await request.json()) as {
+      text?: string;
+      language?: Language;
+      sessionId?: string;
+    };
+    const sessionId = body.sessionId?.trim();
+    if (!sessionId) {
+      return NextResponse.json({ error: "Session required" }, { status: 401 });
+    }
+
+    const session = await db.interviewSession.findUnique({
+      where: { id: sessionId },
+      include: { company: true },
+    });
+    if (!session) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    const denied = await assertEmployeeOwnsSession(request, session);
+    if (denied) return denied;
+
+    const text = sanitizeUserInput(body.text ?? "");
     const language = VALID_LANGUAGES.includes(body.language as Language)
       ? (body.language as Language)
       : "en";

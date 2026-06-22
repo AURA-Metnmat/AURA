@@ -43,18 +43,23 @@ model Company {
 }
 
 model InterviewSession {
-  id              String              @id @default(cuid())
-  companyId       String
-  employeeId      String?
-  status          String              @default("active")
-  language        String              @default("en")
-  stakeholderType String?
-  currentSection  String              @default("A")
-  introStep       Int                 @default(1)
-  completionPct   Int                 @default(0)
-  startedAt       DateTime            @default(now())
-  completedAt     DateTime?
-  updatedAt       DateTime            @updatedAt
+  id                String              @id @default(cuid())
+  companyId         String
+  employeeId        String?
+  status            String              @default("active")
+  language          String              @default("en")
+  stakeholderType   String?
+  currentSection    String              @default("A")
+  introStep         Int                 @default(1)
+  questionIndex     Int                 @default(0)
+  completionPct     Int                 @default(0)
+  consentAcceptedAt DateTime?
+  consentVersion    String?
+  deviceType        String?
+  clientUserAgent   String?
+  startedAt         DateTime            @default(now())
+  completedAt       DateTime?
+  updatedAt         DateTime            @updatedAt
   company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee        Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   participant     ParticipantProfile?

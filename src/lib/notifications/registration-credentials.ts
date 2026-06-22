@@ -21,12 +21,14 @@ function buildRegistrationEmailHtml(params: {
         </tr>
         <tr>
           <td style="padding: 12px 16px; color: #64748b;">Password</td>
-          <td style="padding: 12px 16px;"><strong>${password}</strong></td>
+          <td style="padding: 12px 16px;">
+            The password you chose during registration. For security it is not included in this email.
+          </td>
         </tr>
       </table>
       <p style="margin-top: 16px; font-size: 14px; color: #64748b;">
-        Use your <strong>mobile number</strong> or <strong>email</strong> with this password to sign in later.
-        Keep this email safe and do not share your password.
+        Use your <strong>mobile number</strong> or <strong>email</strong> with the password you set during
+        registration. Keep your password private and do not share it.
       </p>
     </div>
   `.trim();

@@ -12,6 +12,13 @@ import { LanguageBar } from "@/components/interview/LanguageBar";
 import { BilingualChat, type BilingualMessage } from "@/components/interview/BilingualChat";
 import { InterviewChatComposer } from "@/components/interview/InterviewChatComposer";
 import { EmployeeAuthPanel } from "@/components/interview/EmployeeAuthPanel";
+import { DesktopOnlyGate } from "@/components/interview/DesktopOnlyGate";
+import { ConsentScreen } from "@/components/interview/ConsentScreen";
+import {
+  CONSENT_VERSION,
+  detectDeviceType,
+  isDesktopInterviewEligible,
+} from "@/lib/interview/consent";
 import type { MessageInteraction } from "@/lib/aura/interaction";
 
 interface Attachment {
@@ -53,7 +60,7 @@ function formatRemaining(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-type FlowStep = "language" | "auth" | "chat";
+type FlowStep = "desktop" | "language" | "auth" | "consent" | "chat";
 
 export default function InterviewFlow({
   companyId,
@@ -83,6 +90,7 @@ export default function InterviewFlow({
   const [completionPct, setCompletionPct] = useState(0);
   const [report, setReport] = useState<Record<string, string> | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "saving">("idle");
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(initialDurationMinutes);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
@@ -98,6 +106,46 @@ export default function InterviewFlow({
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, loading]);
+
+  useEffect(() => {
+    const syncDesktop = () => {
+      if (!isDesktopInterviewEligible()) {
+        setStep((current) => (current === "chat" ? current : "desktop"));
+      } else {
+        setStep((current) => (current === "desktop" ? "language" : current));
+      }
+    };
+    syncDesktop();
+    window.addEventListener("resize", syncDesktop);
+    return () => window.removeEventListener("resize", syncDesktop);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const draft = localStorage.getItem(`aura-draft-${sessionId}`);
+    if (draft) setInput(draft);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || step !== "chat") return;
+    if (!input.trim()) {
+      localStorage.removeItem(`aura-draft-${sessionId}`);
+      return;
+    }
+    localStorage.setItem(`aura-draft-${sessionId}`, input);
+  }, [input, sessionId, step]);
+
+  useEffect(() => {
+    if (step !== "chat" || !sessionId) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      if (input.trim() || loading) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [step, sessionId, input, loading]);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,7 +211,7 @@ export default function InterviewFlow({
 
   async function handleRegistered(profile: ParticipantForm) {
     setForm(profile);
-    await startInterview(profile);
+    setStep("consent");
   }
 
   async function handleLoggedIn(payload: {
@@ -185,7 +233,7 @@ export default function InterviewFlow({
       setStep("chat");
       return;
     }
-    await startInterview(payload.form);
+    setStep("consent");
   }
 
   async function handleLogout() {
@@ -268,6 +316,9 @@ export default function InterviewFlow({
           action: "start",
           companyId,
           language,
+          consentAccepted: true,
+          consentVersion: CONSENT_VERSION,
+          deviceType: detectDeviceType(),
           participant: {
             fullName: profile.fullName.trim(),
             designation: profile.designation.trim(),
@@ -366,6 +417,7 @@ export default function InterviewFlow({
       },
     ]);
     setLoading(true);
+    setSaveStatus("saving");
     setChatError(null);
     try {
       const res = await fetch("/api/interview", {
@@ -403,10 +455,14 @@ export default function InterviewFlow({
       });
       setCurrentSection(data.currentSection);
       setCompletionPct(data.completionPct);
+      setSaveStatus("saved");
+      if (sessionId) localStorage.removeItem(`aura-draft-${sessionId}`);
+      window.setTimeout(() => setSaveStatus("idle"), 2500);
       if (data.shouldComplete) await completeInterview();
     } catch (e) {
       setChatError(e instanceof Error ? e.message : "Failed to send message. Please try again.");
       setMessages((prev) => prev.slice(0, -1));
+      setSaveStatus("idle");
     } finally {
       setLoading(false);
     }
@@ -591,6 +647,12 @@ export default function InterviewFlow({
                 />
               </div>
               <span className="text-xs text-slate-400 tabular-nums">{completionPct}%</span>
+              {saveStatus === "saving" && (
+                <span className="text-[10px] text-amber-400/80">Saving…</span>
+              )}
+              {saveStatus === "saved" && (
+                <span className="text-[10px] text-emerald-400/80">Saved</span>
+              )}
               {remainingSeconds !== null && (
                 <span
                   className={`text-xs tabular-nums px-2 py-1 rounded-lg border ${
@@ -606,6 +668,8 @@ export default function InterviewFlow({
           )}
         </div>
       </header>
+
+      {step === "desktop" && <DesktopOnlyGate companyName={companyName} />}
 
       {step === "language" && (
         <InterviewWelcome
@@ -633,6 +697,18 @@ export default function InterviewFlow({
         />
       )}
 
+      {step === "consent" && (
+        <ConsentScreen
+          companyName={companyName}
+          loading={loading}
+          onAccept={() => void startInterview()}
+          onDecline={() => {
+            setStep("auth");
+            setChatError(null);
+          }}
+        />
+      )}
+
       {step === "chat" && (
         <>
           <div className="border-b border-white/[0.06] px-4 sm:px-6 py-2 bg-[#09090f] shrink-0">
@@ -656,6 +732,7 @@ export default function InterviewFlow({
               <BilingualChat
                 messages={bilingualMessages}
                 preferredLanguage={language}
+                sessionId={sessionId}
                 thinking={loading}
                 thinkingEn={tEn.thinking}
                 thinkingLocale={t.thinking}

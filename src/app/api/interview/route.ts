@@ -10,6 +10,8 @@ import { requireEmployeeSession } from "@/lib/auth/employee";
 import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
 import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
 import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
+import { sanitizeUserInput, containsPromptInjectionSignals } from "@/lib/ai/safety";
+import { CONSENT_VERSION, type DeviceType } from "@/lib/interview/consent";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
@@ -17,6 +19,9 @@ interface StartPayload {
   action: "start";
   companyId: string;
   language: Language;
+  consentAccepted?: boolean;
+  consentVersion?: string;
+  deviceType?: DeviceType;
   participant: {
     fullName: string;
     designation: string;
@@ -139,6 +144,15 @@ export async function POST(request: Request) {
       const resolvedDesignation =
         participant.designation.trim() || employee.designation?.trim() || "";
 
+      if (!body.consentAccepted) {
+        return NextResponse.json(
+          { error: "Interview consent is required before starting." },
+          { status: 400 }
+        );
+      }
+
+      const clientUserAgent = request.headers.get("user-agent")?.slice(0, 500) ?? null;
+
       const session = await db.interviewSession.create({
         data: {
           companyId: company.id,
@@ -146,7 +160,12 @@ export async function POST(request: Request) {
           language,
           currentSection: "A",
           introStep: 1,
+          questionIndex: 0,
           completionPct: 5,
+          consentAcceptedAt: new Date(),
+          consentVersion: body.consentVersion?.trim() || CONSENT_VERSION,
+          deviceType: body.deviceType ?? "desktop",
+          clientUserAgent,
           participant: {
             create: {
               fullName: participant.fullName,
@@ -292,9 +311,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
-    const userMessage = body.message?.trim();
+    const userMessage = sanitizeUserInput(body.message ?? "");
     if (!userMessage) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
+    }
+
+    if (containsPromptInjectionSignals(userMessage)) {
+      console.warn("[interview] Prompt injection signal detected", { sessionId: session.id });
     }
 
     const attachmentIds = body.attachmentIds ?? [];
@@ -400,6 +423,7 @@ export async function POST(request: Request) {
 
     const postIntro = introStep === 2;
     const activeSection = postIntro ? ("B" as SectionId) : (session.currentSection as SectionId);
+    const questionIndex = session.questionIndex ?? 0;
 
     const response = await generateAuraResponse(
       {
@@ -410,7 +434,7 @@ export async function POST(request: Request) {
         stakeholderType: session.stakeholderType,
         participant: session.participant,
         messageHistory: updatedHistory,
-        questionIndex: 0,
+        questionIndex,
         postIntro,
       },
       userBilingual.en
@@ -432,6 +456,7 @@ export async function POST(request: Request) {
       data: {
         introStep: Math.max(introStep, 3),
         currentSection: response.nextSection,
+        questionIndex: response.nextQuestionIndex,
         completionPct: response.completionPct,
       },
     });

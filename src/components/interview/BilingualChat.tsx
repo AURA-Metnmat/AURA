@@ -23,6 +23,7 @@ export interface BilingualMessage {
 interface BilingualChatProps {
   messages: BilingualMessage[];
   preferredLanguage: Language;
+  sessionId?: string | null;
   thinking?: boolean;
   thinkingEn?: string;
   thinkingLocale?: string;
@@ -98,6 +99,7 @@ interface ChatMessageRowProps {
   listenLabel: string;
   engagement?: EngagementStrings;
   participantName?: string;
+  sessionId?: string | null;
   loading?: boolean;
   thinking?: boolean;
   onMcqSelect?: (answerEn: string, answerLocale: string) => void;
@@ -113,6 +115,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
   listenLabel,
   engagement,
   participantName,
+  sessionId,
   loading,
   thinking,
   onMcqSelect,
@@ -179,6 +182,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
               <AudioPlayButton
                 text={speakText}
                 language={speakLang}
+                sessionId={sessionId}
                 label={listenLabel}
                 autoPlay={false}
                 className="!text-[11px] !px-2.5 !py-1"
@@ -207,6 +211,7 @@ export function BilingualChat({
   thinkingLocale = "...",
   engagement,
   participantName,
+  sessionId,
   loading,
   onMcqSelect,
 }: BilingualChatProps) {
@@ -239,6 +244,7 @@ export function BilingualChat({
           listenLabel={listenLabel}
           engagement={engagement}
           participantName={participantName}
+          sessionId={sessionId}
           loading={loading}
           thinking={thinking}
           onMcqSelect={onMcqSelect}

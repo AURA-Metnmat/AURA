@@ -19,71 +19,49 @@ async function resolveUniqueSlug(baseSlug: string): Promise<string> {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const admin = searchParams.get("admin") === "true";
-  const category = searchParams.get("category");
+  const denied = await requireAdmin(request);
+  if (denied) return denied;
 
-  if (admin) {
-    const denied = await requireAdmin(request);
-    if (denied) return denied;
-  }
+  const { searchParams } = new URL(request.url);
+  const category = searchParams.get("category");
 
   const companies = await db.company.findMany({
     where: {
-      ...(admin ? {} : { isActive: true }),
       ...(category ? { category } : {}),
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
     include: {
       _count: { select: { sessions: true } },
-      ...(admin
-        ? {
-            sessions: {
-              where: { status: "completed" },
-              select: { id: true },
-            },
-          }
-        : {}),
+      sessions: {
+        where: { status: "completed" },
+        select: { id: true },
+      },
     },
   });
 
-  const result = companies.map((c) => {
-    const item = {
-      id: c.id,
-      slug: c.slug,
-      name: c.name,
-      category: c.category,
-      industry: c.industry,
-      description: admin ? c.description : undefined,
-    };
+  const result = companies.map((c) => ({
+    id: c.id,
+    slug: c.slug,
+    name: c.name,
+    category: c.category,
+    industry: c.industry,
+    description: c.description,
+    inviteToken: c.inviteToken,
+    contactName: c.contactName,
+    contactEmail: c.contactEmail,
+    contactPhone: c.contactPhone,
+    location: c.location,
+    aiContext: c.aiContext,
+    interviewDurationMinutes: c.interviewDurationMinutes,
+    isActive: c.isActive,
+    createdAt: c.createdAt,
+    sessionCount: c._count.sessions,
+    completedCount: c.sessions?.length ?? 0,
+    interviewLink: getInterviewLink(c.inviteToken, request),
+  }));
 
-    if (admin) {
-      return {
-        ...item,
-        inviteToken: c.inviteToken,
-        contactName: c.contactName,
-        contactEmail: c.contactEmail,
-        contactPhone: c.contactPhone,
-        location: c.location,
-        aiContext: c.aiContext,
-        interviewDurationMinutes: c.interviewDurationMinutes,
-        isActive: c.isActive,
-        createdAt: c.createdAt,
-        sessionCount: c._count.sessions,
-        completedCount: c.sessions?.length ?? 0,
-        interviewLink: getInterviewLink(c.inviteToken, request),
-      };
-    }
-
-    return item;
-  });
-
-  if (admin) {
-    const categories = [...new Set(companies.map((c) => c.category).filter(Boolean))] as string[];
-    return NextResponse.json({ companies: result, categories });
-  }
-
-  return NextResponse.json({ companies: result });
+  const categories = [...new Set(companies.map((c) => c.category).filter(Boolean))] as string[];
+  return NextResponse.json({ companies: result, categories });
 }
 
 export async function POST(request: Request) {

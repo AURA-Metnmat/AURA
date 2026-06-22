@@ -29,6 +29,7 @@ import {
   serializeInteraction,
   type MessageInteraction,
 } from "./interaction";
+import { wrapUserMessageForLlm } from "@/lib/ai/safety";
 
 export interface SessionContext {
   sessionId: string;
@@ -265,7 +266,7 @@ Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${desig
       role: m.role as "user" | "assistant",
       content: m.content,
     })),
-    { role: "user" as const, content: userMessage },
+    { role: "user" as const, content: wrapUserMessageForLlm(userMessage) },
   ];
 
   const raw =
