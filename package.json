@@ -12,7 +12,7 @@
     "db:seed": "tsx scripts/seed-companies.ts",
     "db:import": "tsx scripts/import-reference-data.ts",
     "setup": "tsx scripts/setup.ts",
-    "test": "tsx --test src/lib/auth/employee-otp/employee-otp.test.ts src/lib/aura/interaction.test.ts src/lib/campaigns/status.test.ts src/lib/refinement/refinement-pipeline.test.ts src/lib/auth/admin-rbac.test.ts src/lib/analytics/interview-funnel.test.ts"
+    "test": "tsx --test src/lib/auth/employee-otp/employee-otp.test.ts src/lib/aura/interaction.test.ts src/lib/campaigns/status.test.ts src/lib/refinement/refinement-pipeline.test.ts src/lib/auth/admin-rbac.test.ts src/lib/analytics/interview-funnel.test.ts src/lib/exports/record-export.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

@@ -40,6 +40,7 @@ model Company {
   questionBank               QuestionBank[]
   adminUsers                 AdminUser[]
   adminAuditLogs             AdminAuditLog[]
+  dataExportLogs             DataExportLog[]
 
   @@index([isActive])
   @@index([category])
@@ -86,6 +87,26 @@ model AdminAuditLog {
   @@index([action])
   @@index([createdAt])
   @@index([adminUserId])
+}
+
+model DataExportLog {
+  id          String   @id @default(cuid())
+  companyId   String
+  exportType  String
+  format      String
+  filter      String?
+  recordCount Int      @default(0)
+  fileName    String?
+  actorEmail  String?
+  adminUserId String?
+  status      String   @default("completed")
+  metadata    String?
+  createdAt   DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([exportType])
+  @@index([createdAt])
 }
 
 model InterviewSession {

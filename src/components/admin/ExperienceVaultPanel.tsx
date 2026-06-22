@@ -22,6 +22,7 @@ import {
   topicCategoryLabel,
   type ReviewStatus,
 } from "@/lib/knowledge/review";
+import ExportHistoryPanel from "@/components/admin/ExportHistoryPanel";
 
 export interface ExperienceItem {
   id: string;
@@ -102,6 +103,7 @@ export default function ExperienceVaultPanel({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [draftNotes, setDraftNotes] = useState<Record<string, string>>({});
+  const [exportHistoryKey, setExportHistoryKey] = useState(0);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -207,6 +209,7 @@ export default function ExperienceVaultPanel({
       a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
+      setExportHistoryKey((k) => k + 1);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Export failed");
     } finally {
@@ -534,6 +537,12 @@ export default function ExperienceVaultPanel({
           ))}
         </div>
       </div>
+
+      <ExportHistoryPanel
+        companyId={companyId}
+        glassCard={glassCard}
+        refreshKey={exportHistoryKey}
+      />
     </div>
   );
 }

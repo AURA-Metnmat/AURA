@@ -28,6 +28,7 @@ import {
 import CampaignsPanel from "@/components/admin/CampaignsPanel";
 import AnswerReviewPanel from "@/components/admin/AnswerReviewPanel";
 import InterviewAnalyticsPanel from "@/components/admin/InterviewAnalyticsPanel";
+import ExportHistoryPanel from "@/components/admin/ExportHistoryPanel";
 
 interface CompanyRow {
   id: string;
@@ -283,6 +284,7 @@ export default function CompanyDetailView({
   const [loadingData, setLoadingData] = useState(true);
   const [loadingKnowledge, setLoadingKnowledge] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [exportHistoryKey, setExportHistoryKey] = useState(0);
   const [reindexing, setReindexing] = useState(false);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
@@ -349,6 +351,7 @@ export default function CompanyDetailView({
       a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
+      setExportHistoryKey((k) => k + 1);
     } catch (e) {
       console.error(e);
       alert(e instanceof Error ? e.message : "Failed to export");
@@ -1055,6 +1058,11 @@ export default function CompanyDetailView({
                     })}
                   </div>
                 )}
+                <ExportHistoryPanel
+                  companyId={company.id}
+                  glassCard={glassCard}
+                  refreshKey={exportHistoryKey}
+                />
               </>
             ) : (
               <p className="text-sm text-red-400">Failed to load interview data</p>

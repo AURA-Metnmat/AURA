@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
+import { EXPORT_TYPES, recordDataExport } from "@/lib/exports/record-export";
 import {
   buildMlJsonl,
   buildMlWorkbook,
@@ -46,17 +47,40 @@ export async function GET(
     const slug = company.slug.replace(/[^a-z0-9-_]/gi, "-");
     const suffix = filterLabel(filter);
 
+    let fileName: string;
+    let recordCount = records.length;
+
     if (format === "jsonl") {
+      fileName = `${slug}-ml-${suffix}.jsonl`;
       const body = buildMlJsonl(records);
+      await recordDataExport({
+        companyId: id,
+        exportType: EXPORT_TYPES.KNOWLEDGE_ML,
+        format: "jsonl",
+        filter,
+        recordCount,
+        fileName,
+        session,
+      });
       return new NextResponse(body, {
         headers: {
           "Content-Type": "application/x-ndjson",
-          "Content-Disposition": `attachment; filename="${slug}-ml-${suffix}.jsonl"`,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
         },
       });
     }
 
     if (format === "json") {
+      fileName = `${slug}-ml-${suffix}.json`;
+      await recordDataExport({
+        companyId: id,
+        exportType: EXPORT_TYPES.KNOWLEDGE_ML,
+        format: "json",
+        filter,
+        recordCount,
+        fileName,
+        session,
+      });
       return NextResponse.json({
         company: company.name,
         companySlug: company.slug,
@@ -66,11 +90,21 @@ export async function GET(
       });
     }
 
+    fileName = `${slug}-ml-${suffix}.xlsx`;
     const buffer = buildMlWorkbook(records, company.slug);
+    await recordDataExport({
+      companyId: id,
+      exportType: EXPORT_TYPES.KNOWLEDGE_ML,
+      format: "xlsx",
+      filter,
+      recordCount,
+      fileName,
+      session,
+    });
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${slug}-ml-${suffix}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${fileName}"`,
       },
     });
   } catch (error) {

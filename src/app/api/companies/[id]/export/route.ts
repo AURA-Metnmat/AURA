@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
+import { EXPORT_TYPES, recordDataExport } from "@/lib/exports/record-export";
 import { buildCompanyInterviewWorkbook } from "@/lib/companies/company-interview-export";
 
 export async function GET(
@@ -20,6 +21,14 @@ export async function GET(
       session,
       companyId: id,
       metadata: { format: "xlsx", type: "interview", fileName },
+    });
+    await recordDataExport({
+      companyId: id,
+      exportType: EXPORT_TYPES.INTERVIEW,
+      format: "xlsx",
+      fileName,
+      session,
+      metadata: { type: "interview" },
     });
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
