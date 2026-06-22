@@ -555,10 +555,18 @@ export default function InterviewFlow({
   }
 
   return (
-    <InterviewShell variant={step === "chat" ? "chat" : step === "language" || step === "auth" ? "welcome" : "default"}>
-      <header className="border-b border-white/[0.06] px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 bg-[#09090f]/95">
+    <InterviewShell variant={step === "chat" ? "chat" : step === "auth" ? "auth" : step === "language" ? "welcome" : "default"}>
+      <header
+        className={`border-b px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 ${
+          step === "auth"
+            ? "border-slate-200 bg-white/90 text-slate-900"
+            : "border-white/[0.06] bg-[#09090f]/95"
+        }`}
+      >
         <div>
-          <p className="text-xs uppercase tracking-widest text-amber-400">AURA-METNMAT Interview</p>
+          <p className={`text-xs uppercase tracking-widest ${step === "auth" ? "text-red-700" : "text-amber-400"}`}>
+            AURA-METNMAT Interview
+          </p>
           <h1 className="text-lg font-semibold">{showCompanyBadge ? companyName : form.fullName || "Interview"}</h1>
         </div>
         <div className="flex items-center gap-3">

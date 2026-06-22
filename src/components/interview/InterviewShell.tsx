@@ -7,7 +7,7 @@ interface InterviewShellProps {
   children: ReactNode;
   className?: string;
   /** Flat static background for chat — no motion or accent shifts */
-  variant?: "default" | "chat" | "welcome";
+  variant?: "default" | "chat" | "welcome" | "auth";
 }
 
 export function InterviewShell({
@@ -18,7 +18,8 @@ export function InterviewShell({
   return (
     <div
       className={cn(
-        "h-dvh bg-[#09090f] text-slate-100 flex flex-col relative overflow-hidden",
+        "h-dvh flex flex-col relative overflow-hidden",
+        variant === "auth" ? "bg-slate-100 text-slate-900" : "bg-[#09090f] text-slate-100",
         className
       )}
     >
@@ -26,6 +27,11 @@ export function InterviewShell({
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 bg-[#09090f]"
+        />
+      ) : variant === "auth" ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-100"
         />
       ) : variant === "welcome" ? (
         <div

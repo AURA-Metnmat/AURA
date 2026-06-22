@@ -37,13 +37,12 @@ export function AuthSwitch({
           position: relative;
           width: 100%;
           max-width: 920px;
-          min-height: 560px;
-          background: #111111;
+          min-height: clamp(640px, 82vh, 900px);
+          background: #ffffff;
           border-radius: 16px;
           box-shadow:
-            0 32px 64px rgba(0, 0, 0, 0.55),
-            0 0 0 1px rgba(255, 255, 255, 0.06),
-            0 0 80px rgba(127, 29, 29, 0.12);
+            0 20px 50px rgba(15, 23, 42, 0.08),
+            0 0 0 1px rgba(15, 23, 42, 0.06);
           overflow: hidden;
         }
 
@@ -53,31 +52,50 @@ export function AuthSwitch({
           height: 100%;
           top: 0;
           left: 0;
+          z-index: 5;
         }
 
         .aura-auth-switch .signin-signup {
           position: absolute;
-          top: 50%;
-          transform: translate(-50%, -50%);
+          top: 0;
           left: 75%;
           width: 50%;
-          transition: 1s 0.7s ease-in-out;
+          height: 100%;
+          transform: translateX(-50%);
+          transition: left 1s 0.7s ease-in-out;
           display: grid;
           grid-template-columns: 1fr;
+          align-content: start;
+          justify-items: center;
+          overflow-x: hidden;
+          overflow-y: auto;
+          padding: 1.75rem 0 2rem;
           z-index: 5;
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+
+        .aura-auth-switch .signin-signup::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .aura-auth-switch .signin-signup::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 999px;
         }
 
         .aura-auth-switch .auth-form {
           display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
           flex-direction: column;
-          padding: 0 3rem;
+          padding: 0 2rem 0.5rem;
           transition: all 0.2s 0.7s;
-          overflow: hidden;
+          overflow: visible;
           grid-column: 1 / 2;
           grid-row: 1 / 2;
           width: 100%;
+          min-height: min-content;
         }
 
         .aura-auth-switch .auth-form.sign-up-form {
@@ -104,7 +122,7 @@ export function AuthSwitch({
 
         .aura-auth-switch .auth-title {
           font-size: 1.65rem;
-          color: #f5f5f5;
+          color: #0f172a;
           margin-bottom: 0.35rem;
           font-weight: 700;
           letter-spacing: -0.02em;
@@ -112,8 +130,8 @@ export function AuthSwitch({
 
         .aura-auth-switch .auth-subtitle {
           font-size: 0.84rem;
-          color: #a3a3a3;
-          margin-bottom: 1.1rem;
+          color: #64748b;
+          margin-bottom: 1rem;
           text-align: center;
           max-width: 340px;
           line-height: 1.55;
@@ -122,30 +140,30 @@ export function AuthSwitch({
         .aura-auth-switch .input-field {
           max-width: 380px;
           width: 100%;
-          background-color: #1c1c1c;
-          margin: 7px 0;
-          min-height: 50px;
+          background-color: #f8fafc;
+          margin: 6px 0;
+          min-height: 48px;
           border-radius: 10px;
           display: flex;
           align-items: center;
           padding: 0 1rem 0 0.85rem;
           gap: 0.65rem;
           transition: 0.2s;
-          border: 1px solid #333333;
+          border: 1px solid #e2e8f0;
         }
 
         .aura-auth-switch .input-field:focus-within {
-          background-color: #242424;
+          background-color: #ffffff;
           border-color: #b91c1c;
-          box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.18);
+          box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
         }
 
         .aura-auth-switch .input-field:focus-within svg {
-          color: #f87171;
+          color: #b91c1c;
         }
 
         .aura-auth-switch .input-field svg {
-          color: #737373;
+          color: #94a3b8;
           flex-shrink: 0;
         }
 
@@ -155,28 +173,28 @@ export function AuthSwitch({
           border: none;
           font-weight: 500;
           font-size: 0.95rem;
-          color: #f5f5f5;
+          color: #0f172a;
           width: 100%;
           line-height: 1.4;
           padding: 0.65rem 0;
         }
 
         .aura-auth-switch .input-field input::placeholder {
-          color: #737373;
+          color: #94a3b8;
           font-weight: 400;
         }
 
         .aura-auth-switch .auth-btn {
           width: 100%;
           max-width: 380px;
-          background: linear-gradient(135deg, #262626 0%, #171717 55%, #450a0a 100%);
-          border: 1px solid rgba(185, 28, 28, 0.45);
+          background: linear-gradient(135deg, #991b1b 0%, #b91c1c 55%, #dc2626 100%);
+          border: 1px solid #991b1b;
           outline: none;
           min-height: 48px;
           border-radius: 10px;
-          color: #fafafa;
+          color: #ffffff;
           font-weight: 600;
-          margin: 14px 0 4px;
+          margin: 16px 0 8px;
           cursor: pointer;
           transition: 0.25s;
           font-size: 0.875rem;
@@ -185,13 +203,13 @@ export function AuthSwitch({
           align-items: center;
           justify-content: center;
           gap: 0.5rem;
+          flex-shrink: 0;
         }
 
         .aura-auth-switch .auth-btn:hover:not(:disabled) {
           transform: translateY(-1px);
-          background: linear-gradient(135deg, #404040 0%, #262626 45%, #991b1b 100%);
-          border-color: rgba(248, 113, 113, 0.55);
-          box-shadow: 0 10px 28px rgba(127, 29, 29, 0.35);
+          background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 45%, #b91c1c 100%);
+          box-shadow: 0 8px 24px rgba(185, 28, 28, 0.28);
         }
 
         .aura-auth-switch .auth-btn:disabled {
@@ -368,8 +386,8 @@ export function AuthSwitch({
 
         .aura-auth-switch .btn-transparent {
           margin: 0 auto;
-          background: transparent;
-          border: 1.5px solid rgba(255, 255, 255, 0.85);
+          background: rgba(255, 255, 255, 0.15);
+          border: 1.5px solid rgba(255, 255, 255, 0.95);
           width: 140px;
           min-height: 42px;
           border-radius: 10px;
@@ -383,8 +401,8 @@ export function AuthSwitch({
         }
 
         .aura-auth-switch .btn-transparent:hover {
-          background: rgba(185, 28, 28, 0.15);
-          border-color: #fca5a5;
+          background: rgba(255, 255, 255, 0.28);
+          border-color: #ffffff;
           transform: translateY(-1px);
         }
 
@@ -400,7 +418,7 @@ export function AuthSwitch({
           top: -10%;
           right: 48%;
           transform: translateY(-50%);
-          background: linear-gradient(145deg, #0a0a0a 0%, #262626 38%, #7f1d1d 100%);
+          background: linear-gradient(145deg, #fef2f2 0%, #fecaca 38%, #b91c1c 100%);
           transition: 1.8s ease-in-out;
           border-radius: 50%;
           z-index: 6;
@@ -433,13 +451,16 @@ export function AuthSwitch({
 
         @media (max-width: 870px) {
           .aura-auth-switch {
-            min-height: 720px;
+            min-height: clamp(720px, 90vh, 960px);
           }
           .aura-auth-switch .signin-signup {
             width: 100%;
-            top: 95%;
-            transform: translate(-50%, -100%);
-            transition: 1s 0.8s ease-in-out;
+            top: auto;
+            bottom: 0;
+            height: 58%;
+            transform: translateX(-50%);
+            transition: bottom 1s 0.8s ease-in-out, height 1s 0.8s ease-in-out;
+            padding-top: 1.25rem;
           }
           .aura-auth-switch .signin-signup,
           .aura-auth-switch.sign-up-mode .signin-signup {
@@ -499,8 +520,9 @@ export function AuthSwitch({
             transform: translateY(300px);
           }
           .aura-auth-switch.sign-up-mode .signin-signup {
-            top: 5%;
-            transform: translate(-50%, 0);
+            top: 0;
+            bottom: auto;
+            height: 58%;
           }
         }
 
@@ -601,7 +623,7 @@ export function AuthInputField({
 
 export function AuthFieldHint({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] text-neutral-500 -mt-1 mb-1 w-full max-w-[380px] text-center">
+    <p className="text-[11px] text-slate-500 -mt-0.5 mb-1 w-full max-w-[380px] text-center leading-snug">
       {children}
     </p>
   );
@@ -609,7 +631,7 @@ export function AuthFieldHint({ children }: { children: ReactNode }) {
 
 export function AuthError({ message }: { message: string }) {
   return (
-    <p className="mt-3 w-full max-w-[380px] text-sm text-red-300 bg-red-950/50 border border-red-900/60 rounded-xl px-4 py-2.5 text-center">
+    <p className="mt-2 mb-1 w-full max-w-[380px] text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-center">
       {message}
     </p>
   );

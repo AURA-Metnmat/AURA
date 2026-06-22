@@ -349,19 +349,19 @@ export function EmployeeAuthPanel({
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-10 overflow-y-auto">
       <div className="w-full max-w-[920px] space-y-5 my-auto">
-        <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-          <span className="text-neutral-400">● Language</span>
-          <span className="text-neutral-700">—</span>
-          <span className="text-red-400/90 font-medium">● Account</span>
-          <span className="text-neutral-700">—</span>
-          <span className="text-neutral-600">○ Interview</span>
+        <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
+          <span className="text-slate-600">● Language</span>
+          <span className="text-slate-300">—</span>
+          <span className="text-red-700 font-semibold">● Account</span>
+          <span className="text-slate-300">—</span>
+          <span className="text-slate-400">○ Interview</span>
         </div>
 
         <div className="text-center space-y-1 px-2">
-          <p className="text-xs uppercase tracking-[0.18em] text-neutral-200 font-medium">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-800 font-semibold">
             {companyName}
           </p>
-          <p className="text-sm text-neutral-500">Create an account or sign in with your password</p>
+          <p className="text-sm text-slate-500">Create an account or sign in with your password</p>
         </div>
 
         <AuthSwitch
@@ -380,7 +380,7 @@ export function EmployeeAuthPanel({
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 mx-auto pt-1"
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mx-auto pt-1"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to language
