@@ -51,6 +51,7 @@ interface InterviewFlowProps {
   companySlug: string;
   companyName: string;
   inviteToken?: string;
+  campaignId?: string;
   interviewDurationMinutes?: number;
   showCompanyBadge?: boolean;
 }
@@ -68,6 +69,7 @@ export default function InterviewFlow({
   companySlug,
   companyName,
   inviteToken,
+  campaignId,
   interviewDurationMinutes: initialDurationMinutes = 5,
   showCompanyBadge = true,
 }: InterviewFlowProps) {
@@ -316,6 +318,7 @@ export default function InterviewFlow({
         body: JSON.stringify({
           action: "start",
           companyId,
+          campaignId,
           language,
           consentAccepted: true,
           consentVersion: CONSENT_VERSION,

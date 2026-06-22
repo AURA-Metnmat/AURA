@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { generateInviteToken, getInterviewLink } from "@/lib/aura/company-utils";
+import { ensureDefaultCampaign } from "@/lib/campaigns/resolve";
 import {
   deleteCompanyCompletely,
   getDeleteCompanySummary,
@@ -126,6 +127,10 @@ export async function PATCH(
       ...(body.regenerateInviteToken && { inviteToken: generateInviteToken() }),
     },
   });
+
+  if (body.regenerateInviteToken) {
+    await ensureDefaultCampaign(company.id, company.inviteToken);
+  }
 
   return NextResponse.json({
     company: {

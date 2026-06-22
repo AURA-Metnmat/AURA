@@ -14,6 +14,8 @@ import { sanitizeUserInput, containsPromptInjectionSignals } from "@/lib/ai/safe
 import { CONSENT_VERSION, type DeviceType } from "@/lib/interview/consent";
 import { saveInterviewAnswer, findLastAssistantMessageId } from "@/lib/interview/answer-capture";
 import type { StructuredAnswerPayload } from "@/lib/aura/interaction";
+import { resolveCampaignForCompany } from "@/lib/campaigns/resolve";
+import { getNextCampaignQuestion } from "@/lib/campaigns/question-runner";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
@@ -21,6 +23,7 @@ interface StartPayload {
   action: "start";
   companyId: string;
   language: Language;
+  campaignId?: string;
   consentAccepted?: boolean;
   consentVersion?: string;
   deviceType?: DeviceType;
@@ -154,12 +157,21 @@ export async function POST(request: Request) {
         );
       }
 
+      const resolvedCampaign = await resolveCampaignForCompany(companyId, body.campaignId);
+      if (!resolvedCampaign) {
+        return NextResponse.json(
+          { error: "Interview campaign is not available or has expired." },
+          { status: 403 }
+        );
+      }
+
       const clientUserAgent = request.headers.get("user-agent")?.slice(0, 500) ?? null;
 
       const session = await db.interviewSession.create({
         data: {
           companyId: company.id,
           employeeId: employee.id,
+          campaignId: resolvedCampaign.id,
           language,
           currentSection: "A",
           introStep: 1,
@@ -199,6 +211,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         resumed: false,
         sessionId: session.id,
+        campaignId: resolvedCampaign.id,
         message: opening.en,
         messageLocale: opening.locale,
         currentSection: "A",
@@ -433,6 +446,47 @@ export async function POST(request: Request) {
         currentSection: "A",
         completionPct: 10,
         shouldComplete: false,
+      });
+    }
+
+    const bankQuestion = await getNextCampaignQuestion(session.id, lang);
+    if (bankQuestion) {
+      await db.message.create({
+        data: {
+          sessionId: session.id,
+          role: "assistant",
+          content: bankQuestion.en,
+          contentLocale: bankQuestion.locale,
+          metadata: bankQuestion.metadata,
+          section: bankQuestion.section ?? session.currentSection,
+        },
+      });
+
+      const nextSection = (bankQuestion.section ?? session.currentSection) as SectionId;
+      const nextIndex = bankQuestion.questionIndex + 1;
+      const nextPct = Math.min(99, session.completionPct + 4);
+
+      await db.interviewSession.update({
+        where: { id: session.id },
+        data: {
+          campaignQuestionIndex: nextIndex,
+          introStep: Math.max(introStep, 3),
+          currentSection: nextSection,
+          completionPct: nextPct,
+        },
+      });
+
+      return NextResponse.json({
+        sessionId: session.id,
+        message: bankQuestion.en,
+        messageLocale: bankQuestion.locale,
+        interaction: bankQuestion.interaction,
+        userMessageEn: userBilingual.en,
+        userMessageLocale: userBilingual.locale,
+        currentSection: nextSection,
+        completionPct: nextPct,
+        shouldComplete: false,
+        fromCampaign: true,
       });
     }
 

@@ -36,6 +36,8 @@ model Company {
   employees                  Employee[]
   otpVerifications           OtpVerification[]
   otpAuditLogs               EmployeeOtpAuditLog[]
+  campaigns                  InterviewCampaign[]
+  questionBank               QuestionBank[]
 
   @@index([isActive])
   @@index([category])
@@ -57,11 +59,14 @@ model InterviewSession {
   consentVersion    String?
   deviceType        String?
   clientUserAgent   String?
+  campaignId              String?
+  campaignQuestionIndex   Int                 @default(0)
   startedAt         DateTime            @default(now())
   completedAt       DateTime?
   updatedAt         DateTime            @updatedAt
   company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employee        Employee?           @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  campaign        InterviewCampaign?  @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   participant     ParticipantProfile?
   messages        Message[]
   attachments     MessageAttachment[]
@@ -77,6 +82,79 @@ model InterviewSession {
   @@index([status])
   @@index([companyId])
   @@index([employeeId])
+  @@index([campaignId])
+}
+
+// ─── Campaigns & question bank ──────────────────────────────────────────────
+
+model InterviewCampaign {
+  id          String             @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  status      String             @default("active")
+  inviteToken String?            @unique
+  startsAt    DateTime?
+  expiresAt   DateTime?
+  isDefault   Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  questions   CampaignQuestion[]
+  sessions    InterviewSession[]
+
+  @@index([companyId])
+  @@index([companyId, isDefault])
+  @@index([status])
+}
+
+model QuestionBank {
+  id        String             @id @default(cuid())
+  companyId String
+  title     String
+  section   String?
+  category  String?
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  versions  QuestionVersion[]
+  campaigns CampaignQuestion[]
+
+  @@index([companyId])
+  @@index([companyId, isActive])
+}
+
+model QuestionVersion {
+  id              String             @id @default(cuid())
+  questionBankId  String
+  version         Int                @default(1)
+  promptEn        String
+  promptLocale    String?
+  interactionJson String?
+  section         String?
+  isCurrent       Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  questionBank    QuestionBank       @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
+  campaignLinks   CampaignQuestion[]
+
+  @@unique([questionBankId, version])
+  @@index([questionBankId, isCurrent])
+}
+
+model CampaignQuestion {
+  id                String            @id @default(cuid())
+  campaignId        String
+  questionBankId    String
+  questionVersionId String
+  sortOrder         Int
+  section           String?
+  campaign          InterviewCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  questionBank      QuestionBank      @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
+  questionVersion   QuestionVersion   @relation(fields: [questionVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, sortOrder])
+  @@index([campaignId])
 }
 
 model Employee {

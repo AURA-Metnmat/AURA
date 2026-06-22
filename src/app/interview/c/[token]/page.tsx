@@ -15,6 +15,7 @@ export default function CompanyInterviewPage({
     slug: string;
     interviewDurationMinutes?: number;
   } | null>(null);
+  const [campaignId, setCampaignId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,8 +30,15 @@ export default function CompanyInterviewPage({
         if (!r.ok) throw new Error("Invalid link");
         return r.json();
       })
-      .then((d) => setCompany(d.company))
-      .catch(() => setError("This interview link is invalid or has expired. Please contact your administrator."))
+      .then((d) => {
+        setCompany(d.company);
+        setCampaignId(d.campaign?.id);
+      })
+      .catch(() =>
+        setError(
+          "This interview link is invalid or has expired. Please contact your administrator."
+        )
+      )
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -59,6 +67,7 @@ export default function CompanyInterviewPage({
       companySlug={company.slug}
       companyName={company.name}
       inviteToken={token ?? undefined}
+      campaignId={campaignId}
       interviewDurationMinutes={company.interviewDurationMinutes ?? 5}
     />
   );

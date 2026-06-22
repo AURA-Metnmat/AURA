@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/admin";
 import { generateInviteToken, getInterviewLink, slugifyCompanyName } from "@/lib/aura/company-utils";
+import { ensureDefaultCampaign } from "@/lib/campaigns/resolve";
 
 async function resolveUniqueSlug(baseSlug: string): Promise<string> {
   if (!baseSlug) return baseSlug;
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
         location: body.location?.trim() || null,
       },
     });
+
+    await ensureDefaultCampaign(company.id, company.inviteToken);
 
     const interviewLink = getInterviewLink(company.inviteToken, request);
 

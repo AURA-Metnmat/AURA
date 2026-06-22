@@ -22,7 +22,9 @@ import {
   RefreshCw,
   BookOpen,
   Layers,
+  Megaphone,
 } from "lucide-react";
+import CampaignsPanel from "@/components/admin/CampaignsPanel";
 
 interface CompanyRow {
   id: string;
@@ -177,7 +179,7 @@ interface GatheredData {
   };
 }
 
-type TabId = "overview" | "reference" | "experience" | "interviews";
+type TabId = "overview" | "reference" | "experience" | "interviews" | "campaigns";
 
 interface CompanyDetailViewProps {
   company: CompanyRow;
@@ -244,6 +246,7 @@ const TABS: { id: TabId; label: string; icon: typeof Database }[] = [
   { id: "overview", label: "Overview", icon: Layers },
   { id: "reference", label: "Reference Knowledge", icon: BookOpen },
   { id: "experience", label: "Experience Vault & ML", icon: Brain },
+  { id: "campaigns", label: "Campaigns", icon: Megaphone },
   { id: "interviews", label: "Live Interviews", icon: Users },
 ];
 
@@ -791,6 +794,17 @@ export default function CompanyDetailView({
             }
             onOpenSession={onOpenSession}
             onReindexComplete={loadKnowledge}
+          />
+        </div>
+      )}
+
+      {/* Campaigns tab */}
+      {activeTab === "campaigns" && (
+        <div className={`${glassPanel} rounded-2xl p-5 border border-white/5`}>
+          <CampaignsPanel
+            companyId={company.id}
+            glassCard={glassCard}
+            onCopyLink={onCopyLink}
           />
         </div>
       )}
