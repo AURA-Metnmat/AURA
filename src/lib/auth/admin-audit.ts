@@ -17,6 +17,9 @@ export const AUDIT_ACTIONS = {
   CAMPAIGN_DELETE: "campaign.delete",
   ADMIN_USER_CREATE: "admin_user.create",
   ADMIN_USER_UPDATE: "admin_user.update",
+  REFERENCE_UPLOAD: "reference.upload",
+  REFERENCE_UPDATE: "reference.update",
+  REFERENCE_DELETE: "reference.delete",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

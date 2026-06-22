@@ -30,6 +30,7 @@ import AnswerReviewPanel from "@/components/admin/AnswerReviewPanel";
 import InterviewAnalyticsPanel from "@/components/admin/InterviewAnalyticsPanel";
 import ExportHistoryPanel from "@/components/admin/ExportHistoryPanel";
 import RegistrationPolicyPanel from "@/components/admin/RegistrationPolicyPanel";
+import ReferenceKnowledgePanel from "@/components/admin/ReferenceKnowledgePanel";
 import { useReindexJob } from "@/hooks/use-reindex-job";
 
 interface CompanyRow {
@@ -193,7 +194,6 @@ interface CompanyDetailViewProps {
   glassPanel: string;
   glassCard: string;
   copied: boolean;
-  uploading: boolean;
   showRegenerateConfirm: boolean;
   regenerating: boolean;
   onBack: () => void;
@@ -203,7 +203,6 @@ interface CompanyDetailViewProps {
   onRegenerateConfirm: () => void;
   onRegenerateCancel: () => void;
   onRegenerate: () => void;
-  onUploadReference: (slug: string, files: FileList | null) => void | Promise<void>;
   onOpenSession: (sessionId: string) => void;
   onRefresh: () => void;
 }
@@ -264,7 +263,6 @@ export default function CompanyDetailView({
   glassPanel,
   glassCard,
   copied,
-  uploading,
   showRegenerateConfirm,
   regenerating,
   onBack,
@@ -274,7 +272,6 @@ export default function CompanyDetailView({
   onRegenerateConfirm,
   onRegenerateCancel,
   onRegenerate,
-  onUploadReference,
   onOpenSession,
   onRefresh,
 }: CompanyDetailViewProps) {
@@ -372,9 +369,7 @@ export default function CompanyDetailView({
     }
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    await onUploadReference(company.slug, e.target.files);
-    e.target.value = "";
+  async function refreshReferenceData() {
     await Promise.all([loadReference(), loadKnowledge()]);
     onRefresh();
   }
@@ -659,135 +654,25 @@ export default function CompanyDetailView({
 
       {/* Reference tab */}
       {activeTab === "reference" && (
-        <div className={`${glassPanel} rounded-2xl overflow-hidden border border-white/5`}>
-          <div className="p-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-indigo-400" />
-                <h3 className="font-semibold text-lg">Reference Knowledge Base</h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Operational documents &amp; data used to ground AI interview questions
-              </p>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => reindexKnowledge("reference")}
-                disabled={reindexing}
-                className="flex items-center gap-2 text-sm border border-indigo-500/30 text-indigo-300 px-3 py-2 rounded-lg hover:bg-indigo-950/30 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${reindexing ? "animate-spin" : ""}`} />
-                Re-index reference
-              </button>
-              <label className="flex items-center gap-2 cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg px-4 py-2 text-sm transition-colors">
-                <Upload className="w-4 h-4" />
-                {uploading ? "Uploading..." : "Import Excel / PDF / TXT"}
-                <input
-                  type="file"
-                  multiple
-                  accept=".xlsx,.xls,.pdf,.txt"
-                  disabled={uploading}
-                  onChange={handleUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className="p-5 space-y-6">
-            {loadingRef ? (
-              <div className="flex items-center justify-center py-12 text-slate-500">
-                <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                Loading reference data...
-              </div>
-            ) : reference ? (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <StatCard label="Files" value={reference.stats.fileCount} accent="indigo" />
-                  <StatCard label="Records" value={reference.stats.recordCount} accent="indigo" />
-                  <StatCard label="Documents" value={reference.pdfs.length} accent="indigo" />
-                  <StatCard label="Insights" value={reference.stats.insightCount} accent="indigo" />
-                  <StatCard label="RAG chunks" value={knowledge?.stats.reference ?? 0} accent="indigo" />
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">Uploaded files</p>
-                    {reference.files.length === 0 ? (
-                      <p className="text-sm text-slate-500 py-8 text-center border border-dashed border-white/10 rounded-xl">
-                        No Excel files yet
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {reference.files.map((f) => (
-                          <li key={f.id} className={`${glassCard} rounded-xl p-3 border border-white/5`}>
-                            <div className="flex items-start gap-3">
-                              <FileSpreadsheet className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium truncate">{f.fileName}</p>
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                  {f.category.replace(/_/g, " ")} · {f.sheetCount} sheet
-                                  {f.sheetCount !== 1 ? "s" : ""} · {f.rowCount.toLocaleString()} rows
-                                </p>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">Documents &amp; context</p>
-                    {reference.pdfs.length === 0 ? (
-                      <p className="text-sm text-slate-500 py-8 text-center border border-dashed border-white/10 rounded-xl">
-                        No documents yet
-                      </p>
-                    ) : (
-                      <ul className="space-y-2">
-                        {reference.pdfs.map((p) => (
-                          <li key={p.id} className={`${glassCard} rounded-xl p-3 border border-white/5`}>
-                            <div className="flex items-start gap-3">
-                              <FileText className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{p.fileName}</p>
-                                {p.summary && (
-                                  <p className="text-xs text-slate-400 mt-1 line-clamp-3">{p.summary}</p>
-                                )}
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-
-                {knowledge && knowledge.referencePreview.length > 0 && (
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-slate-500 mb-3">
-                      Indexed reference chunks (preview)
-                    </p>
-                    <ul className="space-y-2 max-h-64 overflow-y-auto">
-                      {knowledge.referencePreview.map((c) => (
-                        <li key={c.id} className="rounded-xl p-3 bg-slate-950/40 border border-indigo-500/10">
-                          <div className="flex items-center gap-2 mb-1">
-                            <KindBadge kind={c.sourceKind} />
-                            <p className="text-sm font-medium text-indigo-200 truncate">{c.sourceLabel}</p>
-                          </div>
-                          <p className="text-xs text-slate-400 line-clamp-2">{c.preview}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-red-400">Failed to load reference data</p>
-            )}
-          </div>
-        </div>
+        <ReferenceKnowledgePanel
+          companyId={company.id}
+          reference={reference}
+          knowledgeStats={
+            knowledge
+              ? {
+                  reference: knowledge.stats.reference,
+                  lastIndexedAt: knowledge.stats.lastIndexedAt,
+                }
+              : null
+          }
+          referencePreview={knowledge?.referencePreview ?? []}
+          loadingRef={loadingRef}
+          loadingKnowledge={loadingKnowledge}
+          reindexing={reindexing}
+          reindexStatus={reindexStatus}
+          onRefresh={refreshReferenceData}
+          onReindex={() => reindexKnowledge("reference")}
+        />
       )}
 
       {/* Experience tab */}

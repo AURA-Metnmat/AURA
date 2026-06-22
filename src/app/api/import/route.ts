@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
-import { requireAdminSession } from "@/lib/auth/admin";
-import { assertCompanyAccess } from "@/lib/auth/admin-rbac";
+import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
+import { PERMISSIONS } from "@/lib/auth/admin-rbac";
+import { AUDIT_ACTIONS, logAdminAudit } from "@/lib/auth/admin-audit";
 import {
   runReferenceImport,
   runReferenceImportFromUploads,
 } from "@/lib/import/reference-import";
-import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
+import {
+  isAllowedReferenceUpload,
+  MAX_REFERENCE_UPLOAD_BYTES,
+} from "@/lib/reference/reference-categories";
+import { syncReferenceKnowledgeIndex } from "@/lib/reference/reference-mutations";
 import { db } from "@/lib/db";
 
 export async function POST(request: Request) {
-  const session = await requireAdminSession(request);
-  if (session instanceof NextResponse) return session;
-
   try {
     const contentType = request.headers.get("content-type") ?? "";
 
@@ -24,32 +26,51 @@ export async function POST(request: Request) {
 
       const company = await db.company.findUnique({
         where: { slug: companySlug },
-        select: { id: true },
+        select: { id: true, slug: true },
       });
       if (!company) {
         return NextResponse.json({ error: "Company not found" }, { status: 404 });
       }
-      const accessDenied = assertCompanyAccess(session, company.id);
-      if (accessDenied) return accessDenied;
+
+      const session = await requireCompanyAdmin(request, company.id, PERMISSIONS.REVIEW_KNOWLEDGE);
+      if (session instanceof NextResponse) return session;
 
       const uploads: { fileName: string; buffer: Buffer }[] = [];
       for (const entry of formData.getAll("files")) {
-        if (entry instanceof File && entry.size > 0) {
-          const buffer = Buffer.from(await entry.arrayBuffer());
-          uploads.push({ fileName: entry.name, buffer });
+        if (!(entry instanceof File) || entry.size === 0) continue;
+        if (entry.size > MAX_REFERENCE_UPLOAD_BYTES) {
+          return NextResponse.json(
+            { error: `File "${entry.name}" exceeds size limit` },
+            { status: 400 }
+          );
         }
+        if (!isAllowedReferenceUpload(entry.name)) {
+          return NextResponse.json(
+            { error: `Unsupported file type: ${entry.name}` },
+            { status: 400 }
+          );
+        }
+        const buffer = Buffer.from(await entry.arrayBuffer());
+        uploads.push({ fileName: entry.name, buffer });
       }
 
-      const stats = await runReferenceImportFromUploads(companySlug, uploads);
-      await reindexCompanyKnowledge({
-        companySlug,
+      const stats = await runReferenceImportFromUploads(company.slug, uploads);
+      const chunkCount = await syncReferenceKnowledgeIndex(company.slug, company.id);
+
+      await logAdminAudit({
+        action: AUDIT_ACTIONS.REFERENCE_UPLOAD,
+        request,
+        session,
         companyId: company.id,
-        scope: "reference",
+        resourceType: "reference_upload",
+        metadata: { fileNames: uploads.map((u) => u.fileName), chunkCount, stats },
       });
+
       return NextResponse.json({
         success: true,
         message: `Imported ${uploads.length} file(s) for ${companySlug}`,
         stats,
+        chunkCount,
       });
     }
 
@@ -61,24 +82,23 @@ export async function POST(request: Request) {
 
     const company = await db.company.findUnique({
       where: { slug: companySlug },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
-    const accessDenied = assertCompanyAccess(session, company.id);
-    if (accessDenied) return accessDenied;
+
+    const session = await requireCompanyAdmin(request, company.id, PERMISSIONS.REVIEW_KNOWLEDGE);
+    if (session instanceof NextResponse) return session;
 
     const stats = await runReferenceImport(companySlug);
-    await reindexCompanyKnowledge({
-      companySlug,
-      companyId: company.id,
-      scope: "reference",
-    });
+    const chunkCount = await syncReferenceKnowledgeIndex(company.slug, company.id);
+
     return NextResponse.json({
       success: true,
       message: `Reference data imported from server folder for ${companySlug}`,
       stats,
+      chunkCount,
     });
   } catch (error) {
     const err = error as Error;

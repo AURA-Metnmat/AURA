@@ -829,7 +829,6 @@ export default function AdminPage() {
             glassPanel={glassPanel}
             glassCard={glassCard}
             copied={copied}
-            uploading={uploading}
             showRegenerateConfirm={showRegenerateConfirm}
             regenerating={regenerating}
             onBack={() => { setView("dashboard"); setCompanyDetail(null); setEditing(false); }}
@@ -839,7 +838,6 @@ export default function AdminPage() {
             onRegenerateConfirm={() => setShowRegenerateConfirm(true)}
             onRegenerateCancel={() => setShowRegenerateConfirm(false)}
             onRegenerate={regenerateInterviewLink}
-            onUploadReference={uploadReferenceFiles}
             onOpenSession={loadSession}
             onRefresh={() => companyDetail && loadCompanyDetail(companyDetail.company.id)}
           />

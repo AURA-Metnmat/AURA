@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { normalizeReferenceCategory } from "@/lib/reference/reference-categories";
 
 const FILE_CATEGORIES: Record<string, string> = {
   "Binder analysis.xlsx": "binder",
@@ -43,6 +44,9 @@ function resolveCategory(fileName: string): string {
   if (lower.includes("briquette")) return "briquette";
   if (lower.includes("reductant")) return "reductant";
   if (lower.includes("binder")) return "binder";
+  if (lower.includes("process")) return "process";
+  if (lower.includes("quality")) return "quality";
+  if (lower.includes("safety")) return "safety";
   return "general";
 }
 
@@ -51,7 +55,7 @@ async function importExcelFromBuffer(
   companySlug: string,
   buffer: Buffer
 ): Promise<void> {
-  const category = resolveCategory(fileName);
+  const category = normalizeReferenceCategory(resolveCategory(fileName));
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
 
   const existing = await db.dataFile.findFirst({
@@ -139,6 +143,77 @@ async function importExcelFromBuffer(
   });
 }
 
+async function importCsvFromBuffer(
+  fileName: string,
+  companySlug: string,
+  buffer: Buffer
+): Promise<void> {
+  const text = buffer.toString("utf-8");
+  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) {
+    throw new Error(`CSV file ${fileName} is empty`);
+  }
+
+  const headers = lines[0]!.split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+  const category = normalizeReferenceCategory(resolveCategory(fileName));
+
+  const existing = await db.dataFile.findFirst({
+    where: { fileName, companySlug },
+  });
+  if (existing) {
+    await db.dataRecord.deleteMany({ where: { fileId: existing.id } });
+    await db.dataSheet.deleteMany({ where: { fileId: existing.id } });
+    await db.dataFile.delete({ where: { id: existing.id } });
+  }
+
+  const dataFile = await db.dataFile.create({
+    data: {
+      companySlug,
+      fileName,
+      fileType: "csv",
+      category,
+      fileSize: buffer.length,
+      sheetCount: 1,
+      description: `Reference data: ${category.replace(/_/g, " ")}`,
+    },
+  });
+
+  const dataSheet = await db.dataSheet.create({
+    data: {
+      fileId: dataFile.id,
+      sheetName: "CSV",
+      rowCount: lines.length,
+      colCount: headers.length,
+      headers: JSON.stringify(headers),
+    },
+  });
+
+  let totalRows = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i]!.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    if (!cells.some(Boolean)) continue;
+    const rowObj: Record<string, unknown> = {};
+    headers.forEach((h, idx) => {
+      if (h) rowObj[h] = cells[idx] ?? null;
+    });
+    await db.dataRecord.create({
+      data: {
+        fileId: dataFile.id,
+        sheetId: dataSheet.id,
+        rowIndex: i,
+        category,
+        data: JSON.stringify(rowObj),
+      },
+    });
+    totalRows++;
+  }
+
+  await db.dataFile.update({
+    where: { id: dataFile.id },
+    data: { rowCount: totalRows },
+  });
+}
+
 async function importTextKnowledge(
   fileName: string,
   companySlug: string,
@@ -213,10 +288,14 @@ export async function runReferenceImportFromUploads(
     const lower = file.fileName.toLowerCase();
     if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
       await importExcelFromBuffer(file.fileName, companySlug, file.buffer);
+    } else if (lower.endsWith(".csv")) {
+      await importCsvFromBuffer(file.fileName, companySlug, file.buffer);
     } else if (lower.endsWith(".pdf")) {
       await importPdfFromBuffer(file.fileName, companySlug, file.buffer);
-    } else if (lower.endsWith(".txt")) {
+    } else if (lower.endsWith(".txt") || lower.endsWith(".md")) {
       await importTextKnowledge(file.fileName, companySlug, file.buffer);
+    } else {
+      throw new Error(`Unsupported file type: ${file.fileName}`);
     }
   }
 
