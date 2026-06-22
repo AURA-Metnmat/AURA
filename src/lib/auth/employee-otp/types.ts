@@ -27,4 +27,5 @@ export interface OtpVerifySuccess {
   email: string | null;
   active_session: import("@/lib/employees/session-resume").ResumedSessionPayload | null;
   message: string;
+  credentials_email_sent?: boolean;
 }

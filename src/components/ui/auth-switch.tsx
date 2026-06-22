@@ -38,11 +38,11 @@ export function AuthSwitch({
           width: 100%;
           max-width: 920px;
           min-height: clamp(640px, 82vh, 900px);
-          background: #ffffff;
+          background: #1e293b;
           border-radius: 16px;
           box-shadow:
-            0 20px 50px rgba(15, 23, 42, 0.08),
-            0 0 0 1px rgba(15, 23, 42, 0.06);
+            0 24px 48px rgba(0, 0, 0, 0.35),
+            0 0 0 1px rgba(255, 255, 255, 0.08);
           overflow: hidden;
         }
 
@@ -72,7 +72,7 @@ export function AuthSwitch({
           padding: 1.75rem 0 2rem;
           z-index: 5;
           scrollbar-width: thin;
-          scrollbar-color: #cbd5e1 transparent;
+          scrollbar-color: #475569 transparent;
         }
 
         .aura-auth-switch .signin-signup::-webkit-scrollbar {
@@ -80,7 +80,7 @@ export function AuthSwitch({
         }
 
         .aura-auth-switch .signin-signup::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
+          background: #475569;
           border-radius: 999px;
         }
 
@@ -122,7 +122,7 @@ export function AuthSwitch({
 
         .aura-auth-switch .auth-title {
           font-size: 1.65rem;
-          color: #0f172a;
+          color: #f8fafc;
           margin-bottom: 0.35rem;
           font-weight: 700;
           letter-spacing: -0.02em;
@@ -130,7 +130,7 @@ export function AuthSwitch({
 
         .aura-auth-switch .auth-subtitle {
           font-size: 0.84rem;
-          color: #64748b;
+          color: #94a3b8;
           margin-bottom: 1rem;
           text-align: center;
           max-width: 340px;
@@ -140,7 +140,7 @@ export function AuthSwitch({
         .aura-auth-switch .input-field {
           max-width: 380px;
           width: 100%;
-          background-color: #f8fafc;
+          background-color: #0f172a;
           margin: 6px 0;
           min-height: 48px;
           border-radius: 10px;
@@ -149,21 +149,21 @@ export function AuthSwitch({
           padding: 0 1rem 0 0.85rem;
           gap: 0.65rem;
           transition: 0.2s;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #334155;
         }
 
         .aura-auth-switch .input-field:focus-within {
-          background-color: #ffffff;
+          background-color: #1e293b;
           border-color: #b91c1c;
-          box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
+          box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.2);
         }
 
         .aura-auth-switch .input-field:focus-within svg {
-          color: #b91c1c;
+          color: #f87171;
         }
 
         .aura-auth-switch .input-field svg {
-          color: #94a3b8;
+          color: #64748b;
           flex-shrink: 0;
         }
 
@@ -173,14 +173,14 @@ export function AuthSwitch({
           border: none;
           font-weight: 500;
           font-size: 0.95rem;
-          color: #0f172a;
+          color: #f1f5f9;
           width: 100%;
           line-height: 1.4;
           padding: 0.65rem 0;
         }
 
         .aura-auth-switch .input-field input::placeholder {
-          color: #94a3b8;
+          color: #64748b;
           font-weight: 400;
         }
 
@@ -418,7 +418,7 @@ export function AuthSwitch({
           top: -10%;
           right: 48%;
           transform: translateY(-50%);
-          background: linear-gradient(145deg, #fef2f2 0%, #fecaca 38%, #b91c1c 100%);
+          background: linear-gradient(145deg, #1e293b 0%, #334155 38%, #7f1d1d 100%);
           transition: 1.8s ease-in-out;
           border-radius: 50%;
           z-index: 6;
@@ -623,7 +623,7 @@ export function AuthInputField({
 
 export function AuthFieldHint({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] text-slate-500 -mt-0.5 mb-1 w-full max-w-[380px] text-center leading-snug">
+    <p className="text-[11px] text-slate-400 -mt-0.5 mb-1 w-full max-w-[380px] text-center leading-snug">
       {children}
     </p>
   );
@@ -631,7 +631,7 @@ export function AuthFieldHint({ children }: { children: ReactNode }) {
 
 export function AuthError({ message }: { message: string }) {
   return (
-    <p className="mt-2 mb-1 w-full max-w-[380px] text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-center">
+    <p className="mt-2 mb-1 w-full max-w-[380px] text-sm text-red-300 bg-red-950/50 border border-red-800/60 rounded-xl px-4 py-2.5 text-center">
       {message}
     </p>
   );

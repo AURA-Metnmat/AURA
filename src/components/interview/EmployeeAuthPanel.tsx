@@ -18,9 +18,11 @@ import {
   AuthFieldHint,
   AuthError,
 } from "@/components/ui/auth-switch";
+import { RegistrationCredentialsWelcome } from "@/components/interview/RegistrationCredentialsWelcome";
 import type { Language } from "@/lib/aura/i18n";
 
 type AuthMode = "register" | "signIn";
+type AuthStep = "form" | "welcome";
 
 export interface EmployeeProfileForm {
   fullName: string;
@@ -115,8 +117,15 @@ export function EmployeeAuthPanel({
   onLoggedIn,
 }: EmployeeAuthPanelProps) {
   const [mode, setMode] = useState<AuthMode>("register");
+  const [step, setStep] = useState<AuthStep>("form");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [welcomeData, setWelcomeData] = useState<{
+    profile: EmployeeProfileForm;
+    password: string;
+    emailSent: boolean;
+    activeSession: ActiveSessionPayload | null;
+  } | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [designation, setDesignation] = useState("");
@@ -181,11 +190,15 @@ export function EmployeeAuthPanel({
       if (!res.ok) throw new Error(data.error ?? "Registration failed.");
 
       const profile = toProfile(data);
-      if (data.active_session) {
-        onLoggedIn({ form: profile, activeSession: data.active_session });
-      } else {
-        onRegistered(profile);
-      }
+      setWelcomeData({
+        profile,
+        password,
+        emailSent: Boolean(data.credentials_email_sent),
+        activeSession: data.active_session ?? null,
+      });
+      setStep("welcome");
+      setPassword("");
+      setConfirmPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
@@ -346,22 +359,45 @@ export function EmployeeAuthPanel({
     </form>
   );
 
+  function handleWelcomeContinue() {
+    if (!welcomeData) return;
+    if (welcomeData.activeSession) {
+      onLoggedIn({ form: welcomeData.profile, activeSession: welcomeData.activeSession });
+    } else {
+      onRegistered(welcomeData.profile);
+    }
+  }
+
+  if (step === "welcome" && welcomeData) {
+    return (
+      <RegistrationCredentialsWelcome
+        companyName={companyName}
+        employeeName={welcomeData.profile.fullName}
+        mobile={welcomeData.profile.mobile}
+        email={welcomeData.profile.email}
+        password={welcomeData.password}
+        emailSent={welcomeData.emailSent}
+        onContinue={handleWelcomeContinue}
+      />
+    );
+  }
+
   return (
     <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-10 overflow-y-auto">
       <div className="w-full max-w-[920px] space-y-5 my-auto">
-        <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
-          <span className="text-slate-600">● Language</span>
-          <span className="text-slate-300">—</span>
-          <span className="text-red-700 font-semibold">● Account</span>
-          <span className="text-slate-300">—</span>
-          <span className="text-slate-400">○ Interview</span>
+        <div className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-400">
+          <span className="text-slate-500">● Language</span>
+          <span className="text-slate-600">—</span>
+          <span className="text-red-400 font-semibold">● Account</span>
+          <span className="text-slate-600">—</span>
+          <span className="text-slate-500">○ Interview</span>
         </div>
 
         <div className="text-center space-y-1 px-2">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-800 font-semibold">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-200 font-semibold">
             {companyName}
           </p>
-          <p className="text-sm text-slate-500">Create an account or sign in with your password</p>
+          <p className="text-sm text-slate-400">Create an account or sign in with your password</p>
         </div>
 
         <AuthSwitch
@@ -380,7 +416,7 @@ export function EmployeeAuthPanel({
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 mx-auto pt-1"
+          className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 mx-auto pt-1"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to language

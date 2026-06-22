@@ -559,12 +559,12 @@ export default function InterviewFlow({
       <header
         className={`border-b px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 ${
           step === "auth"
-            ? "border-slate-200 bg-white/90 text-slate-900"
+            ? "border-slate-800 bg-slate-950/90 text-slate-100"
             : "border-white/[0.06] bg-[#09090f]/95"
         }`}
       >
         <div>
-          <p className={`text-xs uppercase tracking-widest ${step === "auth" ? "text-red-700" : "text-amber-400"}`}>
+          <p className={`text-xs uppercase tracking-widest ${step === "auth" ? "text-red-400" : "text-amber-400"}`}>
             AURA-METNMAT Interview
           </p>
           <h1 className="text-lg font-semibold">{showCompanyBadge ? companyName : form.fullName || "Interview"}</h1>

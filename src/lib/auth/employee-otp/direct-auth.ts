@@ -26,6 +26,7 @@ import {
   MAX_FAILED_LOGIN_ATTEMPTS,
   validateEmployeePassword,
 } from "./password-policy";
+import { sendRegistrationCredentialsEmail } from "@/lib/notifications/registration-credentials";
 import type { OtpVerifySuccess } from "./types";
 
 const INVALID_CREDENTIALS = "Invalid mobile, email, or password.";
@@ -174,6 +175,14 @@ export async function registerEmployee(
     designation: employee.designation,
   });
 
+  const credentialsEmailSent = await sendRegistrationCredentialsEmail({
+    companyName: company.name,
+    employeeName: name,
+    mobileNumber,
+    email,
+    password,
+  });
+
   const sessionToken = createEmployeeSessionToken(employee.id, company.id);
   const activeSession = await findActiveSessionForEmployee(employee.id, company.id);
 
@@ -190,6 +199,7 @@ export async function registerEmployee(
       email: employee.email,
       active_session: activeSession,
       message: "Profile created. Starting your interview…",
+      credentials_email_sent: credentialsEmailSent,
     },
   };
 }

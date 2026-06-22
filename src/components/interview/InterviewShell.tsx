@@ -19,7 +19,7 @@ export function InterviewShell({
     <div
       className={cn(
         "h-dvh flex flex-col relative overflow-hidden",
-        variant === "auth" ? "bg-slate-100 text-slate-900" : "bg-[#09090f] text-slate-100",
+        variant === "auth" ? "bg-slate-950 text-slate-100" : "bg-[#09090f] text-slate-100",
         className
       )}
     >
@@ -31,7 +31,7 @@ export function InterviewShell({
       ) : variant === "auth" ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-100"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950"
         />
       ) : variant === "welcome" ? (
         <div
