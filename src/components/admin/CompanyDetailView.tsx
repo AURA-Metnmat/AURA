@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import CampaignsPanel from "@/components/admin/CampaignsPanel";
 import AnswerReviewPanel from "@/components/admin/AnswerReviewPanel";
+import InterviewAnalyticsPanel from "@/components/admin/InterviewAnalyticsPanel";
 
 interface CompanyRow {
   id: string;
@@ -181,7 +182,7 @@ interface GatheredData {
   };
 }
 
-type TabId = "overview" | "reference" | "experience" | "interviews" | "campaigns" | "quality";
+type TabId = "overview" | "reference" | "experience" | "interviews" | "campaigns" | "quality" | "analytics";
 
 interface CompanyDetailViewProps {
   company: CompanyRow;
@@ -249,6 +250,7 @@ const TABS: { id: TabId; label: string; icon: typeof Database }[] = [
   { id: "reference", label: "Reference Knowledge", icon: BookOpen },
   { id: "experience", label: "Experience Vault & ML", icon: Brain },
   { id: "campaigns", label: "Campaigns", icon: Megaphone },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "quality", label: "Data Quality", icon: ShieldCheck },
   { id: "interviews", label: "Live Interviews", icon: Users },
 ];
@@ -816,6 +818,13 @@ export default function CompanyDetailView({
             glassCard={glassCard}
             onCopyLink={onCopyLink}
           />
+        </div>
+      )}
+
+      {/* Analytics tab */}
+      {activeTab === "analytics" && (
+        <div className={`${glassPanel} rounded-2xl p-5 border border-white/5`}>
+          <InterviewAnalyticsPanel companyId={company.id} glassCard={glassCard} />
         </div>
       )}
 
