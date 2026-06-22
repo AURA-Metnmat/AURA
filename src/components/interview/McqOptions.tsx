@@ -11,7 +11,7 @@ interface McqOptionsProps {
   answered?: boolean;
   selectHint?: string;
   orTypeHint?: string;
-  onSelect: (answerEn: string, answerLocale: string) => void;
+  onSelect: (answerEn: string, answerLocale: string, optionId: string) => void;
 }
 
 export function McqOptions({
@@ -44,7 +44,7 @@ export function McqOptions({
               key={opt.id}
               type="button"
               disabled={disabled || answered}
-              onClick={() => onSelect(opt.en, opt.locale || opt.en)}
+              onClick={() => onSelect(opt.en, opt.locale || opt.en, opt.id)}
               className={cn(
                 "group w-full text-left rounded-xl border px-4 py-3 text-sm transition-all",
                 "focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50",

@@ -12,6 +12,8 @@ import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
 import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
 import { sanitizeUserInput, containsPromptInjectionSignals } from "@/lib/ai/safety";
 import { CONSENT_VERSION, type DeviceType } from "@/lib/interview/consent";
+import { saveInterviewAnswer, findLastAssistantMessageId } from "@/lib/interview/answer-capture";
+import type { StructuredAnswerPayload } from "@/lib/aura/interaction";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
@@ -35,6 +37,7 @@ interface MessagePayload {
   sessionId: string;
   message: string;
   attachmentIds?: string[];
+  structuredAnswer?: StructuredAnswerPayload;
 }
 
 interface UpdateLanguagePayload {
@@ -362,6 +365,26 @@ export async function POST(request: Request) {
       await db.messageAttachment.updateMany({
         where: { id: { in: attachments.map((a) => a.id) } },
         data: { messageId: userMsg.id },
+      });
+    }
+
+    const structuredAnswer = "structuredAnswer" in body ? body.structuredAnswer : undefined;
+    if (structuredAnswer?.interactionType) {
+      const assistantMessageId = findLastAssistantMessageId(
+        session.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          metadata: m.metadata,
+        }))
+      );
+      await saveInterviewAnswer({
+        sessionId: session.id,
+        messageId: userMsg.id,
+        assistantMessageId,
+        section: session.currentSection,
+        rawText: userBilingual.en,
+        rawTextLocale: userBilingual.locale,
+        structured: structuredAnswer,
       });
     }
 

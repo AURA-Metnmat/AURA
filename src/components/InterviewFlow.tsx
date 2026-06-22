@@ -19,6 +19,7 @@ import {
   detectDeviceType,
   isDesktopInterviewEligible,
 } from "@/lib/interview/consent";
+import type { StructuredSelection } from "@/components/interview/StructuredInteractionInput";
 import type { MessageInteraction } from "@/lib/aura/interaction";
 
 interface Attachment {
@@ -405,7 +406,11 @@ export default function InterviewFlow({
     }
   }
 
-  async function submitUserAnswer(userMsg: string, msgAttachments: Attachment[] = []) {
+  async function submitUserAnswer(
+    userMsg: string,
+    msgAttachments: Attachment[] = [],
+    structured?: StructuredSelection
+  ) {
     if (!sessionId) return;
     setMessages((prev) => [
       ...prev,
@@ -427,6 +432,13 @@ export default function InterviewFlow({
           sessionId,
           message: userMsg,
           attachmentIds: msgAttachments.map((a) => a.id),
+          structuredAnswer: structured
+            ? {
+                interactionType: structured.interactionType,
+                optionId: structured.optionId,
+                value: structured.value,
+              }
+            : undefined,
         }),
       });
       const data = await res.json();
@@ -478,11 +490,13 @@ export default function InterviewFlow({
     await submitUserAnswer(userMsg, msgAttachments);
   }
 
-  async function handleMcqSelect(answerEn: string, answerLocale: string) {
+  async function handleStructuredSelect(selection: StructuredSelection) {
     if (loading || !sessionId) return;
     const display =
-      language === "en" ? answerEn : answerLocale || answerEn;
-    await submitUserAnswer(display);
+      language === "en"
+        ? selection.answerEn
+        : selection.answerLocale || selection.answerEn;
+    await submitUserAnswer(display, [], selection);
   }
 
   async function handleVoiceSubmit(text: string) {
@@ -505,12 +519,12 @@ export default function InterviewFlow({
     [messages]
   );
 
-  const hasUnansweredMcq = useMemo(() => {
+  const hasUnansweredInteraction = useMemo(() => {
     const lastAssistantIdx = [...messages].reverse().findIndex((m) => m.role === "assistant");
     if (lastAssistantIdx < 0) return false;
     const idx = messages.length - 1 - lastAssistantIdx;
     const lastAssistant = messages[idx];
-    if (!lastAssistant?.interaction || lastAssistant.interaction.type !== "mcq") return false;
+    if (!lastAssistant?.interaction) return false;
     return messages[idx + 1]?.role !== "user";
   }, [messages]);
 
@@ -518,10 +532,10 @@ export default function InterviewFlow({
     () =>
       getQuickReplies(language, engagement, {
         messageCount: messages.length,
-        hasUnansweredMcq,
+        hasUnansweredMcq: hasUnansweredInteraction,
         completionPct,
       }),
-    [language, engagement, messages.length, hasUnansweredMcq, completionPct]
+    [language, engagement, messages.length, hasUnansweredInteraction, completionPct]
   );
 
   async function completeInterview() {
@@ -739,7 +753,7 @@ export default function InterviewFlow({
                 engagement={engagement}
                 participantName={form.fullName}
                 loading={loading}
-                onMcqSelect={(en, locale) => void handleMcqSelect(en, locale)}
+                onStructuredSelect={(selection) => void handleStructuredSelect(selection)}
               />
               <div ref={bottomRef} className="h-1" />
             </div>

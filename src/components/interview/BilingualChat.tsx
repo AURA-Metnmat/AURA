@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { Bot, User, Volume2 } from "lucide-react";
 import { AudioPlayButton } from "@/components/interview/AudioPlayButton";
-import { McqOptions } from "@/components/interview/McqOptions";
+import { StructuredInteractionInput, type StructuredSelection } from "@/components/interview/StructuredInteractionInput";
 import type { Language } from "@/lib/aura/i18n";
 import { localeDisplayName } from "@/lib/aura/bilingual";
 import { resolveMessageLocale } from "@/lib/aura/message-locale";
@@ -30,7 +30,7 @@ interface BilingualChatProps {
   engagement?: EngagementStrings;
   participantName?: string;
   loading?: boolean;
-  onMcqSelect?: (answerEn: string, answerLocale: string) => void;
+  onStructuredSelect?: (selection: StructuredSelection) => void;
 }
 
 function isMessageAnswered(messages: BilingualMessage[], index: number): boolean {
@@ -102,7 +102,7 @@ interface ChatMessageRowProps {
   sessionId?: string | null;
   loading?: boolean;
   thinking?: boolean;
-  onMcqSelect?: (answerEn: string, answerLocale: string) => void;
+  onStructuredSelect?: (selection: StructuredSelection) => void;
 }
 
 const ChatMessageRow = memo(function ChatMessageRow({
@@ -118,7 +118,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
   sessionId,
   loading,
   thinking,
-  onMcqSelect,
+  onStructuredSelect,
 }: ChatMessageRowProps) {
   const localeText = resolveMessageLocale(
     msg.contentEn,
@@ -131,16 +131,16 @@ const ChatMessageRow = memo(function ChatMessageRow({
   const speakText = isAssistant && !englishOnly ? localeText : msg.contentEn;
   const speakLang = isAssistant && !englishOnly ? preferredLanguage : "en";
 
-  const mcqBlock =
-    isAssistant && msg.interaction?.type === "mcq" && onMcqSelect ? (
-      <McqOptions
+  const interactionBlock =
+    isAssistant && msg.interaction && onStructuredSelect ? (
+      <StructuredInteractionInput
         interaction={msg.interaction}
         preferredLanguage={preferredLanguage}
         disabled={loading || thinking}
         answered={answered}
         selectHint={engagement?.mcqSelectHint}
         orTypeHint={engagement?.mcqOrTypeHint}
-        onSelect={onMcqSelect}
+        onSelect={onStructuredSelect}
       />
     ) : null;
 
@@ -196,7 +196,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
             </div>
           )}
 
-          {mcqBlock}
+          {interactionBlock}
         </div>
       </div>
     </div>
@@ -213,7 +213,7 @@ export function BilingualChat({
   participantName,
   sessionId,
   loading,
-  onMcqSelect,
+  onStructuredSelect,
 }: BilingualChatProps) {
   const englishOnly = preferredLanguage === "en";
   const listenLabel = engagement?.listenLabel ?? "Listen";
@@ -247,7 +247,7 @@ export function BilingualChat({
           sessionId={sessionId}
           loading={loading}
           thinking={thinking}
-          onMcqSelect={onMcqSelect}
+          onStructuredSelect={onStructuredSelect}
         />
       ))}
 

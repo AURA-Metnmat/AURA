@@ -40,11 +40,13 @@ export function bilingualInstruction(lang: RegionalLanguage): string {
 {"en":"...","locale":"...","interaction":{...}}
 - "en": professional English — warm acknowledgment + ONE clear question (no options listed in prose when using MCQ).
 - "locale": same meaning in ${name}, written fully in native script (not romanized).
-- "interaction": use for objective/multiple-choice questions whenever possible:
-  {"type":"mcq","allowFreeText":true,"options":[{"id":"a","en":"Option in English","locale":"Option in ${name}"}, ...]}
-  Provide exactly 3-4 concise, mutually exclusive options. IDs: short letters a,b,c,d.
-  Use MCQ for: tenure, frequency, scale (team size), yes/no with nuance, severity, tool choice, process stage.
-  Use open text only when the answer truly cannot be structured (e.g. describe a workflow).
+- "interaction": use structured widgets whenever possible (pick ONE type per question):
+  MCQ: {"type":"mcq","allowFreeText":true,"options":[{"id":"a","en":"...","locale":"..."}, ...]} — 3-4 options, ids a,b,c,d.
+  Yes/No: {"type":"yes_no","allowFreeText":true}
+  Rating (1-5 scale): {"type":"rating","min":1,"max":5,"minLabel":"Low","maxLabel":"High","allowFreeText":true}
+  Numeric: {"type":"numeric","unit":"people","placeholder":"e.g. 12","allowFreeText":true}
+  Use MCQ for tenure, tool choice, process stage. Use yes_no for binary decisions. Use rating for severity/frequency. Use numeric for counts/durations.
+  Do not list MCQ options in prose when interaction is present.
 - Keep en/locale to 2-3 short sentences. Sound like a friendly senior colleague.
 - Never ask multiple unrelated questions at once.
 - Acknowledge what they shared before the next question.
@@ -56,9 +58,12 @@ export function englishInstruction(): string {
   return `IMPORTANT: Respond ONLY with valid JSON (no markdown fences):
 {"en":"...","interaction":{...}}
 - "en": warm acknowledgment + ONE clear question. Do not list MCQ options in the prose when interaction is present.
-- "interaction": use for objective questions:
-  {"type":"mcq","allowFreeText":true,"options":[{"id":"a","en":"Option text","locale":"Option text"}, ...]}
-  Provide exactly 3-4 concise options. Use MCQ for tenure, frequency, scale, severity, tool/process choices.
+- "interaction": use structured widgets (one per question):
+  MCQ: {"type":"mcq","allowFreeText":true,"options":[{"id":"a","en":"...","locale":"..."}, ...]}
+  Yes/No: {"type":"yes_no","allowFreeText":true}
+  Rating: {"type":"rating","min":1,"max":5,"allowFreeText":true}
+  Numeric: {"type":"numeric","unit":"hours","allowFreeText":true}
+  Prefer structured types for tenure, frequency, severity, team size, tool choice. Open text only when truly narrative.
 - Keep to 2-3 short sentences natural for voice/TTS.
 - One question at a time. Friendly senior colleague tone.`;
 }

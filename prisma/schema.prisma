@@ -72,6 +72,7 @@ model InterviewSession {
   reporting       ReportingReq[]
   approvals       ApprovalWorkflow[]
   report          InterviewReport?
+  answers         InterviewAnswer[]
 
   @@index([status])
   @@index([companyId])
@@ -209,8 +210,27 @@ model Message {
   createdAt     DateTime            @default(now())
   session       InterviewSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   attachments   MessageAttachment[]
+  answer        InterviewAnswer?
 
   @@index([sessionId])
+}
+
+model InterviewAnswer {
+  id               String           @id @default(cuid())
+  sessionId        String
+  messageId        String?          @unique
+  assistantMsgId   String?
+  interactionType  String
+  rawText          String
+  rawTextLocale    String?
+  structuredJson   String?
+  section          String?
+  createdAt        DateTime         @default(now())
+  session          InterviewSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message          Message?         @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([interactionType])
 }
 
 model MessageAttachment {
