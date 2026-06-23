@@ -47,6 +47,15 @@ interface ParticipantForm {
   email: string;
 }
 
+interface PhaseProgress {
+  phase: string;
+  phase1RemainingSeconds: number | null;
+  phase2RemainingSeconds: number | null;
+  totalRemainingSeconds: number | null;
+  phase1ElapsedSeconds: number;
+  phase2ElapsedSeconds: number;
+}
+
 interface InterviewFlowProps {
   companyId: string;
   companySlug: string;
@@ -54,6 +63,9 @@ interface InterviewFlowProps {
   inviteToken?: string;
   campaignId?: string;
   interviewDurationMinutes?: number;
+  phase1Title?: string;
+  phase2Title?: string;
+  phase2Enabled?: boolean;
   showCompanyBadge?: boolean;
   registrationPolicy?: PublicRegistrationPolicy;
 }
@@ -73,6 +85,9 @@ export default function InterviewFlow({
   inviteToken,
   campaignId,
   interviewDurationMinutes: initialDurationMinutes = 5,
+  phase1Title: initialPhase1Title = "AI Discovery",
+  phase2Title: initialPhase2Title = "Domain Questions",
+  phase2Enabled: initialPhase2Enabled = true,
   showCompanyBadge = true,
   registrationPolicy,
 }: InterviewFlowProps) {
@@ -100,6 +115,15 @@ export default function InterviewFlow({
   const [sessionDurationMinutes, setSessionDurationMinutes] = useState(initialDurationMinutes);
   const [sessionStartedAt, setSessionStartedAt] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [interviewPhase, setInterviewPhase] = useState("phase1_ai");
+  const [phase1Title, setPhase1Title] = useState(initialPhase1Title);
+  const [phase2Title, setPhase2Title] = useState(initialPhase2Title);
+  const [phase2Enabled, setPhase2Enabled] = useState(initialPhase2Enabled);
+  const [phaseProgress, setPhaseProgress] = useState<PhaseProgress | null>(null);
+  const [phase2QuestionNumber, setPhase2QuestionNumber] = useState<number | null>(null);
+  const [phase2QuestionTotal, setPhase2QuestionTotal] = useState<number | null>(null);
+  const [phaseRemainingAnchor, setPhaseRemainingAnchor] = useState<number | null>(null);
+  const [phaseRemainingAtAnchor, setPhaseRemainingAtAnchor] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const t = UI[language];
@@ -186,6 +210,44 @@ export default function InterviewFlow({
     };
   }, [companyId]);
 
+  function applyPhasePayload(data: {
+    interviewPhase?: string;
+    phase1Title?: string;
+    phase2Title?: string;
+    phase2Enabled?: boolean;
+    phaseProgress?: PhaseProgress;
+    phase2QuestionNumber?: number;
+    phase2QuestionTotal?: number;
+    interviewDurationMinutes?: number;
+  }) {
+    if (data.interviewPhase) setInterviewPhase(data.interviewPhase);
+    if (data.phase1Title) setPhase1Title(data.phase1Title);
+    if (data.phase2Title) setPhase2Title(data.phase2Title);
+    if (typeof data.phase2Enabled === "boolean") setPhase2Enabled(data.phase2Enabled);
+    if (data.phaseProgress) {
+      setPhaseProgress(data.phaseProgress);
+      const phaseRemaining =
+        data.interviewPhase === "phase2_fixed"
+          ? data.phaseProgress.phase2RemainingSeconds
+          : data.phaseProgress.phase1RemainingSeconds;
+      const fallback = data.phaseProgress.totalRemainingSeconds;
+      const anchorValue = phaseRemaining ?? fallback;
+      if (anchorValue !== null) {
+        setPhaseRemainingAnchor(Date.now());
+        setPhaseRemainingAtAnchor(anchorValue);
+      }
+    }
+    if (typeof data.phase2QuestionNumber === "number") {
+      setPhase2QuestionNumber(data.phase2QuestionNumber);
+    }
+    if (typeof data.phase2QuestionTotal === "number") {
+      setPhase2QuestionTotal(data.phase2QuestionTotal);
+    }
+    if (typeof data.interviewDurationMinutes === "number") {
+      setSessionDurationMinutes(data.interviewDurationMinutes);
+    }
+  }
+
   function hydrateSession(
     active: {
       sessionId: string;
@@ -193,6 +255,11 @@ export default function InterviewFlow({
       currentSection: string;
       completionPct: number;
       interviewDurationMinutes: number;
+      interviewPhase?: string;
+      phase1Title?: string;
+      phase2Title?: string;
+      phase2Enabled?: boolean;
+      phaseProgress?: PhaseProgress;
       messages: Message[];
       participant: ParticipantForm;
       startedAt: string;
@@ -206,6 +273,7 @@ export default function InterviewFlow({
     setCompletionPct(active.completionPct);
     setSessionDurationMinutes(active.interviewDurationMinutes);
     setSessionStartedAt(new Date(active.startedAt).getTime());
+    applyPhasePayload(active);
     setForm({
       fullName: active.participant.fullName || fallbackName || "",
       designation: active.participant.designation,
@@ -255,15 +323,26 @@ export default function InterviewFlow({
 
   useEffect(() => {
     if (!sessionStartedAt || step !== "chat") return;
-    const totalSeconds = sessionDurationMinutes * 60;
     const tick = () => {
+      if (phaseRemainingAnchor !== null && phaseRemainingAtAnchor !== null) {
+        const elapsed = Math.floor((Date.now() - phaseRemainingAnchor) / 1000);
+        setRemainingSeconds(Math.max(0, phaseRemainingAtAnchor - elapsed));
+        return;
+      }
+      const totalSeconds = sessionDurationMinutes * 60;
       const elapsed = Math.floor((Date.now() - sessionStartedAt) / 1000);
       setRemainingSeconds(Math.max(0, totalSeconds - elapsed));
     };
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [sessionStartedAt, sessionDurationMinutes, step]);
+  }, [
+    sessionStartedAt,
+    sessionDurationMinutes,
+    step,
+    phaseRemainingAnchor,
+    phaseRemainingAtAnchor,
+  ]);
 
   async function changeLanguage(newLang: Language) {
     if (newLang === language) return;
@@ -355,6 +434,7 @@ export default function InterviewFlow({
         if (typeof data.interviewDurationMinutes === "number") {
           setSessionDurationMinutes(data.interviewDurationMinutes);
         }
+        applyPhasePayload(data);
         setSessionStartedAt(
           data.startedAt ? new Date(data.startedAt).getTime() : Date.now()
         );
@@ -363,6 +443,7 @@ export default function InterviewFlow({
       }
 
       setSessionId(data.sessionId);
+      applyPhasePayload(data);
       setMessages([
         {
           role: "assistant",
@@ -378,9 +459,7 @@ export default function InterviewFlow({
       setForm(profile);
       setCurrentSection(data.currentSection);
       setCompletionPct(data.completionPct);
-      if (typeof data.interviewDurationMinutes === "number") {
-        setSessionDurationMinutes(data.interviewDurationMinutes);
-      }
+      applyPhasePayload(data);
       setSessionStartedAt(Date.now());
       setStep("chat");
     } catch {
@@ -473,6 +552,13 @@ export default function InterviewFlow({
       });
       setCurrentSection(data.currentSection);
       setCompletionPct(data.completionPct);
+      applyPhasePayload(data);
+      if (typeof data.phase2QuestionNumber === "number") {
+        setPhase2QuestionNumber(data.phase2QuestionNumber);
+      }
+      if (typeof data.phase2QuestionTotal === "number") {
+        setPhase2QuestionTotal(data.phase2QuestionTotal);
+      }
       setSaveStatus("saved");
       if (sessionId) localStorage.removeItem(`aura-draft-${sessionId}`);
       window.setTimeout(() => setSaveStatus("idle"), 2500);
@@ -657,6 +743,22 @@ export default function InterviewFlow({
           )}
           {step === "chat" && (
             <>
+              <span
+                className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full border hidden sm:inline ${
+                  interviewPhase === "phase2_fixed"
+                    ? "border-sky-500/40 text-sky-300 bg-sky-950/40"
+                    : "border-amber-500/40 text-amber-300 bg-amber-950/40"
+                }`}
+              >
+                {interviewPhase === "phase2_fixed" ? phase2Title : phase1Title}
+                {interviewPhase === "phase2_fixed" &&
+                  phase2QuestionNumber &&
+                  phase2QuestionTotal && (
+                    <span className="ml-1 opacity-80">
+                      · Q{phase2QuestionNumber}/{phase2QuestionTotal}
+                    </span>
+                  )}
+              </span>
               <span className="text-xs bg-slate-800/80 px-3 py-1 rounded-full hidden lg:inline border border-white/10">
                 {t.section} {currentSection}: {sections[currentSection]}
               </span>

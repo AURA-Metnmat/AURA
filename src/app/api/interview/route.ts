@@ -2,11 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { assertCompanyAccess, companyScopeFilter } from "@/lib/auth/admin-rbac";
-import { generateAuraResponse, generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
+import { generateInterviewReport, normalizeUserMessage } from "@/lib/aura/agent";
 import { getOpeningQuestion1, getOpeningQuestion2 } from "@/lib/aura/opening-questions";
 import { serializeInteraction } from "@/lib/aura/interaction";
 import { resolveMessageLocale } from "@/lib/aura/message-locale";
-import { loadFullCompanyContext } from "@/lib/companies/company-knowledge";
 import { requireEmployeeSession } from "@/lib/auth/employee";
 import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
 import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
@@ -16,7 +15,8 @@ import { CONSENT_VERSION, type DeviceType } from "@/lib/interview/consent";
 import { captureUserAnswer, findLastAssistantMessageId } from "@/lib/interview/answer-capture";
 import type { StructuredAnswerPayload } from "@/lib/aura/interaction";
 import { resolveCampaignForCompany } from "@/lib/campaigns/resolve";
-import { getNextCampaignQuestion } from "@/lib/campaigns/question-runner";
+import { buildPhaseConfig } from "@/lib/interview/phase-config";
+import { handlePostIntroInterviewTurn } from "@/lib/interview/handle-interview-turn";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
@@ -136,6 +136,11 @@ export async function POST(request: Request) {
           language: existing.language,
           interviewDurationMinutes: existing.interviewDurationMinutes,
           startedAt: existing.startedAt,
+          interviewPhase: existing.interviewPhase,
+          phase1Title: existing.phase1Title,
+          phase2Title: existing.phase2Title,
+          phase2Enabled: existing.phase2Enabled,
+          phaseProgress: existing.phaseProgress,
           company: { id: company.id, name: company.name },
         });
       }
@@ -209,6 +214,8 @@ export async function POST(request: Request) {
         },
       });
 
+      const phaseConfig = buildPhaseConfig(company);
+
       return NextResponse.json({
         resumed: false,
         sessionId: session.id,
@@ -217,7 +224,11 @@ export async function POST(request: Request) {
         messageLocale: opening.locale,
         currentSection: "A",
         completionPct: 5,
-        interviewDurationMinutes: company.interviewDurationMinutes ?? 5,
+        interviewDurationMinutes: phaseConfig.totalDurationMinutes,
+        phase1Title: phaseConfig.phase1Title,
+        phase2Title: phaseConfig.phase2Title,
+        phase2Enabled: phaseConfig.phase2Enabled,
+        interviewPhase: "phase1_ai",
         company: { id: company.id, name: company.name },
       });
     }
@@ -467,80 +478,35 @@ export async function POST(request: Request) {
       });
     }
 
-    const bankQuestion = await getNextCampaignQuestion(session.id, lang);
-
-    const companyCtx = await loadFullCompanyContext({
-      name: session.company.name,
-      industry: session.company.industry,
-      description: session.company.description,
-      aiContext: session.company.aiContext,
-      slug: session.company.slug,
-    });
-
-    const postIntro = introStep === 2;
-    const activeSection = bankQuestion
-      ? ((bankQuestion.section ?? session.currentSection) as SectionId)
-      : postIntro
-        ? ("B" as SectionId)
-        : (session.currentSection as SectionId);
-    const questionIndex = session.questionIndex ?? 0;
-
-    const response = await generateAuraResponse(
-      {
-        sessionId: session.id,
-        language: lang,
-        company: companyCtx,
-        currentSection: activeSection,
+    const turnResult = await handlePostIntroInterviewTurn({
+      session: {
+        id: session.id,
+        companyId: session.companyId,
+        interviewPhase: session.interviewPhase,
+        phase2QuestionIndex: session.phase2QuestionIndex,
+        phase1StartedAt: session.phase1StartedAt,
+        phase2StartedAt: session.phase2StartedAt,
+        startedAt: session.startedAt,
+        currentSection: session.currentSection,
+        questionIndex: session.questionIndex,
+        completionPct: session.completionPct,
         stakeholderType: session.stakeholderType,
-        participant: session.participant,
-        messageHistory: updatedHistory,
-        questionIndex,
-        postIntro,
-        campaignGuidance: bankQuestion?.en ?? null,
+        company: session.company,
+        participant: session.participant
+          ? {
+              fullName: session.participant.fullName ?? "",
+              designation: session.participant.designation,
+              department: session.participant.department,
+            }
+          : null,
       },
-      userBilingual.en
-    );
-
-    const interaction = response.interaction ?? bankQuestion?.interaction ?? null;
-    const metadata =
-      response.metadata ?? (interaction ? serializeInteraction(interaction) : null);
-
-    await db.message.create({
-      data: {
-        sessionId: session.id,
-        role: "assistant",
-        content: response.content,
-        contentLocale: response.contentLocale,
-        metadata,
-        section: response.nextSection,
-      },
+      lang,
+      userBilingual,
+      updatedHistory,
+      introStep,
     });
 
-    await db.interviewSession.update({
-      where: { id: session.id },
-      data: {
-        introStep: Math.max(introStep, 3),
-        currentSection: response.nextSection,
-        questionIndex: response.nextQuestionIndex,
-        campaignQuestionIndex: bankQuestion
-          ? bankQuestion.questionIndex + 1
-          : session.campaignQuestionIndex,
-        completionPct: response.completionPct,
-      },
-    });
-
-    return NextResponse.json({
-      sessionId: session.id,
-      message: response.content,
-      messageLocale: response.contentLocale,
-      interaction,
-      userMessageEn: userBilingual.en,
-      userMessageLocale: userBilingual.locale,
-      currentSection: response.nextSection,
-      completionPct: response.completionPct,
-      shouldComplete: response.shouldComplete,
-      fromCampaign: Boolean(bankQuestion),
-    });
+    return NextResponse.json(turnResult);
   } catch (error) {
     console.error("Interview API error:", error);
     return NextResponse.json({ error: "Interview processing failed" }, { status: 500 });

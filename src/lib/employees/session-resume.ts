@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import type { Language } from "@/lib/aura/i18n";
 import { parseInteraction, type MessageInteraction } from "@/lib/aura/interaction";
+import { buildPhaseConfig } from "@/lib/interview/phase-config";
+import { getPhaseProgress } from "@/lib/interview/phase-transition";
 
 export interface ResumedSessionPayload {
   sessionId: string;
@@ -9,6 +11,11 @@ export interface ResumedSessionPayload {
   completionPct: number;
   introStep: number;
   interviewDurationMinutes: number;
+  interviewPhase: string;
+  phase1Title: string;
+  phase2Title: string;
+  phase2Enabled: boolean;
+  phaseProgress: ReturnType<typeof getPhaseProgress>;
   messages: {
     role: "user" | "assistant";
     contentEn: string;
@@ -58,6 +65,7 @@ export async function findActiveSessionForEmployee(
   if (!employee) return null;
 
   const p = session.participant;
+  const phaseConfig = buildPhaseConfig(session.company);
 
   return {
     sessionId: session.id,
@@ -65,7 +73,18 @@ export async function findActiveSessionForEmployee(
     currentSection: session.currentSection,
     completionPct: session.completionPct,
     introStep: session.introStep,
-    interviewDurationMinutes: session.company.interviewDurationMinutes ?? 5,
+    interviewDurationMinutes: phaseConfig.totalDurationMinutes,
+    interviewPhase: session.interviewPhase,
+    phase1Title: phaseConfig.phase1Title,
+    phase2Title: phaseConfig.phase2Title,
+    phase2Enabled: phaseConfig.phase2Enabled,
+    phaseProgress: getPhaseProgress({
+      interviewPhase: session.interviewPhase,
+      phase1StartedAt: session.phase1StartedAt,
+      phase2StartedAt: session.phase2StartedAt,
+      startedAt: session.startedAt,
+      config: phaseConfig,
+    }),
     messages: session.messages.map((m) => ({
       role: m.role as "user" | "assistant",
       contentEn: m.content,

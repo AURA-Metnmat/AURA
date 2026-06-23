@@ -21,6 +21,11 @@ model Company {
   description                String?
   aiContext                  String?
   interviewDurationMinutes   Int                @default(15)
+  phase1DurationMinutes      Int                @default(8)
+  phase2DurationMinutes      Int                @default(7)
+  phase2Enabled              Boolean            @default(true)
+  phase1Title                String             @default("AI Discovery")
+  phase2Title                String             @default("Domain Questions")
   contactName                String?
   contactEmail               String?
   contactPhone               String?
@@ -42,6 +47,7 @@ model Company {
   adminAuditLogs             AdminAuditLog[]
   dataExportLogs             DataExportLog[]
   reindexJobs                KnowledgeReindexJob[]
+  fixedPhaseQuestions        FixedPhaseQuestion[]
 
   @@index([isActive])
   @@index([category])
@@ -147,6 +153,10 @@ model InterviewSession {
   clientUserAgent   String?
   campaignId              String?
   campaignQuestionIndex   Int                 @default(0)
+  interviewPhase          String              @default("phase1_ai")
+  phase2QuestionIndex     Int                 @default(0)
+  phase1StartedAt         DateTime?
+  phase2StartedAt         DateTime?
   startedAt         DateTime            @default(now())
   completedAt       DateTime?
   updatedAt         DateTime            @updatedAt
@@ -169,6 +179,30 @@ model InterviewSession {
   @@index([companyId])
   @@index([employeeId])
   @@index([campaignId])
+  @@index([interviewPhase])
+}
+
+// ─── Phase 2 fixed objective questions (admin-controlled) ─────────────────
+
+model FixedPhaseQuestion {
+  id              String   @id @default(cuid())
+  companyId       String
+  sortOrder       Int
+  promptEn        String   @db.Text
+  promptLocale    String?  @db.Text
+  interactionJson String?
+  questionType    String   @default("text")
+  optionsJson     String?
+  section         String?
+  isActive        Boolean  @default(true)
+  sourceFile      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, sortOrder])
+  @@index([companyId])
+  @@index([companyId, isActive])
 }
 
 // ─── Campaigns & question bank ──────────────────────────────────────────────

@@ -8,6 +8,7 @@ import {
 import { toPublicRegistrationPolicy } from "@/lib/companies/registration-policy";
 import type { RegistrationMode } from "@/lib/auth/employee-otp/types";
 import type { PublicRegistrationPolicy } from "@/lib/companies/registration-policy";
+import { buildPhaseConfig } from "@/lib/interview/phase-config";
 
 export interface ResolvedCampaign {
   id: string;
@@ -26,6 +27,11 @@ export interface ResolvedInterviewAccess {
     industry: string | null;
     description: string | null;
     interviewDurationMinutes: number;
+    phase1DurationMinutes: number;
+    phase2DurationMinutes: number;
+    phase2Enabled: boolean;
+    phase1Title: string;
+    phase2Title: string;
     registrationPolicy: PublicRegistrationPolicy;
   };
   campaign: ResolvedCampaign;
@@ -39,6 +45,11 @@ const companySelect = {
   industry: true,
   description: true,
   interviewDurationMinutes: true,
+  phase1DurationMinutes: true,
+  phase2DurationMinutes: true,
+  phase2Enabled: true,
+  phase1Title: true,
+  phase2Title: true,
   inviteToken: true,
   isActive: true,
   allowEmployeeSelfRegistration: true,
@@ -55,11 +66,17 @@ function formatResolvedCompany(
     industry: string | null;
     description: string | null;
     interviewDurationMinutes: number;
+    phase1DurationMinutes: number;
+    phase2DurationMinutes: number;
+    phase2Enabled: boolean;
+    phase1Title: string;
+    phase2Title: string;
     allowEmployeeSelfRegistration: boolean;
     allowedEmailDomains: string | null;
     registrationMode: string;
   }
 ) {
+  const phaseConfig = buildPhaseConfig(company);
   return {
     id: company.id,
     name: company.name,
@@ -67,7 +84,12 @@ function formatResolvedCompany(
     category: company.category,
     industry: company.industry,
     description: company.description,
-    interviewDurationMinutes: company.interviewDurationMinutes,
+    interviewDurationMinutes: phaseConfig.totalDurationMinutes,
+    phase1DurationMinutes: phaseConfig.phase1DurationMinutes,
+    phase2DurationMinutes: phaseConfig.phase2DurationMinutes,
+    phase2Enabled: phaseConfig.phase2Enabled,
+    phase1Title: phaseConfig.phase1Title,
+    phase2Title: phaseConfig.phase2Title,
     registrationPolicy: toPublicRegistrationPolicy({
       allowEmployeeSelfRegistration: company.allowEmployeeSelfRegistration,
       requireMobileOtpForEmployeeLogin: false,

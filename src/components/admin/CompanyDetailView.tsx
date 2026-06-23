@@ -21,6 +21,7 @@ import {
   Users,
   RefreshCw,
   BookOpen,
+  ListOrdered,
   Layers,
   Megaphone,
   ShieldCheck,
@@ -31,6 +32,7 @@ import InterviewAnalyticsPanel from "@/components/admin/InterviewAnalyticsPanel"
 import ExportHistoryPanel from "@/components/admin/ExportHistoryPanel";
 import RegistrationPolicyPanel from "@/components/admin/RegistrationPolicyPanel";
 import ReferenceKnowledgePanel from "@/components/admin/ReferenceKnowledgePanel";
+import InterviewPhasesPanel from "@/components/admin/InterviewPhasesPanel";
 import { useReindexJob } from "@/hooks/use-reindex-job";
 
 interface CompanyRow {
@@ -186,7 +188,7 @@ interface GatheredData {
   };
 }
 
-type TabId = "overview" | "reference" | "experience" | "interviews" | "campaigns" | "quality" | "analytics";
+type TabId = "overview" | "reference" | "experience" | "interviews" | "campaigns" | "phases" | "quality" | "analytics";
 
 interface CompanyDetailViewProps {
   company: CompanyRow;
@@ -252,6 +254,7 @@ const TABS: { id: TabId; label: string; icon: typeof Database }[] = [
   { id: "reference", label: "Reference Knowledge", icon: BookOpen },
   { id: "experience", label: "Experience Vault & ML", icon: Brain },
   { id: "campaigns", label: "Campaigns", icon: Megaphone },
+  { id: "phases", label: "Interview Phases", icon: ListOrdered },
   { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "quality", label: "Data Quality", icon: ShieldCheck },
   { id: "interviews", label: "Live Interviews", icon: Users },
@@ -706,6 +709,12 @@ export default function CompanyDetailView({
             glassCard={glassCard}
             onCopyLink={onCopyLink}
           />
+        </div>
+      )}
+
+      {activeTab === "phases" && (
+        <div className={`${glassPanel} rounded-2xl p-5 border border-white/5`}>
+          <InterviewPhasesPanel companyId={company.id} glassCard={glassCard} />
         </div>
       )}
 

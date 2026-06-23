@@ -15,6 +15,9 @@ export default function CompanyInterviewPage({
     name: string;
     slug: string;
     interviewDurationMinutes?: number;
+    phase1Title?: string;
+    phase2Title?: string;
+    phase2Enabled?: boolean;
     registrationPolicy?: PublicRegistrationPolicy;
   } | null>(null);
   const [campaignId, setCampaignId] = useState<string | undefined>();
@@ -70,7 +73,10 @@ export default function CompanyInterviewPage({
       companyName={company.name}
       inviteToken={token ?? undefined}
       campaignId={campaignId}
-      interviewDurationMinutes={company.interviewDurationMinutes ?? 5}
+      interviewDurationMinutes={company.interviewDurationMinutes ?? 15}
+      phase1Title={company.phase1Title}
+      phase2Title={company.phase2Title}
+      phase2Enabled={company.phase2Enabled}
       registrationPolicy={company.registrationPolicy}
     />
   );
