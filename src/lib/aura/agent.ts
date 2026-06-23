@@ -45,6 +45,8 @@ export interface SessionContext {
   messageHistory: { role: "user" | "assistant"; content: string }[];
   questionIndex: number;
   postIntro?: boolean;
+  /** Campaign question bank prompt — AI adapts using reference knowledge */
+  campaignGuidance?: string | null;
 }
 
 export interface AuraResponse {
@@ -241,10 +243,14 @@ export async function generateAuraResponse(
 IMPORTANT: Ask questions specific to a ${designation} at ${ctx.company.name}. Focus on their daily workflows, tools, approvals, handoffs, KPIs, and pain points for THIS post — avoid generic questions unrelated to their job.`
     : `Participant department: ${department}.`;
 
+  const campaignLine = ctx.campaignGuidance?.trim()
+    ? `Campaign question to ask (adapt using reference knowledge and employee context — keep one clear question): ${ctx.campaignGuidance.trim()}\n`
+    : "";
+
   const sectionPrompt = isPreferredLanguage(lang)
     ? `${bilingualInstruction(lang)}
 ${ctx.postIntro ? "POST-INTRO: The employee finished introduction (journey + tenure). Use company knowledge AND their answers. First deep-dive question MUST use MCQ when asking about frequency, volume, team size, tools, or severity.\n" : ""}
-${roleFocus}
+${campaignLine}${roleFocus}
 Current section: ${sectionInfo?.name} (${ctx.currentSection})
 Client company: ${ctx.company.name}
 Suggested focus questions (locale): ${questions.join(" | ")}
@@ -252,7 +258,7 @@ English reference questions: ${enQuestions.join(" | ")}
 Question progress in section: ${ctx.questionIndex + 1}/${questions.length}
 Participant: ${ctx.participant?.fullName ?? "unknown"} | ${department} | ${designation}`
     : `${englishInstruction()}
-${ctx.postIntro ? "POST-INTRO: Employee finished introduction. First deep-dive MUST use MCQ when appropriate (frequency, scale, tools, severity).\n" : ""}${roleFocus}
+${ctx.postIntro ? "POST-INTRO: Employee finished introduction. First deep-dive MUST use MCQ when appropriate (frequency, scale, tools, severity).\n" : ""}${campaignLine}${roleFocus}
 Current section: ${sectionInfo?.name} (${ctx.currentSection})
 Client company: ${ctx.company.name}
 Suggested questions: ${enQuestions.join(" | ")}

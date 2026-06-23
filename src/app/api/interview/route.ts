@@ -468,45 +468,6 @@ export async function POST(request: Request) {
     }
 
     const bankQuestion = await getNextCampaignQuestion(session.id, lang);
-    if (bankQuestion) {
-      await db.message.create({
-        data: {
-          sessionId: session.id,
-          role: "assistant",
-          content: bankQuestion.en,
-          contentLocale: bankQuestion.locale,
-          metadata: bankQuestion.metadata,
-          section: bankQuestion.section ?? session.currentSection,
-        },
-      });
-
-      const nextSection = (bankQuestion.section ?? session.currentSection) as SectionId;
-      const nextIndex = bankQuestion.questionIndex + 1;
-      const nextPct = Math.min(99, session.completionPct + 4);
-
-      await db.interviewSession.update({
-        where: { id: session.id },
-        data: {
-          campaignQuestionIndex: nextIndex,
-          introStep: Math.max(introStep, 3),
-          currentSection: nextSection,
-          completionPct: nextPct,
-        },
-      });
-
-      return NextResponse.json({
-        sessionId: session.id,
-        message: bankQuestion.en,
-        messageLocale: bankQuestion.locale,
-        interaction: bankQuestion.interaction,
-        userMessageEn: userBilingual.en,
-        userMessageLocale: userBilingual.locale,
-        currentSection: nextSection,
-        completionPct: nextPct,
-        shouldComplete: false,
-        fromCampaign: true,
-      });
-    }
 
     const companyCtx = await loadFullCompanyContext({
       name: session.company.name,
@@ -517,7 +478,11 @@ export async function POST(request: Request) {
     });
 
     const postIntro = introStep === 2;
-    const activeSection = postIntro ? ("B" as SectionId) : (session.currentSection as SectionId);
+    const activeSection = bankQuestion
+      ? ((bankQuestion.section ?? session.currentSection) as SectionId)
+      : postIntro
+        ? ("B" as SectionId)
+        : (session.currentSection as SectionId);
     const questionIndex = session.questionIndex ?? 0;
 
     const response = await generateAuraResponse(
@@ -531,9 +496,14 @@ export async function POST(request: Request) {
         messageHistory: updatedHistory,
         questionIndex,
         postIntro,
+        campaignGuidance: bankQuestion?.en ?? null,
       },
       userBilingual.en
     );
+
+    const interaction = response.interaction ?? bankQuestion?.interaction ?? null;
+    const metadata =
+      response.metadata ?? (interaction ? serializeInteraction(interaction) : null);
 
     await db.message.create({
       data: {
@@ -541,7 +511,7 @@ export async function POST(request: Request) {
         role: "assistant",
         content: response.content,
         contentLocale: response.contentLocale,
-        metadata: response.metadata ?? null,
+        metadata,
         section: response.nextSection,
       },
     });
@@ -552,6 +522,9 @@ export async function POST(request: Request) {
         introStep: Math.max(introStep, 3),
         currentSection: response.nextSection,
         questionIndex: response.nextQuestionIndex,
+        campaignQuestionIndex: bankQuestion
+          ? bankQuestion.questionIndex + 1
+          : session.campaignQuestionIndex,
         completionPct: response.completionPct,
       },
     });
@@ -560,12 +533,13 @@ export async function POST(request: Request) {
       sessionId: session.id,
       message: response.content,
       messageLocale: response.contentLocale,
-      interaction: response.interaction ?? null,
+      interaction,
       userMessageEn: userBilingual.en,
       userMessageLocale: userBilingual.locale,
       currentSection: response.nextSection,
       completionPct: response.completionPct,
       shouldComplete: response.shouldComplete,
+      fromCampaign: Boolean(bankQuestion),
     });
   } catch (error) {
     console.error("Interview API error:", error);

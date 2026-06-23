@@ -93,7 +93,7 @@ async function loadLegacyCorpus(companySlug: string): Promise<RetrievalChunk[]> 
 async function loadIndexedCorpus(companySlug: string): Promise<RetrievalChunk[]> {
   const indexed = await db.knowledgeChunk.findMany({
     where: { companySlug },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ sourceType: "asc" }, { updatedAt: "desc" }],
     take: 180,
     select: {
       sourceLabel: true,
@@ -107,7 +107,12 @@ async function loadIndexedCorpus(companySlug: string): Promise<RetrievalChunk[]>
     return loadLegacyCorpus(companySlug);
   }
 
-  return indexed.map((c) => ({
+  const referenceFirst = [
+    ...indexed.filter((c) => c.sourceType === SOURCE_TYPE.REFERENCE),
+    ...indexed.filter((c) => c.sourceType !== SOURCE_TYPE.REFERENCE),
+  ];
+
+  return referenceFirst.map((c) => ({
     source: c.sourceLabel,
     category:
       c.sourceType === SOURCE_TYPE.EXPERIENCE

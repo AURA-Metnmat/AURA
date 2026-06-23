@@ -9,6 +9,10 @@ import {
   MAX_REFERENCE_UPLOAD_BYTES,
 } from "@/lib/reference/reference-categories";
 import { syncReferenceKnowledgeIndex } from "@/lib/reference/reference-mutations";
+import { parseFormDataUploads } from "@/lib/upload/form-data-files";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(
   request: Request,
@@ -28,30 +32,32 @@ export async function POST(
     }
 
     const formData = await request.formData();
+    const parsed = await parseFormDataUploads(formData);
     const uploads: { fileName: string; buffer: Buffer }[] = [];
 
-    for (const entry of formData.getAll("files")) {
-      if (!(entry instanceof File) || entry.size === 0) continue;
+    for (const entry of parsed) {
       if (entry.size > MAX_REFERENCE_UPLOAD_BYTES) {
         return NextResponse.json(
           {
-            error: `File "${entry.name}" exceeds ${Math.round(MAX_REFERENCE_UPLOAD_BYTES / (1024 * 1024))}MB limit`,
+            error: `File "${entry.fileName}" exceeds ${Math.round(MAX_REFERENCE_UPLOAD_BYTES / (1024 * 1024))}MB limit`,
           },
           { status: 400 }
         );
       }
-      if (!isAllowedReferenceUpload(entry.name)) {
+      if (!isAllowedReferenceUpload(entry.fileName)) {
         return NextResponse.json(
-          { error: `Unsupported file type: ${entry.name}` },
+          { error: `Unsupported file type: ${entry.fileName}. Use Excel, CSV, PDF, TXT, or Markdown.` },
           { status: 400 }
         );
       }
-      const buffer = Buffer.from(await entry.arrayBuffer());
-      uploads.push({ fileName: entry.name, buffer });
+      uploads.push({ fileName: entry.fileName, buffer: entry.buffer });
     }
 
     if (uploads.length === 0) {
-      return NextResponse.json({ error: "No valid files uploaded" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No valid files uploaded. Choose a supported file type with content." },
+        { status: 400 }
+      );
     }
 
     const stats = await runReferenceImportFromUploads(company.slug, uploads);

@@ -12,6 +12,7 @@ import {
 } from "@/lib/reference/reference-categories";
 import { syncReferenceKnowledgeIndex } from "@/lib/reference/reference-mutations";
 import { db } from "@/lib/db";
+import { parseFormDataUploads } from "@/lib/upload/form-data-files";
 
 export async function POST(request: Request) {
   try {
@@ -35,23 +36,22 @@ export async function POST(request: Request) {
       const session = await requireCompanyAdmin(request, company.id, PERMISSIONS.REVIEW_KNOWLEDGE);
       if (session instanceof NextResponse) return session;
 
+      const parsed = await parseFormDataUploads(formData);
       const uploads: { fileName: string; buffer: Buffer }[] = [];
-      for (const entry of formData.getAll("files")) {
-        if (!(entry instanceof File) || entry.size === 0) continue;
+      for (const entry of parsed) {
         if (entry.size > MAX_REFERENCE_UPLOAD_BYTES) {
           return NextResponse.json(
-            { error: `File "${entry.name}" exceeds size limit` },
+            { error: `File "${entry.fileName}" exceeds size limit` },
             { status: 400 }
           );
         }
-        if (!isAllowedReferenceUpload(entry.name)) {
+        if (!isAllowedReferenceUpload(entry.fileName)) {
           return NextResponse.json(
-            { error: `Unsupported file type: ${entry.name}` },
+            { error: `Unsupported file type: ${entry.fileName}` },
             { status: 400 }
           );
         }
-        const buffer = Buffer.from(await entry.arrayBuffer());
-        uploads.push({ fileName: entry.name, buffer });
+        uploads.push({ fileName: entry.fileName, buffer: entry.buffer });
       }
 
       const stats = await runReferenceImportFromUploads(company.slug, uploads);
