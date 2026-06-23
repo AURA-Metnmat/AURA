@@ -8,8 +8,7 @@ import {
 } from "@/lib/import/reference-import";
 import { syncReferenceKnowledgeIndex } from "@/lib/reference/reference-mutations";
 import { db } from "@/lib/db";
-import { parseFormDataUploads } from "@/lib/upload/form-data-files";
-import { validateReferenceUploads } from "@/lib/upload/reference-upload";
+import { parseReferenceFormData, validateReferenceUploads } from "@/lib/upload/reference-upload";
 
 export async function POST(request: Request) {
   try {
@@ -33,7 +32,7 @@ export async function POST(request: Request) {
       const session = await requireCompanyAdmin(request, company.id, PERMISSIONS.REVIEW_KNOWLEDGE);
       if (session instanceof NextResponse) return session;
 
-      const parsed = await parseFormDataUploads(formData);
+      const parsed = await parseReferenceFormData(formData);
       const validated = validateReferenceUploads(parsed);
       if (!validated.ok) {
         return NextResponse.json({ error: validated.error }, { status: 400 });

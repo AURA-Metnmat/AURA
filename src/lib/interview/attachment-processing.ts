@@ -97,10 +97,34 @@ export async function extractAttachmentText(
   }
 
   if (lower.endsWith(".doc") || lower.endsWith(".docx")) {
-    return `[Word document: ${fileName} — stored; download file for full content]`;
+    return `[Word document: ${fileName} — stored (${buffer.length} bytes); download for full content]`;
   }
 
-  return `[File: ${fileName} (${fileType || "unknown"}) — stored at upload URL]`;
+  if (lower.endsWith(".pptx") || lower.endsWith(".ppt")) {
+    return `[Presentation: ${fileName} — stored (${buffer.length} bytes); download for full content]`;
+  }
+
+  if (lower.endsWith(".zip") || lower.endsWith(".rar") || lower.endsWith(".7z")) {
+    return `[Archive: ${fileName} — stored (${buffer.length} bytes)]`;
+  }
+
+  // Best-effort text for unknown types (skip likely binary)
+  if (buffer.length <= 512_000) {
+    const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
+    const nullBytes = sample.filter((b) => b === 0).length;
+    if (nullBytes / sample.length < 0.05) {
+      try {
+        const text = truncate(buffer.toString("utf-8"));
+        if (text.replace(/\s/g, "").length > 20) {
+          return text;
+        }
+      } catch {
+        // fall through
+      }
+    }
+  }
+
+  return `[File: ${fileName} (${fileType || "application/octet-stream"}) — stored (${buffer.length} bytes)]`;
 }
 
 export function previewExtractedText(text: string | null | undefined, max = 240): string {

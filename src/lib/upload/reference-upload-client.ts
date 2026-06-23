@@ -1,9 +1,14 @@
 import {
-  isAllowedReferenceUpload,
   MAX_REFERENCE_UPLOAD_BYTES,
-  sanitizeReferenceFileName,
+  resolveReferenceFileName,
 } from "@/lib/reference/reference-categories";
 import { JSON_REFERENCE_UPLOAD_MAX_BYTES } from "./reference-upload";
+
+export interface PreparedReferenceFile {
+  fileName: string;
+  buffer: ArrayBuffer;
+  mimeType: string;
+}
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -15,44 +20,74 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export function validateClientReferenceFiles(files: File[]): string | null {
-  for (const file of files) {
-    const fileName = sanitizeReferenceFileName(file.name);
-    if (!fileName) {
-      return "Selected file has no name.";
-    }
-    if (!isAllowedReferenceUpload(fileName)) {
-      return `Invalid file name: ${file.name}`;
-    }
-    if (file.size === 0) {
-      return `File "${fileName}" is empty. If it is on OneDrive, download it locally first.`;
-    }
-    if (file.size > MAX_REFERENCE_UPLOAD_BYTES) {
-      return `File "${fileName}" exceeds 25MB.`;
-    }
+function estimateJsonPayloadBytes(prepared: PreparedReferenceFile[]): number {
+  return prepared.reduce(
+    (sum, file) =>
+      sum + Math.ceil(file.buffer.byteLength * 4 / 3) + file.fileName.length + 64,
+    256
+  );
+}
+
+export async function prepareReferenceFiles(files: File[]): Promise<PreparedReferenceFile[]> {
+  if (files.length === 0) {
+    throw new Error("Choose at least one file to upload.");
   }
-  return null;
+
+  const prepared: PreparedReferenceFile[] = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]!;
+    const displayName = file.name?.trim() || `file-${i + 1}`;
+
+    if (file.size > MAX_REFERENCE_UPLOAD_BYTES) {
+      throw new Error(`File "${displayName}" exceeds 25MB.`);
+    }
+
+    let buffer: ArrayBuffer;
+    try {
+      buffer = await file.arrayBuffer();
+    } catch {
+      throw new Error(
+        `Could not read "${displayName}". Download it from OneDrive to your computer first, then upload.`
+      );
+    }
+
+    if (buffer.byteLength === 0) {
+      throw new Error(
+        `File "${displayName}" has no readable content. If it is on OneDrive, download it locally first (cloud-only files cannot be uploaded from the browser).`
+      );
+    }
+
+    if (buffer.byteLength > MAX_REFERENCE_UPLOAD_BYTES) {
+      throw new Error(`File "${displayName}" exceeds 25MB.`);
+    }
+
+    prepared.push({
+      fileName: resolveReferenceFileName(file.name, i, file.type),
+      buffer,
+      mimeType: file.type || "application/octet-stream",
+    });
+  }
+
+  return prepared;
 }
 
 export async function buildReferenceUploadRequest(
   files: File[]
 ): Promise<{ init: RequestInit; mode: "json" | "multipart" }> {
-  const validationError = validateClientReferenceFiles(files);
-  if (validationError) {
-    throw new Error(validationError);
-  }
-
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-  const useJson = totalSize <= JSON_REFERENCE_UPLOAD_MAX_BYTES;
+  const prepared = await prepareReferenceFiles(files);
+  const estimatedJsonBytes = estimateJsonPayloadBytes(prepared);
+  const useJson =
+    estimatedJsonBytes <= JSON_REFERENCE_UPLOAD_MAX_BYTES &&
+    prepared.every((file) => file.buffer.byteLength <= JSON_REFERENCE_UPLOAD_MAX_BYTES);
 
   if (useJson) {
     const payload = {
-      files: await Promise.all(
-        files.map(async (file) => ({
-          fileName: sanitizeReferenceFileName(file.name),
-          contentBase64: arrayBufferToBase64(await file.arrayBuffer()),
-        }))
-      ),
+      files: prepared.map((file) => ({
+        fileName: file.fileName,
+        mimeType: file.mimeType,
+        contentBase64: arrayBufferToBase64(file.buffer),
+      })),
     };
 
     return {
@@ -67,8 +102,9 @@ export async function buildReferenceUploadRequest(
   }
 
   const formData = new FormData();
-  for (const file of files) {
-    formData.append("files", file, sanitizeReferenceFileName(file.name));
+  for (const file of prepared) {
+    const blob = new Blob([file.buffer], { type: file.mimeType });
+    formData.append("files", blob, file.fileName);
   }
 
   return {

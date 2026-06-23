@@ -26,4 +26,16 @@ describe("reference upload parsing", () => {
     ]);
     assert.equal(result.ok, true);
   });
+
+  it("accepts extensionless files with resolved names", () => {
+    const uploads = parseJsonReferenceUploads([
+      {
+        fileName: "",
+        mimeType: "application/pdf",
+        contentBase64: Buffer.from("pdf-bytes").toString("base64"),
+      },
+    ]);
+    assert.equal(uploads.length, 1);
+    assert.equal(uploads[0]?.fileName, "reference-1.pdf");
+  });
 });

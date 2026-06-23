@@ -1,16 +1,17 @@
 import {
   isAllowedReferenceUpload,
   MAX_REFERENCE_UPLOAD_BYTES,
-  sanitizeReferenceFileName,
+  resolveReferenceFileName,
 } from "@/lib/reference/reference-categories";
 import { parseFormDataUploads, type ParsedFormUpload } from "./form-data-files";
 
-/** Vercel serverless request body limit is ~4.5MB — use JSON below this raw size */
+/** Vercel serverless request body limit is ~4.5MB — keep JSON payloads under this */
 export const JSON_REFERENCE_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
 
 export interface JsonReferenceUploadFile {
   fileName: string;
   contentBase64: string;
+  mimeType?: string;
 }
 
 function decodeBase64Payload(contentBase64: string): Buffer | null {
@@ -31,15 +32,39 @@ function decodeBase64Payload(contentBase64: string): Buffer | null {
 export function parseJsonReferenceUploads(files: JsonReferenceUploadFile[]): ParsedFormUpload[] {
   const uploads: ParsedFormUpload[] = [];
 
-  for (const file of files) {
-    const fileName = sanitizeReferenceFileName(file.fileName ?? "");
-    if (!fileName || !isAllowedReferenceUpload(fileName)) continue;
-
+  files.forEach((file, index) => {
     const buffer = decodeBase64Payload(file.contentBase64 ?? "");
-    if (!buffer) continue;
+    if (!buffer) return;
+
+    const fileName = resolveReferenceFileName(
+      file.fileName ?? "",
+      index,
+      file.mimeType ?? null
+    );
+    if (!isAllowedReferenceUpload(fileName)) return;
 
     uploads.push({ fileName, buffer, size: buffer.length });
-  }
+  });
+
+  return uploads;
+}
+
+export async function parseReferenceFormData(formData: FormData): Promise<ParsedFormUpload[]> {
+  const parsed = await parseFormDataUploads(formData, ["files", "file"]);
+  const uploads: ParsedFormUpload[] = [];
+
+  parsed.forEach((entry, index) => {
+    if (entry.buffer.length === 0) return;
+
+    const fileName = resolveReferenceFileName(entry.fileName, index);
+    if (!isAllowedReferenceUpload(fileName)) return;
+
+    uploads.push({
+      fileName,
+      buffer: entry.buffer,
+      size: entry.buffer.length,
+    });
+  });
 
   return uploads;
 }
@@ -53,13 +78,7 @@ export async function parseReferenceUploadRequest(request: Request): Promise<Par
   }
 
   const formData = await request.formData();
-  const parsed = await parseFormDataUploads(formData);
-  return parsed
-    .map((entry) => ({
-      ...entry,
-      fileName: sanitizeReferenceFileName(entry.fileName),
-    }))
-    .filter((entry) => entry.fileName && entry.buffer.length > 0);
+  return parseReferenceFormData(formData);
 }
 
 export function validateReferenceUploads(
@@ -69,16 +88,16 @@ export function validateReferenceUploads(
     return {
       ok: false,
       error:
-        "No valid files received. Choose a file up to 25MB with content. If the file is on OneDrive, download it to your computer first, then upload.",
+        "No valid files received. The file may be empty, unreadable, or still on OneDrive — download it to your computer first, then upload again. Any file type up to 25MB is supported.",
     };
   }
 
   const uploads: ParsedFormUpload[] = [];
 
   for (const entry of parsed) {
-    const fileName = sanitizeReferenceFileName(entry.fileName);
-    if (!fileName || !isAllowedReferenceUpload(fileName)) {
-      return { ok: false, error: "Invalid file name." };
+    const fileName = resolveReferenceFileName(entry.fileName, uploads.length);
+    if (!isAllowedReferenceUpload(fileName)) {
+      return { ok: false, error: `Invalid file name: ${entry.fileName}` };
     }
 
     if (entry.size > MAX_REFERENCE_UPLOAD_BYTES) {

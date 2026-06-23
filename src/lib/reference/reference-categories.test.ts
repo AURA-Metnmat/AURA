@@ -5,6 +5,7 @@ import {
   isReferenceFileCategory,
   isStructuredReferenceDataFile,
   normalizeReferenceCategory,
+  resolveReferenceFileName,
   sanitizeReferenceFileName,
 } from "./reference-categories";
 
@@ -24,6 +25,14 @@ describe("reference categories", () => {
 
   it("sanitizes file names", () => {
     assert.equal(sanitizeReferenceFileName("C:\\docs\\furnace.pdf"), "furnace.pdf");
+  });
+
+  it("resolves fallback names from mime type", () => {
+    assert.equal(
+      resolveReferenceFileName("", 0, "application/pdf"),
+      "reference-1.pdf"
+    );
+    assert.equal(resolveReferenceFileName("notes", 1, "text/plain"), "notes");
   });
 
   it("normalizes categories", () => {

@@ -45,10 +45,55 @@ export function sanitizeReferenceFileName(fileName: string): string {
   return base.replace(UNSAFE_FILE_NAME, "").slice(0, 255);
 }
 
+const MIME_EXTENSION_HINTS: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "text/plain": ".txt",
+  "text/csv": ".csv",
+  "text/markdown": ".md",
+  "application/json": ".json",
+  "application/xml": ".xml",
+  "text/xml": ".xml",
+  "text/html": ".html",
+  "application/vnd.ms-excel": ".xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/msword": ".doc",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/gif": ".gif",
+  "image/webp": ".webp",
+};
+
+function extensionFromMimeType(mimeType?: string | null): string {
+  if (!mimeType) return "";
+  const normalized = mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
+  return MIME_EXTENSION_HINTS[normalized] ?? "";
+}
+
+/** Stable display name for uploads — never returns empty for a non-empty buffer */
+export function resolveReferenceFileName(
+  fileName: string,
+  fallbackIndex: number,
+  mimeType?: string | null
+): string {
+  const sanitized = sanitizeReferenceFileName(fileName);
+  if (sanitized && isAllowedReferenceUpload(sanitized)) {
+    return sanitized;
+  }
+
+  const ext = extensionFromMimeType(mimeType) || ".bin";
+  const fallback = `reference-${fallbackIndex + 1}${ext}`;
+  return sanitizeReferenceFileName(fallback) || `reference-${fallbackIndex + 1}.bin`;
+}
+
 /** Any non-empty safe filename — Excel/CSV get structured import; others are text-extracted */
 export function isAllowedReferenceUpload(fileName: string): boolean {
   const name = sanitizeReferenceFileName(fileName);
-  return name.length > 0 && !name.includes("..");
+  if (!name) return false;
+  if (name.includes("..")) return false;
+  if (name === "." || name === "..") return false;
+  return true;
 }
 
 export function isStructuredReferenceDataFile(fileName: string): boolean {

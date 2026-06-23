@@ -32,8 +32,30 @@ async function readUploadEntry(
     return null;
   }
 
-  const blob = entry as Blob & { name?: string };
-  const buffer = Buffer.from(await blob.arrayBuffer());
+  const blob = entry as Blob & { name?: string; size?: number };
+  let buffer = Buffer.from(await blob.arrayBuffer());
+
+  if (buffer.length === 0 && typeof blob.stream === "function") {
+    try {
+      const reader = blob.stream().getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value?.length) {
+          chunks.push(value);
+          total += value.length;
+        }
+      }
+      if (total > 0) {
+        buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), total);
+      }
+    } catch {
+      // keep empty buffer
+    }
+  }
+
   if (buffer.length === 0) return null;
 
   const fileName = fileNameFromEntry(blob, fieldName, fallbackIndex);
