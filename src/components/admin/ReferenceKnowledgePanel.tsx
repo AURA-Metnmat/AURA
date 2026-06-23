@@ -17,6 +17,7 @@ import {
   REFERENCE_UPLOAD_ACCEPT,
   type ReferenceFileCategory,
 } from "@/lib/reference/reference-categories";
+import { buildReferenceUploadRequest } from "@/lib/upload/reference-upload-client";
 
 const glassPanel = "bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-lg shadow-black/20";
 const glassCard = "bg-slate-900/50 backdrop-blur-md border border-white/10 hover:border-indigo-500/20 transition-colors";
@@ -128,18 +129,12 @@ export default function ReferenceKnowledgePanel({
     e.target.value = "";
     setUploading(true);
     try {
-      const formData = new FormData();
-      for (const file of Array.from(files)) {
-        formData.append("files", file);
-      }
-      const res = await fetch(`/api/companies/${companyId}/reference/upload`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
+      const fileList = Array.from(files);
+      const { init } = await buildReferenceUploadRequest(fileList);
+      const res = await fetch(`/api/companies/${companyId}/reference/upload`, init);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed");
-      showNotice(data.message ?? `Uploaded ${files.length} file(s) and synced knowledge index`);
+      showNotice(data.message ?? `Uploaded ${fileList.length} file(s) and synced knowledge index`);
       await onRefresh();
     } catch (err) {
       showNotice(err instanceof Error ? err.message : "Upload failed", "error");
