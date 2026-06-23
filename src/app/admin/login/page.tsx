@@ -7,7 +7,6 @@ import { PLATFORM_NAME } from "@/lib/aura/config";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,10 +19,7 @@ export default function AdminLoginPage() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim() || undefined,
-          password,
-        }),
+        body: JSON.stringify({ password }),
         credentials: "include",
       });
       if (!res.ok) {
@@ -47,28 +43,12 @@ export default function AdminLoginPage() {
           ← {PLATFORM_NAME}
         </Link>
         <h1 className="text-2xl font-semibold mt-4">METNMAT Admin</h1>
-        <p className="text-sm text-slate-400 mt-2">
-          Sign in with your admin account, or use the legacy shared password.
-        </p>
+        <p className="text-sm text-slate-400 mt-2">Enter your admin password to continue.</p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
-            <label htmlFor="email" className="text-xs text-slate-500 uppercase tracking-wider">
-              Email (optional for legacy login)
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm"
-              placeholder="admin@company.com"
-              autoComplete="username"
-            />
-          </div>
-          <div>
             <label htmlFor="password" className="text-xs text-slate-500 uppercase tracking-wider">
-              Password
+              Admin password
             </label>
             <input
               id="password"
@@ -76,9 +56,10 @@ export default function AdminLoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="mt-2 w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm"
-              placeholder="Enter password"
+              placeholder="Enter admin password"
               autoComplete="current-password"
               required
+              autoFocus
             />
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}

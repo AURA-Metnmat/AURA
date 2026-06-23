@@ -74,8 +74,7 @@ export function getAppEnv(): AppEnv {
     appUrl,
     adminPassword,
     allowLegacyAdminPassword:
-      process.env.ALLOW_LEGACY_ADMIN_PASSWORD?.trim().toLowerCase() === "true" ||
-      (!isProduction && process.env.ALLOW_LEGACY_ADMIN_PASSWORD?.trim().toLowerCase() !== "false"),
+      process.env.ALLOW_LEGACY_ADMIN_PASSWORD?.trim().toLowerCase() !== "false",
     sessionSecret,
     storage: { supabaseUrl, supabaseServiceKey, bucket },
     importDataDir: process.env.IMPORT_DATA_DIR?.trim() ?? null,
