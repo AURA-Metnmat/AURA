@@ -3,6 +3,7 @@ import type { Language } from "@/lib/aura/i18n";
 import { parseInteraction, type MessageInteraction } from "@/lib/aura/interaction";
 import { buildPhaseConfig } from "@/lib/interview/phase-config";
 import { getPhaseProgress } from "@/lib/interview/phase-transition";
+import { buildInterviewPhaseMeta } from "@/lib/interview/phase-response";
 
 export interface ResumedSessionPayload {
   sessionId: string;
@@ -16,6 +17,8 @@ export interface ResumedSessionPayload {
   phase2Title: string;
   phase2Enabled: boolean;
   phaseProgress: ReturnType<typeof getPhaseProgress>;
+  phase2QuestionNumber?: number;
+  phase2QuestionTotal?: number;
   messages: {
     role: "user" | "assistant";
     contentEn: string;
@@ -66,6 +69,15 @@ export async function findActiveSessionForEmployee(
 
   const p = session.participant;
   const phaseConfig = buildPhaseConfig(session.company);
+  const phaseMeta = await buildInterviewPhaseMeta({
+    companyId: session.companyId,
+    company: session.company,
+    interviewPhase: session.interviewPhase,
+    phase2QuestionIndex: session.phase2QuestionIndex,
+    phase1StartedAt: session.phase1StartedAt,
+    phase2StartedAt: session.phase2StartedAt,
+    startedAt: session.startedAt,
+  });
 
   return {
     sessionId: session.id,
@@ -74,17 +86,13 @@ export async function findActiveSessionForEmployee(
     completionPct: session.completionPct,
     introStep: session.introStep,
     interviewDurationMinutes: phaseConfig.totalDurationMinutes,
-    interviewPhase: session.interviewPhase,
-    phase1Title: phaseConfig.phase1Title,
-    phase2Title: phaseConfig.phase2Title,
-    phase2Enabled: phaseConfig.phase2Enabled,
-    phaseProgress: getPhaseProgress({
-      interviewPhase: session.interviewPhase,
-      phase1StartedAt: session.phase1StartedAt,
-      phase2StartedAt: session.phase2StartedAt,
-      startedAt: session.startedAt,
-      config: phaseConfig,
-    }),
+    interviewPhase: phaseMeta.interviewPhase,
+    phase1Title: phaseMeta.phase1Title,
+    phase2Title: phaseMeta.phase2Title,
+    phase2Enabled: phaseMeta.phase2Enabled,
+    phaseProgress: phaseMeta.phaseProgress,
+    phase2QuestionNumber: phaseMeta.phase2QuestionNumber,
+    phase2QuestionTotal: phaseMeta.phase2QuestionTotal,
     messages: session.messages.map((m) => ({
       role: m.role as "user" | "assistant",
       contentEn: m.content,

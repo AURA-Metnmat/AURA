@@ -4,7 +4,7 @@ import { loadFullCompanyContext } from "@/lib/companies/company-knowledge";
 import { serializeInteraction, type MessageInteraction } from "@/lib/aura/interaction";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
-import { buildPhaseConfig, INTERVIEW_PHASE } from "./phase-config";
+import { buildPhaseConfig, INTERVIEW_PHASE, hasPendingPhase2, PHASE2_FINISHED_COMPLETION_PCT } from "./phase-config";
 import {
   buildPhase2TransitionMessage,
   getPhaseProgress,
@@ -88,8 +88,18 @@ export async function handlePostIntroInterviewTurn(params: {
   const { session, lang, userBilingual, updatedHistory, introStep } = params;
   const config = buildPhaseConfig(session.company);
   const phase2Count = await countActivePhase2Questions(session.companyId);
+  let interviewPhase = session.interviewPhase;
+
+  if (interviewPhase === INTERVIEW_PHASE.PHASE2_FIXED && phase2Count === 0) {
+    await db.interviewSession.update({
+      where: { id: session.id },
+      data: { interviewPhase: INTERVIEW_PHASE.PHASE1_AI },
+    });
+    interviewPhase = INTERVIEW_PHASE.PHASE1_AI;
+  }
+
   const phaseProgress = getPhaseProgress({
-    interviewPhase: session.interviewPhase,
+    interviewPhase,
     phase1StartedAt: session.phase1StartedAt,
     phase2StartedAt: session.phase2StartedAt,
     startedAt: session.startedAt,
@@ -100,18 +110,18 @@ export async function handlePostIntroInterviewTurn(params: {
     sessionId: session.id,
     userMessageEn: userBilingual.en,
     userMessageLocale: userBilingual.locale,
-    interviewPhase: session.interviewPhase,
+    interviewPhase,
     phase1Title: config.phase1Title,
     phase2Title: config.phase2Title,
     phaseProgress,
   };
 
-  if (session.interviewPhase === INTERVIEW_PHASE.PHASE2_FIXED) {
+  if (interviewPhase === INTERVIEW_PHASE.PHASE2_FIXED && phase2Count > 0) {
     const nextIndex = session.phase2QuestionIndex + 1;
     const total = phase2Count;
 
-    if (nextIndex >= total) {
-      const completionPct = Math.min(100, session.completionPct + 5);
+    if (total > 0 && nextIndex >= total) {
+      const completionPct = PHASE2_FINISHED_COMPLETION_PCT;
       await db.interviewSession.update({
         where: { id: session.id },
         data: { completionPct },
@@ -191,7 +201,7 @@ export async function handlePostIntroInterviewTurn(params: {
   }
 
   const transitioning = shouldTransitionToPhase2({
-    interviewPhase: session.interviewPhase,
+    interviewPhase,
     phase1StartedAt: session.phase1StartedAt,
     startedAt: session.startedAt,
     config,
@@ -300,6 +310,9 @@ export async function handlePostIntroInterviewTurn(params: {
     },
   });
 
+  const phase2Pending = hasPendingPhase2(config, phase2Count);
+  const shouldComplete = response.shouldComplete && !phase2Pending;
+
   await db.interviewSession.update({
     where: { id: session.id },
     data: {
@@ -318,7 +331,7 @@ export async function handlePostIntroInterviewTurn(params: {
     interaction: response.interaction ?? null,
     currentSection: response.nextSection,
     completionPct: response.completionPct,
-    shouldComplete: response.shouldComplete,
+    shouldComplete,
     interviewPhase: INTERVIEW_PHASE.PHASE1_AI,
     phaseProgress: getPhaseProgress({
       interviewPhase: INTERVIEW_PHASE.PHASE1_AI,

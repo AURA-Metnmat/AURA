@@ -15,8 +15,14 @@ import { CONSENT_VERSION, type DeviceType } from "@/lib/interview/consent";
 import { captureUserAnswer, findLastAssistantMessageId } from "@/lib/interview/answer-capture";
 import type { StructuredAnswerPayload } from "@/lib/aura/interaction";
 import { resolveCampaignForCompany } from "@/lib/campaigns/resolve";
-import { buildPhaseConfig } from "@/lib/interview/phase-config";
+import {
+  buildPhaseConfig,
+  INTERVIEW_COMPLETE_MIN_PCT,
+  isPhase2InterviewComplete,
+} from "@/lib/interview/phase-config";
 import { handlePostIntroInterviewTurn } from "@/lib/interview/handle-interview-turn";
+import { countActivePhase2Questions } from "@/lib/interview/phase2-runner";
+import { buildInterviewPhaseMeta } from "@/lib/interview/phase-response";
 import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 
@@ -141,6 +147,8 @@ export async function POST(request: Request) {
           phase2Title: existing.phase2Title,
           phase2Enabled: existing.phase2Enabled,
           phaseProgress: existing.phaseProgress,
+          phase2QuestionNumber: existing.phase2QuestionNumber,
+          phase2QuestionTotal: existing.phase2QuestionTotal,
           company: { id: company.id, name: company.name },
         });
       }
@@ -215,6 +223,15 @@ export async function POST(request: Request) {
       });
 
       const phaseConfig = buildPhaseConfig(company);
+      const phaseMeta = await buildInterviewPhaseMeta({
+        companyId: company.id,
+        company,
+        interviewPhase: session.interviewPhase,
+        phase2QuestionIndex: session.phase2QuestionIndex,
+        phase1StartedAt: session.phase1StartedAt,
+        phase2StartedAt: session.phase2StartedAt,
+        startedAt: session.startedAt,
+      });
 
       return NextResponse.json({
         resumed: false,
@@ -225,10 +242,11 @@ export async function POST(request: Request) {
         currentSection: "A",
         completionPct: 5,
         interviewDurationMinutes: phaseConfig.totalDurationMinutes,
-        phase1Title: phaseConfig.phase1Title,
-        phase2Title: phaseConfig.phase2Title,
-        phase2Enabled: phaseConfig.phase2Enabled,
-        interviewPhase: "phase1_ai",
+        phase1Title: phaseMeta.phase1Title,
+        phase2Title: phaseMeta.phase2Title,
+        phase2Enabled: phaseMeta.phase2Enabled,
+        interviewPhase: phaseMeta.interviewPhase,
+        phaseProgress: phaseMeta.phaseProgress,
         company: { id: company.id, name: company.name },
       });
     }
@@ -274,7 +292,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Session not found" }, { status: 404 });
       }
 
-      if (fullSession.completionPct < 60) {
+      const phase2QuestionCount = fullSession.company
+        ? await countActivePhase2Questions(fullSession.companyId)
+        : 0;
+      const phase2Complete = isPhase2InterviewComplete({
+        interviewPhase: fullSession.interviewPhase,
+        phase2QuestionIndex: fullSession.phase2QuestionIndex,
+        phase2QuestionCount,
+      });
+
+      if (fullSession.completionPct < INTERVIEW_COMPLETE_MIN_PCT && !phase2Complete) {
         return NextResponse.json(
           { error: "Please continue the interview — you have not reached enough progress to finish." },
           { status: 400 }
@@ -465,6 +492,15 @@ export async function POST(request: Request) {
         where: { id: session.id },
         data: { introStep: 2, completionPct: 10 },
       });
+      const phaseMeta = await buildInterviewPhaseMeta({
+        companyId: session.companyId,
+        company: session.company,
+        interviewPhase: session.interviewPhase,
+        phase2QuestionIndex: session.phase2QuestionIndex,
+        phase1StartedAt: session.phase1StartedAt,
+        phase2StartedAt: session.phase2StartedAt,
+        startedAt: session.startedAt,
+      });
       return NextResponse.json({
         sessionId: session.id,
         message: opening2.en,
@@ -475,6 +511,13 @@ export async function POST(request: Request) {
         currentSection: "A",
         completionPct: 10,
         shouldComplete: false,
+        interviewPhase: phaseMeta.interviewPhase,
+        phase1Title: phaseMeta.phase1Title,
+        phase2Title: phaseMeta.phase2Title,
+        phase2Enabled: phaseMeta.phase2Enabled,
+        phaseProgress: phaseMeta.phaseProgress,
+        phase2QuestionNumber: phaseMeta.phase2QuestionNumber,
+        phase2QuestionTotal: phaseMeta.phase2QuestionTotal,
       });
     }
 

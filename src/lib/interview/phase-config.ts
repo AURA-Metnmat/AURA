@@ -14,6 +14,12 @@ export interface CompanyPhaseConfig {
   totalDurationMinutes: number;
 }
 
+/** Minimum completion % required to finish via the complete API (Phase 1 path). */
+export const INTERVIEW_COMPLETE_MIN_PCT = 60;
+
+/** Completion % set when all Phase 2 fixed questions are answered. */
+export const PHASE2_FINISHED_COMPLETION_PCT = 100;
+
 const MIN_PHASE_MINUTES = 1;
 const MAX_PHASE_MINUTES = 120;
 
@@ -49,6 +55,23 @@ export function buildPhaseConfig(company: {
         ? totalDurationMinutes
         : company.interviewDurationMinutes ?? 15,
   };
+}
+
+export function hasPendingPhase2(
+  config: CompanyPhaseConfig,
+  phase2QuestionCount: number
+): boolean {
+  return config.phase2Enabled && phase2QuestionCount > 0;
+}
+
+export function isPhase2InterviewComplete(params: {
+  interviewPhase: string;
+  phase2QuestionIndex: number;
+  phase2QuestionCount: number;
+}): boolean {
+  if (params.interviewPhase !== INTERVIEW_PHASE.PHASE2_FIXED) return false;
+  if (params.phase2QuestionCount <= 0) return false;
+  return params.phase2QuestionIndex + 1 >= params.phase2QuestionCount;
 }
 
 export function parsePhaseConfigUpdate(body: Record<string, unknown>): Partial<{
