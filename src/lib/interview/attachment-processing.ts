@@ -72,10 +72,19 @@ export async function extractAttachmentText(
 
   if (
     lower.endsWith(".txt") ||
+    lower.endsWith(".md") ||
     lower.endsWith(".csv") ||
+    lower.endsWith(".json") ||
+    lower.endsWith(".xml") ||
+    lower.endsWith(".html") ||
+    lower.endsWith(".htm") ||
     fileType.startsWith("text/")
   ) {
-    return truncate(buffer.toString("utf-8"));
+    try {
+      return truncate(buffer.toString("utf-8"));
+    } catch {
+      return `[Text file: ${fileName} — stored (${buffer.length} bytes)]`;
+    }
   }
 
   if (

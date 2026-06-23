@@ -1,6 +1,7 @@
 import {
   isAllowedReferenceUpload,
   MAX_REFERENCE_UPLOAD_BYTES,
+  sanitizeReferenceFileName,
 } from "@/lib/reference/reference-categories";
 import { parseFormDataUploads, type ParsedFormUpload } from "./form-data-files";
 
@@ -12,24 +13,31 @@ export interface JsonReferenceUploadFile {
   contentBase64: string;
 }
 
+function decodeBase64Payload(contentBase64: string): Buffer | null {
+  const trimmed = contentBase64.trim();
+  if (!trimmed) return null;
+
+  const payload = trimmed.includes(",") ? (trimmed.split(",").pop() ?? "") : trimmed;
+  if (!payload) return null;
+
+  try {
+    const buffer = Buffer.from(payload, "base64");
+    return buffer.length > 0 ? buffer : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseJsonReferenceUploads(files: JsonReferenceUploadFile[]): ParsedFormUpload[] {
   const uploads: ParsedFormUpload[] = [];
 
   for (const file of files) {
-    const fileName = file.fileName?.trim();
-    if (!fileName) continue;
+    const fileName = sanitizeReferenceFileName(file.fileName ?? "");
+    if (!fileName || !isAllowedReferenceUpload(fileName)) continue;
 
-    const contentBase64 = file.contentBase64?.trim();
-    if (!contentBase64) continue;
+    const buffer = decodeBase64Payload(file.contentBase64 ?? "");
+    if (!buffer) continue;
 
-    let buffer: Buffer;
-    try {
-      buffer = Buffer.from(contentBase64, "base64");
-    } catch {
-      continue;
-    }
-
-    if (buffer.length === 0) continue;
     uploads.push({ fileName, buffer, size: buffer.length });
   }
 
@@ -45,7 +53,13 @@ export async function parseReferenceUploadRequest(request: Request): Promise<Par
   }
 
   const formData = await request.formData();
-  return parseFormDataUploads(formData);
+  const parsed = await parseFormDataUploads(formData);
+  return parsed
+    .map((entry) => ({
+      ...entry,
+      fileName: sanitizeReferenceFileName(entry.fileName),
+    }))
+    .filter((entry) => entry.fileName && entry.buffer.length > 0);
 }
 
 export function validateReferenceUploads(
@@ -55,32 +69,31 @@ export function validateReferenceUploads(
     return {
       ok: false,
       error:
-        "No valid files received. Use Excel (.xlsx/.xls), CSV, PDF, TXT, or Markdown under 25MB. If the file is on OneDrive, download it to your computer first, then upload.",
+        "No valid files received. Choose a file up to 25MB with content. If the file is on OneDrive, download it to your computer first, then upload.",
     };
   }
 
   const uploads: ParsedFormUpload[] = [];
 
   for (const entry of parsed) {
+    const fileName = sanitizeReferenceFileName(entry.fileName);
+    if (!fileName || !isAllowedReferenceUpload(fileName)) {
+      return { ok: false, error: "Invalid file name." };
+    }
+
     if (entry.size > MAX_REFERENCE_UPLOAD_BYTES) {
       return {
         ok: false,
-        error: `File "${entry.fileName}" exceeds ${Math.round(MAX_REFERENCE_UPLOAD_BYTES / (1024 * 1024))}MB limit`,
-      };
-    }
-    if (!isAllowedReferenceUpload(entry.fileName)) {
-      return {
-        ok: false,
-        error: `Unsupported file type: ${entry.fileName}. Use Excel, CSV, PDF, TXT, or Markdown.`,
+        error: `File "${fileName}" exceeds ${Math.round(MAX_REFERENCE_UPLOAD_BYTES / (1024 * 1024))}MB limit`,
       };
     }
     if (entry.buffer.length === 0) {
       return {
         ok: false,
-        error: `File "${entry.fileName}" is empty. Save or download the file locally, then try again.`,
+        error: `File "${fileName}" is empty. Save or download the file locally, then try again.`,
       };
     }
-    uploads.push(entry);
+    uploads.push({ ...entry, fileName });
   }
 
   return { ok: true, uploads };

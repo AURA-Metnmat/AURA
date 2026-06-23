@@ -1,6 +1,7 @@
 import {
   isAllowedReferenceUpload,
   MAX_REFERENCE_UPLOAD_BYTES,
+  sanitizeReferenceFileName,
 } from "@/lib/reference/reference-categories";
 import { JSON_REFERENCE_UPLOAD_MAX_BYTES } from "./reference-upload";
 
@@ -16,17 +17,18 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 export function validateClientReferenceFiles(files: File[]): string | null {
   for (const file of files) {
-    if (!file.name.trim()) {
+    const fileName = sanitizeReferenceFileName(file.name);
+    if (!fileName) {
       return "Selected file has no name.";
     }
-    if (!isAllowedReferenceUpload(file.name)) {
-      return `Unsupported file type: ${file.name}. Use Excel, CSV, PDF, TXT, or Markdown.`;
+    if (!isAllowedReferenceUpload(fileName)) {
+      return `Invalid file name: ${file.name}`;
     }
     if (file.size === 0) {
-      return `File "${file.name}" is empty. If it is on OneDrive, download it locally first.`;
+      return `File "${fileName}" is empty. If it is on OneDrive, download it locally first.`;
     }
     if (file.size > MAX_REFERENCE_UPLOAD_BYTES) {
-      return `File "${file.name}" exceeds 25MB.`;
+      return `File "${fileName}" exceeds 25MB.`;
     }
   }
   return null;
@@ -47,7 +49,7 @@ export async function buildReferenceUploadRequest(
     const payload = {
       files: await Promise.all(
         files.map(async (file) => ({
-          fileName: file.name,
+          fileName: sanitizeReferenceFileName(file.name),
           contentBase64: arrayBufferToBase64(await file.arrayBuffer()),
         }))
       ),
@@ -66,7 +68,7 @@ export async function buildReferenceUploadRequest(
 
   const formData = new FormData();
   for (const file of files) {
-    formData.append("files", file, file.name);
+    formData.append("files", file, sanitizeReferenceFileName(file.name));
   }
 
   return {

@@ -33,11 +33,25 @@ export const REFERENCE_UPLOAD_EXTENSIONS = [
   ".md",
 ] as const;
 
-export const REFERENCE_UPLOAD_ACCEPT = REFERENCE_UPLOAD_EXTENSIONS.join(",");
+/** Accept any file in the file picker */
+export const REFERENCE_UPLOAD_ACCEPT = "*/*";
 
 export const MAX_REFERENCE_UPLOAD_BYTES = 25 * 1024 * 1024;
 
+const UNSAFE_FILE_NAME = /[\\/]/;
+
+export function sanitizeReferenceFileName(fileName: string): string {
+  const base = fileName.trim().replace(/\\/g, "/").split("/").pop() ?? "";
+  return base.replace(UNSAFE_FILE_NAME, "").slice(0, 255);
+}
+
+/** Any non-empty safe filename — Excel/CSV get structured import; others are text-extracted */
 export function isAllowedReferenceUpload(fileName: string): boolean {
-  const lower = fileName.toLowerCase();
-  return REFERENCE_UPLOAD_EXTENSIONS.some((ext) => lower.endsWith(ext));
+  const name = sanitizeReferenceFileName(fileName);
+  return name.length > 0 && !name.includes("..");
+}
+
+export function isStructuredReferenceDataFile(fileName: string): boolean {
+  const lower = sanitizeReferenceFileName(fileName).toLowerCase();
+  return lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".csv");
 }

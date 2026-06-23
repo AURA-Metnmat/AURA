@@ -6,13 +6,10 @@ import {
   runReferenceImport,
   runReferenceImportFromUploads,
 } from "@/lib/import/reference-import";
-import {
-  isAllowedReferenceUpload,
-  MAX_REFERENCE_UPLOAD_BYTES,
-} from "@/lib/reference/reference-categories";
 import { syncReferenceKnowledgeIndex } from "@/lib/reference/reference-mutations";
 import { db } from "@/lib/db";
 import { parseFormDataUploads } from "@/lib/upload/form-data-files";
+import { validateReferenceUploads } from "@/lib/upload/reference-upload";
 
 export async function POST(request: Request) {
   try {
@@ -37,22 +34,14 @@ export async function POST(request: Request) {
       if (session instanceof NextResponse) return session;
 
       const parsed = await parseFormDataUploads(formData);
-      const uploads: { fileName: string; buffer: Buffer }[] = [];
-      for (const entry of parsed) {
-        if (entry.size > MAX_REFERENCE_UPLOAD_BYTES) {
-          return NextResponse.json(
-            { error: `File "${entry.fileName}" exceeds size limit` },
-            { status: 400 }
-          );
-        }
-        if (!isAllowedReferenceUpload(entry.fileName)) {
-          return NextResponse.json(
-            { error: `Unsupported file type: ${entry.fileName}` },
-            { status: 400 }
-          );
-        }
-        uploads.push({ fileName: entry.fileName, buffer: entry.buffer });
+      const validated = validateReferenceUploads(parsed);
+      if (!validated.ok) {
+        return NextResponse.json({ error: validated.error }, { status: 400 });
       }
+      const uploads = validated.uploads.map((entry) => ({
+        fileName: entry.fileName,
+        buffer: entry.buffer,
+      }));
 
       const stats = await runReferenceImportFromUploads(company.slug, uploads);
       const chunkCount = await syncReferenceKnowledgeIndex(company.slug, company.id);

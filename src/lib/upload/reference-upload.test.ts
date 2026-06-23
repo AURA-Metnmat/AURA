@@ -16,17 +16,14 @@ describe("reference upload parsing", () => {
     assert.equal(uploads[0]?.buffer.toString("utf8"), "furnace context");
   });
 
-  it("rejects unsupported extensions with a clear message", () => {
+  it("accepts any file extension", () => {
     const result = validateReferenceUploads([
       {
-        fileName: "notes.docx",
-        buffer: Buffer.from("hello"),
-        size: 5,
+        fileName: "diagram.png",
+        buffer: Buffer.from("fake-png"),
+        size: 8,
       },
     ]);
-    assert.equal(result.ok, false);
-    if (!result.ok) {
-      assert.match(result.error, /Unsupported file type/i);
-    }
+    assert.equal(result.ok, true);
   });
 });

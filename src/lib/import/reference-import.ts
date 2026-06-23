@@ -3,7 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { normalizeReferenceCategory } from "@/lib/reference/reference-categories";
+import { extractAttachmentText } from "@/lib/interview/attachment-processing";
+import { sanitizeReferenceFileName, normalizeReferenceCategory } from "@/lib/reference/reference-categories";
 
 const FILE_CATEGORIES: Record<string, string> = {
   "Binder analysis.xlsx": "binder",
@@ -266,6 +267,28 @@ async function importPdfFromBuffer(
   }
 }
 
+async function importGenericReferenceFile(
+  fileName: string,
+  companySlug: string,
+  buffer: Buffer
+): Promise<void> {
+  const safeName = sanitizeReferenceFileName(fileName);
+  const extracted =
+    (await extractAttachmentText(buffer, safeName, "application/octet-stream"))?.trim() ||
+    `[Reference file: ${safeName} (${buffer.length} bytes)]`;
+
+  await db.pdfDocument.deleteMany({ where: { fileName: safeName, companySlug } });
+  await db.pdfDocument.create({
+    data: {
+      companySlug,
+      fileName: safeName,
+      pageCount: 1,
+      content: extracted,
+      summary: extracted.slice(0, 500).replace(/\s+/g, " ").trim(),
+    },
+  });
+}
+
 async function importStats(companySlug: string) {
   return {
     files: await db.dataFile.count({ where: { companySlug } }),
@@ -285,17 +308,18 @@ export async function runReferenceImportFromUploads(
   }
 
   for (const file of files) {
-    const lower = file.fileName.toLowerCase();
+    const safeName = sanitizeReferenceFileName(file.fileName);
+    const lower = safeName.toLowerCase();
     if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
-      await importExcelFromBuffer(file.fileName, companySlug, file.buffer);
+      await importExcelFromBuffer(safeName, companySlug, file.buffer);
     } else if (lower.endsWith(".csv")) {
-      await importCsvFromBuffer(file.fileName, companySlug, file.buffer);
+      await importCsvFromBuffer(safeName, companySlug, file.buffer);
     } else if (lower.endsWith(".pdf")) {
-      await importPdfFromBuffer(file.fileName, companySlug, file.buffer);
+      await importPdfFromBuffer(safeName, companySlug, file.buffer);
     } else if (lower.endsWith(".txt") || lower.endsWith(".md")) {
-      await importTextKnowledge(file.fileName, companySlug, file.buffer);
+      await importTextKnowledge(safeName, companySlug, file.buffer);
     } else {
-      throw new Error(`Unsupported file type: ${file.fileName}`);
+      await importGenericReferenceFile(safeName, companySlug, file.buffer);
     }
   }
 
