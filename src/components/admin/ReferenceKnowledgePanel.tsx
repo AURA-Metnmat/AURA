@@ -124,12 +124,13 @@ export default function ReferenceKnowledgePanel({
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files?.length) return;
-    e.target.value = "";
+    const input = e.target;
+    const fileList = Array.from(input.files ?? []);
+    if (fileList.length === 0) return;
+
     setUploading(true);
+    setNotice(null);
     try {
-      const fileList = Array.from(files);
       const { init } = await buildReferenceUploadRequest(fileList);
       const res = await fetch(`/api/companies/${companyId}/reference/upload`, init);
       const data = await res.json();
@@ -140,6 +141,7 @@ export default function ReferenceKnowledgePanel({
       showNotice(err instanceof Error ? err.message : "Upload failed", "error");
     } finally {
       setUploading(false);
+      input.value = "";
     }
   }
 
