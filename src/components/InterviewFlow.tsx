@@ -814,7 +814,51 @@ export default function InterviewFlow({
     [language, engagement, messages.length, hasUnansweredInteraction, completionPct]
   );
 
-  async function completeInterview() {
+  async function resetForNewEmployee() {
+    try {
+      await fetch("/api/employees/me", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId }),
+      });
+    } catch {
+      // Best-effort logout so the next employee can register fresh.
+    }
+
+    if (sessionId) {
+      localStorage.removeItem(`aura-draft-${sessionId}`);
+    }
+
+    setSessionId(null);
+    setMessages([]);
+    setReport(null);
+    setMilestone(null);
+    setInput("");
+    setPendingFiles([]);
+    setCompletionPct(0);
+    setCurrentSection("B");
+    setInterviewPhase("phase1_ai");
+    setPhaseProgress(null);
+    setPhase2QuestionNumber(null);
+    setPhase2QuestionTotal(null);
+    setRemainingSeconds(null);
+    setSessionStartedAt(null);
+    setPhaseRemainingAnchor(null);
+    setPhaseRemainingAtAnchor(null);
+    setChatError(null);
+    setSaveStatus("idle");
+    setForm({
+      fullName: "",
+      designation: "",
+      department: "",
+      mobile: "",
+      email: "",
+    });
+    phaseAdvanceLock.current = false;
+    setStep("language");
+  }
+
+  async function completeInterview(options?: { redirectForNewEmployee?: boolean }) {
     if (!sessionId) return;
     setLoading(true);
     setChatError(null);
@@ -828,7 +872,11 @@ export default function InterviewFlow({
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to complete interview");
       }
-      if (data.report) setReport(data.report);
+      if (options?.redirectForNewEmployee) {
+        await resetForNewEmployee();
+      } else if (data.report) {
+        setReport(data.report);
+      }
     } catch (e) {
       setChatError(e instanceof Error ? e.message : "Failed to complete interview. Please try again.");
     } finally {
@@ -1109,14 +1157,14 @@ export default function InterviewFlow({
               participantName={form.fullName}
               companyName={companyName}
               loading={loading}
-              onFinish={() => void completeInterview()}
+              onFinish={() => void completeInterview({ redirectForNewEmployee: true })}
             />
           )}
 
           {completionPct >= 70 && (
             <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-3 text-center shrink-0">
               <button
-                onClick={completeInterview}
+                onClick={() => void completeInterview()}
                 disabled={loading}
                 className="text-xs text-amber-400 hover:text-amber-300 underline"
               >
