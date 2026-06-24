@@ -279,13 +279,16 @@ export async function handlePostIntroInterviewTurn(params: {
     }
   }
 
-  const companyCtx = await loadFullCompanyContext({
-    name: session.company.name,
-    industry: session.company.industry,
-    description: session.company.description,
-    aiContext: session.company.aiContext,
-    slug: session.company.slug,
-  });
+  const companyCtx = await loadFullCompanyContext(
+    {
+      name: session.company.name,
+      industry: session.company.industry,
+      description: session.company.description,
+      aiContext: session.company.aiContext,
+      slug: session.company.slug,
+    },
+    { lite: true }
+  );
 
   const postIntro = introStep === 2;
   const activeSection = postIntro

@@ -313,10 +313,15 @@ export async function POST(request: Request) {
           include: {
             company: true,
             participant: true,
-            messages: { orderBy: { createdAt: "asc" } },
+            messages: { orderBy: { createdAt: "desc" }, take: 40 },
           },
         })
       : null;
+
+    const sessionMessages =
+      session?.messages.slice().sort(
+        (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+      ) ?? [];
 
     if (!session && !("action" in body && body.action === "complete")) {
       return NextResponse.json({ error: "Session required" }, { status: 400 });
@@ -494,32 +499,33 @@ export async function POST(request: Request) {
 
     const structuredAnswer = "structuredAnswer" in body ? body.structuredAnswer : undefined;
     const assistantMessageId = findLastAssistantMessageId(
-      session.messages.map((m) => ({
+      sessionMessages.map((m) => ({
         id: m.id,
         role: m.role,
         metadata: m.metadata,
       }))
     );
 
-    await captureUserAnswer({
-      sessionId: session.id,
-      messageId: userMsg.id,
-      assistantMessageId,
-      section: session.currentSection,
-      rawText: userBilingual.en,
-      rawTextLocale: userBilingual.locale,
-      structured: structuredAnswer?.interactionType ? structuredAnswer : null,
-    });
-
-    await extractStructuredData(
-      session.id,
-      session.currentSection as SectionId,
-      userMessage,
-      Boolean(structuredAnswer?.interactionType)
-    );
+    await Promise.all([
+      captureUserAnswer({
+        sessionId: session.id,
+        messageId: userMsg.id,
+        assistantMessageId,
+        section: session.currentSection,
+        rawText: userBilingual.en,
+        rawTextLocale: userBilingual.locale,
+        structured: structuredAnswer?.interactionType ? structuredAnswer : null,
+      }),
+      extractStructuredData(
+        session.id,
+        session.currentSection as SectionId,
+        userMessage,
+        Boolean(structuredAnswer?.interactionType)
+      ),
+    ]);
 
     const updatedHistory = [
-      ...session.messages.map((m) => ({
+      ...sessionMessages.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       })),

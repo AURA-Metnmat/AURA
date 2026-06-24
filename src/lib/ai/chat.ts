@@ -15,6 +15,12 @@ import {
   mergeReportFields,
   REPORT_ENHANCE_SYSTEM,
 } from "./ai-config";
+import {
+  getInterviewMaxTokens,
+  isInterviewDualRefineEnabled,
+  isNormalizeDualPolishEnabled,
+  isReportDualEnhanceEnabled,
+} from "./performance-config";
 
 export interface ChatJsonOptions {
   messages: ChatMessage[];
@@ -125,11 +131,11 @@ export async function chatJson(options: ChatJsonOptions): Promise<string | null>
 export async function chatInterviewJson(messages: ChatMessage[]): Promise<string | null> {
   const baseOptions = {
     temperature: 0.55,
-    maxTokens: 900,
+    maxTokens: getInterviewMaxTokens(),
     claudeModel: CLAUDE_INTERVIEW_MODEL,
   };
 
-  if (!isDualModelActive()) {
+  if (!isDualModelActive() || !isInterviewDualRefineEnabled()) {
     return chatJson({
       messages,
       ...baseOptions,
@@ -175,7 +181,7 @@ export async function chatReportJson(messages: ChatMessage[]): Promise<string | 
     claudeModel: CLAUDE_REPORT_MODEL,
   };
 
-  if (!isDualModelActive()) {
+  if (!isDualModelActive() || !isReportDualEnhanceEnabled()) {
     return chatJson({
       messages,
       ...baseOptions,
@@ -229,7 +235,7 @@ export async function chatReportJson(messages: ChatMessage[]): Promise<string | 
  * Fast translation / normalization — dual-model: OpenAI draft, Claude polishes locale script.
  */
 export async function chatNormalizeJson(messages: ChatMessage[]): Promise<string | null> {
-  if (!isDualModelActive()) {
+  if (!isDualModelActive() || !isNormalizeDualPolishEnabled()) {
     const openaiRaw = await chatJsonOpenAI(messages, 0.2, 400);
     if (openaiRaw) return openaiRaw;
 

@@ -4,14 +4,18 @@ export async function getCompanyDocumentContext(companySlug: string): Promise<st
   return loadDocumentContext(companySlug);
 }
 
-export async function loadFullCompanyContext(company: {
-  name: string;
-  industry?: string | null;
-  description?: string | null;
-  aiContext?: string | null;
-  slug: string;
-}) {
-  const documentContext = await loadDocumentContext(company.slug);
+export async function loadFullCompanyContext(
+  company: {
+    name: string;
+    industry?: string | null;
+    description?: string | null;
+    aiContext?: string | null;
+    slug: string;
+  },
+  options?: { lite?: boolean }
+) {
+  const documentContext =
+    options?.lite === true ? null : await loadDocumentContext(company.slug);
   return {
     name: company.name,
     slug: company.slug,

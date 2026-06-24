@@ -8,9 +8,18 @@ import {
   mergeRetrievalIndices,
   RETRIEVAL_OPENAI_SYSTEM,
 } from "./ai-config";
+import { isRetrievalLlmEnabled } from "./performance-config";
 
 const MAX_CORPUS_CHARS = 24_000;
 const MAX_RETRIEVED_CHARS = 6_000;
+const CORPUS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const corpusCache = new Map<string, { chunks: RetrievalChunk[]; expiresAt: number }>();
+
+export function invalidateKnowledgeCorpusCache(companySlug?: string): void {
+  if (companySlug) corpusCache.delete(companySlug);
+  else corpusCache.clear();
+}
 
 export interface RetrievalChunk {
   source: string;
@@ -123,7 +132,17 @@ async function loadIndexedCorpus(companySlug: string): Promise<RetrievalChunk[]>
 }
 
 async function loadKnowledgeCorpus(companySlug: string): Promise<RetrievalChunk[]> {
-  return loadIndexedCorpus(companySlug);
+  const cached = corpusCache.get(companySlug);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.chunks;
+  }
+
+  const chunks = await loadIndexedCorpus(companySlug);
+  corpusCache.set(companySlug, {
+    chunks,
+    expiresAt: Date.now() + CORPUS_CACHE_TTL_MS,
+  });
+  return chunks;
 }
 
 function heuristicRetrieve(
@@ -299,6 +318,10 @@ export async function retrieveRelevantKnowledge(params: {
   const chunks = await loadKnowledgeCorpus(params.companySlug);
   if (chunks.length === 0) {
     return { chunks: [], formattedContext: "", provider: "none" };
+  }
+
+  if (!isRetrievalLlmEnabled()) {
+    return heuristicRetrieve(chunks, params.userMessage, params.sectionName);
   }
 
   const llmResult = await llmRetrieve(
