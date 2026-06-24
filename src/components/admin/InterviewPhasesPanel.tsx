@@ -340,8 +340,9 @@ export default function InterviewPhasesPanel({ companyId, glassCard }: Interview
           </span>
         </div>
         <p className="text-xs text-slate-500 mb-4">
-          Upload a .txt, .csv, or Excel file. One question per line, or columns: Question, Type
-          (text/mcq/yes_no/rating), Options (pipe-separated), Section.
+          Upload a .txt, .csv, .xlsx, .xls, or text-based .pdf file. One question per line, or columns:
+          Question, Type (text/mcq/yes_no/rating), Options (pipe-separated), Section. For MCQ use at least 2
+          options — e.g. <code className="text-slate-400">Which ERP?,mcq,SAP|Oracle|Excel</code>
         </p>
 
         <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-white/20 hover:border-sky-500/50 hover:bg-sky-950/20 cursor-pointer text-sm text-slate-300">
@@ -349,7 +350,7 @@ export default function InterviewPhasesPanel({ companyId, glassCard }: Interview
           {uploading ? "Uploading…" : "Upload question file (replaces existing)"}
           <input
             type="file"
-            accept=".txt,.csv,.xlsx,.xls"
+            accept=".txt,.csv,.xlsx,.xls,.pdf"
             className="hidden"
             disabled={uploading}
             onChange={(e) => void handleUpload(e)}

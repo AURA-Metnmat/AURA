@@ -14,6 +14,7 @@ import { InterviewChatComposer } from "@/components/interview/InterviewChatCompo
 import { EmployeeAuthPanel } from "@/components/interview/EmployeeAuthPanel";
 import { DesktopOnlyGate } from "@/components/interview/DesktopOnlyGate";
 import { ConsentScreen } from "@/components/interview/ConsentScreen";
+import { InterviewPhaseMilestone } from "@/components/interview/InterviewPhaseMilestone";
 import {
   CONSENT_VERSION,
   detectDeviceType,
@@ -124,6 +125,8 @@ export default function InterviewFlow({
   const [phase2QuestionTotal, setPhase2QuestionTotal] = useState<number | null>(null);
   const [phaseRemainingAnchor, setPhaseRemainingAnchor] = useState<number | null>(null);
   const [phaseRemainingAtAnchor, setPhaseRemainingAtAnchor] = useState<number | null>(null);
+  const [milestone, setMilestone] = useState<"phase1_complete" | "phase2_thankyou" | null>(null);
+  const phaseAdvanceLock = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const t = UI[language];
@@ -246,6 +249,108 @@ export default function InterviewFlow({
     if (typeof data.interviewDurationMinutes === "number") {
       setSessionDurationMinutes(data.interviewDurationMinutes);
     }
+    if (data.interviewPhase === "phase1_complete") {
+      setMilestone("phase1_complete");
+    }
+  }
+
+  function appendAssistantMessages(
+    entries: Array<{
+      contentEn: string;
+      contentLocale: string;
+      interaction?: MessageInteraction | null;
+    }>
+  ) {
+    setMessages((prev) => [
+      ...prev,
+      ...entries.map((entry) => ({
+        role: "assistant" as const,
+        contentEn: entry.contentEn,
+        contentLocale: entry.contentLocale,
+        interaction: entry.interaction ?? null,
+      })),
+    ]);
+  }
+
+  function applyAdvanceResponse(data: {
+    phaseEvent?: string;
+    message?: string;
+    messageLocale?: string;
+    interaction?: MessageInteraction | null;
+    introMessage?: string;
+    introMessageLocale?: string;
+    currentSection?: string;
+    completionPct?: number;
+    interviewPhase?: string;
+    phase1Title?: string;
+    phase2Title?: string;
+    phase2Enabled?: boolean;
+    phaseProgress?: PhaseProgress;
+    phase2QuestionNumber?: number;
+    phase2QuestionTotal?: number;
+  }) {
+    applyPhasePayload(data);
+    if (typeof data.completionPct === "number") setCompletionPct(data.completionPct);
+    if (data.currentSection) setCurrentSection(data.currentSection);
+
+    if (data.phaseEvent === "phase1_complete" && data.message) {
+      appendAssistantMessages([
+        {
+          contentEn: data.message,
+          contentLocale: data.messageLocale ?? data.message,
+        },
+      ]);
+      setMilestone("phase1_complete");
+      return;
+    }
+
+    if (data.phaseEvent === "phase2_started") {
+      setMilestone(null);
+      const toAdd: Array<{
+        contentEn: string;
+        contentLocale: string;
+        interaction?: MessageInteraction | null;
+      }> = [];
+      if (data.introMessage) {
+        toAdd.push({
+          contentEn: data.introMessage,
+          contentLocale: data.introMessageLocale ?? data.introMessage,
+        });
+      }
+      if (data.message) {
+        toAdd.push({
+          contentEn: data.message,
+          contentLocale: data.messageLocale ?? data.message,
+          interaction: data.interaction ?? null,
+        });
+      }
+      if (toAdd.length > 0) appendAssistantMessages(toAdd);
+    }
+  }
+
+  async function callAdvancePhase(trigger: "timer" | "start_phase2") {
+    if (!sessionId || phaseAdvanceLock.current) return;
+    phaseAdvanceLock.current = true;
+    setLoading(true);
+    setChatError(null);
+    try {
+      const res = await fetch("/api/interview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "advancePhase", sessionId, trigger }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to advance interview phase");
+      if (data.ok === false || data.phaseEvent === "not_ready") return;
+      applyAdvanceResponse(data);
+    } catch (e) {
+      setChatError(
+        e instanceof Error ? e.message : "Could not start the next phase. Please try again."
+      );
+    } finally {
+      setLoading(false);
+      phaseAdvanceLock.current = false;
+    }
   }
 
   function hydrateSession(
@@ -274,6 +379,9 @@ export default function InterviewFlow({
     setSessionDurationMinutes(active.interviewDurationMinutes);
     setSessionStartedAt(new Date(active.startedAt).getTime());
     applyPhasePayload(active);
+    if (active.interviewPhase === "phase1_complete") {
+      setMilestone("phase1_complete");
+    }
     setForm({
       fullName: active.participant.fullName || fallbackName || "",
       designation: active.participant.designation,
@@ -343,6 +451,45 @@ export default function InterviewFlow({
     phaseRemainingAnchor,
     phaseRemainingAtAnchor,
   ]);
+
+  useEffect(() => {
+    if (
+      step !== "chat" ||
+      !sessionId ||
+      loading ||
+      interviewPhase !== "phase1_ai" ||
+      !phase2Enabled ||
+      remainingSeconds !== 0 ||
+      milestone !== null
+    ) {
+      return;
+    }
+    void callAdvancePhase("timer");
+  }, [
+    step,
+    sessionId,
+    loading,
+    interviewPhase,
+    phase2Enabled,
+    remainingSeconds,
+    milestone,
+  ]);
+
+  useEffect(() => {
+    if (
+      step !== "chat" ||
+      !sessionId ||
+      interviewPhase !== "phase1_ai" ||
+      !phase2Enabled ||
+      milestone !== null
+    ) {
+      return;
+    }
+    const serverRemaining = phaseProgress?.phase1RemainingSeconds;
+    if (serverRemaining === 0) {
+      void callAdvancePhase("timer");
+    }
+  }, [step, sessionId, interviewPhase, phase2Enabled, phaseProgress?.phase1RemainingSeconds, milestone]);
 
   async function changeLanguage(newLang: Language) {
     if (newLang === language) return;
@@ -540,6 +687,39 @@ export default function InterviewFlow({
             contentLocale: data.userMessageLocale ?? updated[lastUserIdx].contentLocale,
           };
         }
+
+        if (data.phaseEvent === "phase1_complete") {
+          setMilestone("phase1_complete");
+          return [
+            ...updated,
+            {
+              role: "assistant" as const,
+              contentEn: data.message,
+              contentLocale: data.messageLocale ?? data.message,
+              interaction: null,
+            },
+          ];
+        }
+
+        if (data.phaseEvent === "phase2_started") {
+          setMilestone(null);
+          const assistantMsgs: Message[] = [];
+          if (data.introMessage) {
+            assistantMsgs.push({
+              role: "assistant",
+              contentEn: data.introMessage,
+              contentLocale: data.introMessageLocale ?? data.introMessage,
+            });
+          }
+          assistantMsgs.push({
+            role: "assistant",
+            contentEn: data.message,
+            contentLocale: data.messageLocale ?? data.message,
+            interaction: data.interaction ?? null,
+          });
+          return [...updated, ...assistantMsgs];
+        }
+
         return [
           ...updated,
           {
@@ -562,7 +742,11 @@ export default function InterviewFlow({
       setSaveStatus("saved");
       if (sessionId) localStorage.removeItem(`aura-draft-${sessionId}`);
       window.setTimeout(() => setSaveStatus("idle"), 2500);
-      if (data.shouldComplete) await completeInterview();
+      if (data.phaseEvent === "phase2_complete") {
+        setMilestone("phase2_thankyou");
+      } else if (data.shouldComplete) {
+        await completeInterview();
+      }
     } catch (e) {
       setChatError(e instanceof Error ? e.message : "Failed to send message. Please try again.");
       setMessages((prev) => prev.slice(0, -1));
@@ -747,10 +931,16 @@ export default function InterviewFlow({
                 className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-full border hidden sm:inline ${
                   interviewPhase === "phase2_fixed"
                     ? "border-sky-500/40 text-sky-300 bg-sky-950/40"
-                    : "border-amber-500/40 text-amber-300 bg-amber-950/40"
+                    : interviewPhase === "phase1_complete"
+                      ? "border-emerald-500/40 text-emerald-300 bg-emerald-950/40"
+                      : "border-amber-500/40 text-amber-300 bg-amber-950/40"
                 }`}
               >
-                {interviewPhase === "phase2_fixed" ? phase2Title : phase1Title}
+                {interviewPhase === "phase2_fixed"
+                  ? phase2Title
+                  : interviewPhase === "phase1_complete"
+                    ? `${phase1Title} ✓`
+                    : phase1Title}
                 {interviewPhase === "phase2_fixed" &&
                   phase2QuestionNumber &&
                   phase2QuestionTotal && (
@@ -878,7 +1068,7 @@ export default function InterviewFlow({
             onRemoveFile={(id) => setPendingFiles((p) => p.filter((x) => x.id !== id))}
             loading={loading}
             uploading={uploading}
-            sessionReady={!!sessionId}
+            sessionReady={!!sessionId && milestone === null}
             language={language}
             t={t}
             engagement={engagement}
@@ -889,12 +1079,38 @@ export default function InterviewFlow({
             onQuickPrefill={(text) => setInput(text)}
           />
 
-          {remainingSeconds === 0 && (
+          {remainingSeconds === 0 &&
+            interviewPhase === "phase1_ai" &&
+            !phase2Enabled && (
             <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-2 shrink-0">
               <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-2 text-center">
                 Your allotted session time has ended. You may finish your current answer and complete the interview.
               </p>
             </div>
+          )}
+
+          {milestone === "phase1_complete" && (
+            <InterviewPhaseMilestone
+              variant="phase1_complete"
+              phase1Title={phase1Title}
+              phase2Title={phase2Title}
+              participantName={form.fullName}
+              companyName={companyName}
+              loading={loading}
+              onContinue={() => void callAdvancePhase("start_phase2")}
+            />
+          )}
+
+          {milestone === "phase2_thankyou" && (
+            <InterviewPhaseMilestone
+              variant="phase2_thankyou"
+              phase1Title={phase1Title}
+              phase2Title={phase2Title}
+              participantName={form.fullName}
+              companyName={companyName}
+              loading={loading}
+              onFinish={() => void completeInterview()}
+            />
           )}
 
           {completionPct >= 70 && (

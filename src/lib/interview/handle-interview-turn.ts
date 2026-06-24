@@ -6,10 +6,11 @@ import type { Language } from "@/lib/aura/i18n";
 import type { SectionId } from "@/lib/aura/config";
 import { buildPhaseConfig, INTERVIEW_PHASE, hasPendingPhase2, PHASE2_FINISHED_COMPLETION_PCT } from "./phase-config";
 import {
-  buildPhase2TransitionMessage,
+  buildInterviewThankYouMessage,
   getPhaseProgress,
-  shouldTransitionToPhase2,
+  shouldCelebratePhase1Complete,
 } from "./phase-transition";
+import { advanceInterviewPhase } from "./phase-advance";
 import {
   countActivePhase2Questions,
   formatPhase2QuestionForLanguage,
@@ -33,6 +34,9 @@ export interface InterviewTurnResult {
   fromPhase2?: boolean;
   phase2QuestionNumber?: number;
   phase2QuestionTotal?: number;
+  phaseEvent?: "phase1_complete" | "phase2_started" | "phase2_complete";
+  introMessage?: string;
+  introMessageLocale?: string;
 }
 
 function formatFixedQuestionMessage(
@@ -116,27 +120,67 @@ export async function handlePostIntroInterviewTurn(params: {
     phaseProgress,
   };
 
+  if (interviewPhase === INTERVIEW_PHASE.PHASE1_COMPLETE) {
+    const started = await advanceInterviewPhase({
+      session: { ...session, introStep },
+      lang,
+      trigger: "start_phase2",
+    });
+    if (started) {
+      return {
+        sessionId: session.id,
+        message: started.message,
+        messageLocale: started.messageLocale,
+        interaction: started.interaction,
+        userMessageEn: userBilingual.en,
+        userMessageLocale: userBilingual.locale,
+        currentSection: started.currentSection,
+        completionPct: started.completionPct,
+        shouldComplete: false,
+        interviewPhase: started.interviewPhase,
+        phase1Title: started.phase1Title,
+        phase2Title: started.phase2Title,
+        phaseProgress: started.phaseProgress,
+        fromPhase2: true,
+        phase2QuestionNumber: started.phase2QuestionNumber,
+        phase2QuestionTotal: started.phase2QuestionTotal,
+        phaseEvent: "phase2_started",
+        introMessage: started.introMessage,
+        introMessageLocale: started.introMessageLocale,
+      };
+    }
+  }
+
   if (interviewPhase === INTERVIEW_PHASE.PHASE2_FIXED && phase2Count > 0) {
     const nextIndex = session.phase2QuestionIndex + 1;
     const total = phase2Count;
 
     if (total > 0 && nextIndex >= total) {
       const completionPct = PHASE2_FINISHED_COMPLETION_PCT;
+      const thanks = buildInterviewThankYouMessage(session.company.name, lang);
+      await db.message.create({
+        data: {
+          sessionId: session.id,
+          role: "assistant",
+          content: thanks.en,
+          contentLocale: thanks.locale,
+          section: session.currentSection,
+        },
+      });
       await db.interviewSession.update({
         where: { id: session.id },
         data: { completionPct },
       });
       return {
         ...baseResponse,
-        message:
-          "Thank you for completing all structured questions. You may finish the interview when ready.",
-        messageLocale:
-          "Thank you for completing all structured questions. You may finish the interview when ready.",
+        message: thanks.en,
+        messageLocale: thanks.locale,
         interaction: null,
         currentSection: session.currentSection,
         completionPct,
         shouldComplete: true,
         interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
+        phaseEvent: "phase2_complete",
         phaseProgress: getPhaseProgress({
           interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
           phase1StartedAt: session.phase1StartedAt,
@@ -200,7 +244,7 @@ export async function handlePostIntroInterviewTurn(params: {
     };
   }
 
-  const transitioning = shouldTransitionToPhase2({
+  const celebrating = shouldCelebratePhase1Complete({
     interviewPhase,
     phase1StartedAt: session.phase1StartedAt,
     startedAt: session.startedAt,
@@ -209,59 +253,30 @@ export async function handlePostIntroInterviewTurn(params: {
     introStep,
   });
 
-  if (transitioning) {
-    const transition = buildPhase2TransitionMessage(config, lang);
-    const firstQuestion = await getFixedPhaseQuestionAt(session.companyId, 0);
-    const qText = formatFixedQuestionMessage(firstQuestion, lang);
-    const combinedEn = `${transition.en}\n\n${qText.en}`;
-    const combinedLocale = `${transition.locale}\n\n${qText.locale}`;
-    const interaction = firstQuestion?.interaction ?? null;
-    const metadata = interaction ? serializeInteraction(interaction) : null;
-    const now = new Date();
-
-    await db.message.create({
-      data: {
+  if (celebrating) {
+    const advanced = await advanceInterviewPhase({
+      session: { ...session, introStep },
+      lang,
+      trigger: "timer",
+    });
+    if (advanced) {
+      return {
         sessionId: session.id,
-        role: "assistant",
-        content: combinedEn,
-        contentLocale: combinedLocale,
-        metadata,
-        section: firstQuestion?.section ?? "B",
-      },
-    });
-
-    await db.interviewSession.update({
-      where: { id: session.id },
-      data: {
-        interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
-        phase2StartedAt: now,
-        phase2QuestionIndex: 0,
-        introStep: Math.max(introStep, 3),
-        currentSection: firstQuestion?.section ?? "B",
-        completionPct: Math.max(session.completionPct, 45),
-      },
-    });
-
-    return {
-      ...baseResponse,
-      message: combinedEn,
-      messageLocale: combinedLocale,
-      interaction,
-      currentSection: firstQuestion?.section ?? "B",
-      completionPct: Math.max(session.completionPct, 45),
-      shouldComplete: false,
-      interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
-      fromPhase2: true,
-      phase2QuestionNumber: 1,
-      phase2QuestionTotal: phase2Count,
-      phaseProgress: getPhaseProgress({
-        interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
-        phase1StartedAt: session.phase1StartedAt,
-        phase2StartedAt: now,
-        startedAt: session.startedAt,
-        config,
-      }),
-    };
+        message: advanced.message,
+        messageLocale: advanced.messageLocale,
+        interaction: null,
+        userMessageEn: userBilingual.en,
+        userMessageLocale: userBilingual.locale,
+        currentSection: advanced.currentSection,
+        completionPct: advanced.completionPct,
+        shouldComplete: false,
+        interviewPhase: advanced.interviewPhase,
+        phase1Title: advanced.phase1Title,
+        phase2Title: advanced.phase2Title,
+        phaseProgress: advanced.phaseProgress,
+        phaseEvent: "phase1_complete",
+      };
+    }
   }
 
   const companyCtx = await loadFullCompanyContext({

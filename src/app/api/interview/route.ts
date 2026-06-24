@@ -21,6 +21,7 @@ import {
   isPhase2InterviewComplete,
 } from "@/lib/interview/phase-config";
 import { handlePostIntroInterviewTurn } from "@/lib/interview/handle-interview-turn";
+import { advanceInterviewPhase } from "@/lib/interview/phase-advance";
 import { countActivePhase2Questions } from "@/lib/interview/phase2-runner";
 import { buildInterviewPhaseMeta } from "@/lib/interview/phase-response";
 import type { Language } from "@/lib/aura/i18n";
@@ -62,7 +63,18 @@ interface CompletePayload {
   message?: string;
 }
 
-type InterviewBody = StartPayload | MessagePayload | CompletePayload | UpdateLanguagePayload;
+interface AdvancePhasePayload {
+  action: "advancePhase";
+  sessionId: string;
+  trigger: "timer" | "start_phase2";
+}
+
+type InterviewBody =
+  | StartPayload
+  | MessagePayload
+  | CompletePayload
+  | UpdateLanguagePayload
+  | AdvancePhasePayload;
 
 export async function POST(request: Request) {
   try {
@@ -105,6 +117,49 @@ export async function POST(request: Request) {
         data: { language },
       });
       return NextResponse.json({ ok: true, language });
+    }
+
+    if ("action" in body && body.action === "advancePhase") {
+      const { sessionId, trigger } = body;
+      if (!sessionId || (trigger !== "timer" && trigger !== "start_phase2")) {
+        return NextResponse.json({ error: "Invalid phase advance request" }, { status: 400 });
+      }
+
+      const session = await db.interviewSession.findUnique({
+        where: { id: sessionId },
+        include: { company: true, participant: true },
+      });
+      if (!session) {
+        return NextResponse.json({ error: "Session not found" }, { status: 404 });
+      }
+
+      const denied = await assertEmployeeOwnsSession(request, session);
+      if (denied) return denied;
+
+      const lang = (session.language as Language) || "en";
+      const advanced = await advanceInterviewPhase({
+        session: {
+          id: session.id,
+          companyId: session.companyId,
+          interviewPhase: session.interviewPhase,
+          phase2QuestionIndex: session.phase2QuestionIndex,
+          phase1StartedAt: session.phase1StartedAt,
+          phase2StartedAt: session.phase2StartedAt,
+          startedAt: session.startedAt,
+          currentSection: session.currentSection,
+          completionPct: session.completionPct,
+          introStep: session.introStep ?? 1,
+          company: session.company,
+        },
+        lang,
+        trigger,
+      });
+
+      if (!advanced) {
+        return NextResponse.json({ ok: false, phaseEvent: "not_ready" });
+      }
+
+      return NextResponse.json({ ok: true, ...advanced });
     }
 
     if ("action" in body && body.action === "start") {

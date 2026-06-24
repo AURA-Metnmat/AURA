@@ -47,12 +47,18 @@ export async function buildInterviewPhaseMeta(params: {
     }),
   };
 
-  if (
-    params.interviewPhase === INTERVIEW_PHASE.PHASE2_FIXED &&
-    phase2QuestionCount > 0
-  ) {
+    if (params.interviewPhase === INTERVIEW_PHASE.PHASE2_FIXED && phase2QuestionCount > 0) {
     meta.phase2QuestionNumber = params.phase2QuestionIndex + 1;
     meta.phase2QuestionTotal = phase2QuestionCount;
+  } else if (
+    params.interviewPhase === INTERVIEW_PHASE.PHASE1_COMPLETE ||
+    params.interviewPhase === INTERVIEW_PHASE.PHASE1_AI
+  ) {
+    const count =
+      params.phase2QuestionCount ?? (await countActivePhase2Questions(params.companyId));
+    if (config.phase2Enabled && count > 0) {
+      meta.phase2QuestionTotal = count;
+    }
   }
 
   return meta;

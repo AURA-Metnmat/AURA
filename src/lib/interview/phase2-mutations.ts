@@ -6,7 +6,7 @@ export async function replacePhase2QuestionsFromFile(
   fileName: string,
   buffer: Buffer
 ): Promise<number> {
-  const parsed = parsePhase2QuestionFile(buffer, fileName);
+  const parsed = await parsePhase2QuestionFile(buffer, fileName);
   if (parsed.length === 0) {
     throw new Error("No questions found in file. Add one question per line or use Excel with a Question column.");
   }

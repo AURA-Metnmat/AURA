@@ -1,5 +1,7 @@
 export const INTERVIEW_PHASE = {
   PHASE1_AI: "phase1_ai",
+  /** Phase 1 time ended — celebration shown; MCQ not started yet. */
+  PHASE1_COMPLETE: "phase1_complete",
   PHASE2_FIXED: "phase2_fixed",
 } as const;
 
