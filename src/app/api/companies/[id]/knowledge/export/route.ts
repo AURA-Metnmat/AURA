@@ -50,7 +50,7 @@ export async function GET(
     const suffix = filterLabel(filter);
 
     let fileName: string;
-    let recordCount = records.length;
+    const recordCount = records.length;
 
     if (format === "jsonl") {
       fileName = `${slug}-ml-${suffix}.jsonl`;
