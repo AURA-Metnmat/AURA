@@ -650,6 +650,41 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Single-session detail: derive the company from the session itself, then
+  // access-check it. This works for super-admins (no company scope) without
+  // requiring a companyId query param, while company-admins stay scoped.
+  if (sessionId) {
+    const interviewSession = await db.interviewSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        company: true,
+        participant: true,
+        messages: {
+          orderBy: { createdAt: "asc" },
+          include: { attachments: true },
+        },
+        attachments: true,
+        processes: true,
+        painPoints: true,
+        requirements: true,
+        integrations: true,
+        reporting: true,
+        approvals: true,
+        report: true,
+      },
+    });
+
+    if (!interviewSession) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    const denied = assertCompanyAccess(adminSession, interviewSession.companyId);
+    if (denied) return denied;
+
+    return NextResponse.json({ session: interviewSession });
+  }
+
+  // List mode requires a company.
   const companyId =
     companyIdParam ?? (scope.id && scope.id !== "__none__" ? scope.id : null);
 
@@ -663,41 +698,13 @@ export async function GET(request: Request) {
   const denied = assertCompanyAccess(adminSession, companyId);
   if (denied) return denied;
 
-  if (!sessionId) {
-    const sessions = await db.interviewSession.findMany({
-      where: { companyId },
-      orderBy: { startedAt: "desc" },
-      take: 50,
-      include: { participant: true, company: true, report: true },
-    });
-    return NextResponse.json({ sessions });
-  }
-
-  const interviewSession = await db.interviewSession.findUnique({
-    where: { id: sessionId },
-    include: {
-      company: true,
-      participant: true,
-      messages: {
-        orderBy: { createdAt: "asc" },
-        include: { attachments: true },
-      },
-      attachments: true,
-      processes: true,
-      painPoints: true,
-      requirements: true,
-      integrations: true,
-      reporting: true,
-      approvals: true,
-      report: true,
-    },
+  const sessions = await db.interviewSession.findMany({
+    where: { companyId },
+    orderBy: { startedAt: "desc" },
+    take: 50,
+    include: { participant: true, company: true, report: true },
   });
-
-  if (!interviewSession || interviewSession.companyId !== companyId) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ session: interviewSession });
+  return NextResponse.json({ sessions });
 }
 
 async function extractStructuredData(
