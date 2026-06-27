@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import type { InteractionType, StructuredAnswerPayload } from "@/lib/aura/interaction";
 import { runRefinementPipeline } from "@/lib/refinement/refinement-pipeline";
@@ -41,8 +42,13 @@ export async function captureUserAnswer(input: SaveInterviewAnswerInput): Promis
     },
   });
 
-  void runRefinementPipeline(answer.id).catch((err) =>
-    console.error("[refinement] Pipeline failed:", err)
+  // Run refinement after the response so it isn't dropped when the serverless
+  // function suspends. captureUserAnswer is only ever called from the interview
+  // route handler, so we're always inside a request scope here.
+  after(() =>
+    runRefinementPipeline(answer.id).catch((err) =>
+      console.error("[refinement] Pipeline failed:", err)
+    )
   );
 
   return answer.id;

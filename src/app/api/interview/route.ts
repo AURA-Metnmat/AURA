@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { assertCompanyAccess, companyScopeFilter } from "@/lib/auth/admin-rbac";
@@ -430,11 +430,17 @@ export async function POST(request: Request) {
       });
 
       if (fullSession.company) {
-        void reindexCompanyKnowledge({
-          companySlug: fullSession.company.slug,
-          companyId: fullSession.company.id,
-          scope: "experience",
-        }).catch((err) => console.error("Experience knowledge reindex failed:", err));
+        const reindexSlug = fullSession.company.slug;
+        const reindexCompanyId = fullSession.company.id;
+        // Run after the response so it isn't dropped when the serverless
+        // function suspends (after() keeps the invocation alive to finish it).
+        after(() =>
+          reindexCompanyKnowledge({
+            companySlug: reindexSlug,
+            companyId: reindexCompanyId,
+            scope: "experience",
+          }).catch((err) => console.error("Experience knowledge reindex failed:", err))
+        );
       }
 
       return NextResponse.json({ sessionId: session.id, report: reportData, completed: true });
