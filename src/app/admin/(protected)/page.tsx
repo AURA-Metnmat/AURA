@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Sparkles, FileText, Loader2, Download } from "lucide-react";
+import { Sparkles, FileText, Loader2, Download, Trash2 } from "lucide-react";
 import NeuralBackground from "@/components/ui/flow-field-background";
 import { PLATFORM_NAME, DEFAULT_GAPS } from "@/lib/aura/config";
 import { COMPANY_CATEGORIES } from "@/lib/aura/company-utils";
@@ -110,6 +110,7 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -334,6 +335,37 @@ export default function AdminPage() {
       showNotice(e instanceof Error ? e.message : "PDF download failed", "error");
     } finally {
       setDownloadingPdf(false);
+    }
+  }
+
+  async function deleteSessionEmployee() {
+    if (!sessionDetail) return;
+    const name = sessionDetail.participant?.fullName ?? "this employee";
+    if (
+      !window.confirm(
+        `Permanently delete ${name} and ALL their interview data (sessions, answers, uploaded files, reports)? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingSession(true);
+    try {
+      const res = await fetch(
+        `/api/companies/${sessionDetail.company.id}/sessions/${sessionDetail.id}`,
+        { method: "DELETE", credentials: "include" }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete");
+      showNotice(
+        `Deleted ${data.mode === "employee" ? "employee" : "session"} — removed ${data.sessionsDeleted} session(s) and ${data.filesDeleted} file(s).`
+      );
+      const companyId = sessionDetail.company.id;
+      setSessionDetail(null);
+      await loadCompanyDetail(companyId);
+    } catch (e) {
+      showNotice(e instanceof Error ? e.message : "Failed to delete", "error");
+    } finally {
+      setDeletingSession(false);
     }
   }
 
@@ -888,21 +920,36 @@ export default function AdminPage() {
                 {sessionDetail.company.name} · {sessionDetail.status} · {sessionDetail.completionPct}%
               </p>
             </div>
-            {sessionDetail.report && (
+            <div className="flex flex-wrap gap-2">
+              {sessionDetail.report && (
+                <button
+                  type="button"
+                  onClick={() => void downloadSessionReportPdf()}
+                  disabled={downloadingPdf}
+                  className="flex items-center gap-2 text-sm bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 px-3 py-2 rounded-lg disabled:opacity-50"
+                >
+                  {downloadingPdf ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileText className="w-4 h-4" />
+                  )}
+                  Download PDF
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => void downloadSessionReportPdf()}
-                disabled={downloadingPdf}
-                className="flex items-center gap-2 text-sm bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 px-3 py-2 rounded-lg disabled:opacity-50"
+                onClick={() => void deleteSessionEmployee()}
+                disabled={deletingSession}
+                className="flex items-center gap-2 text-sm bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/30 px-3 py-2 rounded-lg disabled:opacity-50"
               >
-                {downloadingPdf ? (
+                {deletingSession ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <FileText className="w-4 h-4" />
+                  <Trash2 className="w-4 h-4" />
                 )}
-                Download PDF
+                Delete employee &amp; data
               </button>
-            )}
+            </div>
           </div>
 
           {sessionDetail.report ? (
