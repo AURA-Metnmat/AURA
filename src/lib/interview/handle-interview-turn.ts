@@ -201,26 +201,29 @@ export async function handlePostIntroInterviewTurn(params: {
       50 + Math.round(((nextIndex + 1) / Math.max(total, 1)) * 45)
     );
 
-    await db.message.create({
-      data: {
-        sessionId: session.id,
-        role: "assistant",
-        content: formatted.en,
-        contentLocale: formatted.locale,
-        metadata,
-        section,
-      },
-    });
-
-    await db.interviewSession.update({
-      where: { id: session.id },
-      data: {
-        phase2QuestionIndex: nextIndex,
-        currentSection: section,
-        completionPct,
-        introStep: Math.max(introStep, 3),
-      },
-    });
+    // Atomic: the next-question message and the phase2QuestionIndex advance must
+    // commit together, or a retry could re-serve / skip a question.
+    await db.$transaction([
+      db.message.create({
+        data: {
+          sessionId: session.id,
+          role: "assistant",
+          content: formatted.en,
+          contentLocale: formatted.locale,
+          metadata,
+          section,
+        },
+      }),
+      db.interviewSession.update({
+        where: { id: session.id },
+        data: {
+          phase2QuestionIndex: nextIndex,
+          currentSection: section,
+          completionPct,
+          introStep: Math.max(introStep, 3),
+        },
+      }),
+    ]);
 
     return {
       ...baseResponse,
