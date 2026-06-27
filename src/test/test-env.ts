@@ -11,9 +11,14 @@ function applyFallbackEnv(): void {
   process.env.SUPABASE_URL ??= "https://example.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY ??= "integration-test-service-role-key";
   process.env.SUPABASE_STORAGE_BUCKET ??= "aura-uploads";
+  process.env.ANTHROPIC_API_KEY ??= "sk-ant-integration-test-key";
+  process.env.NEXT_PUBLIC_APP_URL ??= "https://aura-test.example.com";
 }
 
-const envPath = resolve(process.cwd(), ".env");
+// Tests deliberately read .env.test (not .env) so they NEVER pick up production
+// credentials from the real .env on disk. Combined with applyFallbackEnv below,
+// `npm test` is fully self-contained and isolated from prod by default.
+const envPath = resolve(process.cwd(), ".env.test");
 if (existsSync(envPath)) {
   for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
