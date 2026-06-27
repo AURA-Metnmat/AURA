@@ -67,7 +67,7 @@ export function McqOptions({
                 </span>
                 {showDual ? (
                   <span className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 min-w-0">
-                    <span className="leading-snug text-slate-100">{localeLabel}</span>
+                    <span lang={preferredLanguage} className="leading-snug text-slate-100">{localeLabel}</span>
                     <span className="leading-snug text-slate-400 text-[13px]">{opt.en}</span>
                   </span>
                 ) : (
