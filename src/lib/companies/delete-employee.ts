@@ -78,19 +78,18 @@ export async function deleteEmployeeOrSession(
     }
   }
 
-  const ops = [
+  await db.$transaction([
     db.knowledgeChunk.deleteMany({
       where: { companySlug: company.slug, sourceId: { in: [...sessionIds, ...answerIds] } },
     }),
     // Cascades to messages, answers, attachments, processes, pain points,
     // requirements, integrations, reporting, approvals, and the report.
     db.interviewSession.deleteMany({ where: { id: { in: sessionIds } } }),
-  ];
-  if (target.employeeId) {
     // Cascades auth logs; nulls OTP rows.
-    ops.push(db.employee.delete({ where: { id: target.employeeId } }));
-  }
-  await db.$transaction(ops);
+    ...(target.employeeId
+      ? [db.employee.delete({ where: { id: target.employeeId } })]
+      : []),
+  ]);
 
   return {
     mode: target.employeeId ? "employee" : "session",
