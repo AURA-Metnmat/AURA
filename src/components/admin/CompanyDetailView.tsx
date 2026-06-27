@@ -15,6 +15,7 @@ import {
   Link2,
   BarChart3,
   Loader2,
+  Trash2,
   Paperclip,
   Brain,
   Sparkles,
@@ -286,6 +287,7 @@ export default function CompanyDetailView({
   const [loadingData, setLoadingData] = useState(true);
   const [loadingKnowledge, setLoadingKnowledge] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [exportHistoryKey, setExportHistoryKey] = useState(0);
   const { startReindex, running: reindexing, statusMessage: reindexStatus } =
     useReindexJob(company.id);
@@ -375,6 +377,32 @@ export default function CompanyDetailView({
   async function refreshReferenceData() {
     await Promise.all([loadReference(), loadKnowledge()]);
     onRefresh();
+  }
+
+  async function deleteSessionEmployee(sessionId: string, name: string) {
+    if (
+      !window.confirm(
+        `Permanently delete ${name} and ALL their interview data (sessions, answers, uploaded files, reports)? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(sessionId);
+    try {
+      const res = await fetch(`/api/companies/${company.id}/sessions/${sessionId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to delete");
+      if (expandedSession === sessionId) setExpandedSession(null);
+      await loadGathered();
+      onRefresh();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to delete employee data");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   const completedCount = gathered?.totals.completed ?? company.completedCount;
@@ -948,13 +976,33 @@ export default function CompanyDetailView({
                                   Interview in progress — structured data appears as the conversation continues.
                                 </p>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => onOpenSession(s.id)}
-                                className="text-xs text-amber-400 hover:text-amber-300 font-medium"
-                              >
-                                View full conversation &amp; report →
-                              </button>
+                              <div className="flex flex-wrap items-center gap-4 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenSession(s.id)}
+                                  className="text-xs text-amber-400 hover:text-amber-300 font-medium"
+                                >
+                                  View full conversation &amp; report →
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void deleteSessionEmployee(
+                                      s.id,
+                                      s.participant?.fullName ?? "this employee"
+                                    )
+                                  }
+                                  disabled={deletingId === s.id}
+                                  className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1 disabled:opacity-50"
+                                >
+                                  {deletingId === s.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-3 h-3" />
+                                  )}
+                                  Delete employee &amp; data
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
