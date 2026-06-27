@@ -9,7 +9,7 @@ import {
   type ReviewStatus,
 } from "@/lib/knowledge/review";
 import { parseConfidenceFilter } from "@/lib/refinement/quality-stats";
-import { parseIntParam } from "@/lib/http/query-params";
+import { parseIntParam, safeJsonParse } from "@/lib/http/query-params";
 
 export async function GET(
   request: Request,
@@ -92,9 +92,7 @@ export async function GET(
       reviewStatus,
       reviewStatusLabel: REVIEW_STATUS_LABELS[reviewStatus],
       duplicateOfId: a.duplicateOfId,
-      contradictionFlags: a.contradictionFlags
-        ? (JSON.parse(a.contradictionFlags) as unknown[])
-        : [],
+      contradictionFlags: safeJsonParse<unknown[]>(a.contradictionFlags) ?? [],
       reviewNotes: a.reviewNotes,
       reviewedAt: a.reviewedAt?.toISOString() ?? null,
       refinedAt: a.refinedAt?.toISOString() ?? null,

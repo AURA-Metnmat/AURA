@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdminSession } from "@/lib/auth/admin";
-import { parseIntParam } from "@/lib/http/query-params";
+import { parseIntParam, safeJsonParse } from "@/lib/http/query-params";
 import {
   assertCompanyAccess,
   canAccessCompany,
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
         companyName: log.company?.name ?? null,
         resourceType: log.resourceType,
         resourceId: log.resourceId,
-        metadata: log.metadata ? (JSON.parse(log.metadata) as Record<string, unknown>) : null,
+        metadata: safeJsonParse<Record<string, unknown>>(log.metadata),
         createdAt: log.createdAt.toISOString(),
       })),
   });

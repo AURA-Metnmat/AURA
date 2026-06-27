@@ -17,6 +17,20 @@ export function parseIntParam(
 }
 
 /**
+ * Safely JSON.parse a string column, returning null instead of throwing on
+ * malformed/null input. Guards list endpoints where one bad row would otherwise
+ * fail the entire response.
+ */
+export function safeJsonParse<T = unknown>(raw: string | null | undefined): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Parse a date input into a valid Date, or return null if missing/invalid.
  * Guards against `new Date("garbage")` producing an Invalid Date that Prisma
  * rejects with a 500.
