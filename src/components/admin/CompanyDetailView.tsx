@@ -591,7 +591,11 @@ export default function CompanyDetailView({
           </section>
 
           <section className={`lg:col-span-2 ${glassPanel} rounded-2xl p-5 border border-white/5`}>
-            <RegistrationPolicyPanel companyId={company.id} glassCard={glassCard} />
+            <RegistrationPolicyPanel
+              companyId={company.id}
+              glassCard={glassCard}
+              onSaved={onRefresh}
+            />
           </section>
 
           <section className={`lg:col-span-2 ${glassPanel} rounded-2xl p-5 border border-white/5`}>

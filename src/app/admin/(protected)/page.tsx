@@ -219,28 +219,44 @@ export default function AdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create company");
 
+      let knowledgeWarning: string | null = null;
       if (knowledgeFiles.length > 0 && data.company?.slug) {
-        const formData = new FormData();
-        formData.set("companySlug", data.company.slug);
-        for (const file of knowledgeFiles) {
-          formData.append("files", file);
-        }
-        const importRes = await fetch("/api/import", {
-          method: "POST",
-          credentials: "include",
-          body: formData,
-        });
-        const importData = await importRes.json();
-        if (!importRes.ok) {
-          throw new Error(importData.details ?? importData.error ?? "Knowledge file upload failed");
+        try {
+          const formData = new FormData();
+          formData.set("companySlug", data.company.slug);
+          for (const file of knowledgeFiles) {
+            formData.append("files", file);
+          }
+          const importRes = await fetch("/api/import", {
+            method: "POST",
+            credentials: "include",
+            body: formData,
+          });
+          const importData = await importRes.json();
+          if (!importRes.ok) {
+            knowledgeWarning =
+              importData.details ?? importData.error ?? "Reference file upload failed";
+          }
+        } catch {
+          knowledgeWarning = "Reference file upload failed";
         }
       }
 
+      // The company and its link already exist — always surface the link. A
+      // reference-upload failure is non-fatal (retry later from Reference
+      // Knowledge), so we never block the wizard or risk a duplicate company.
       setCreatedLink(data.interviewLink);
       setKnowledgeFiles([]);
       setOnboardStep(2);
       await loadCompanies();
-      showNotice("Interview link generated successfully");
+      if (knowledgeWarning) {
+        showNotice(
+          `Company created, but reference upload failed: ${knowledgeWarning}. Upload it later from Reference Knowledge.`,
+          "error"
+        );
+      } else {
+        showNotice("Interview link generated successfully");
+      }
     } catch (e) {
       showNotice(e instanceof Error ? e.message : "Failed to create company", "error");
     } finally {
@@ -316,11 +332,18 @@ export default function AdminPage() {
     }
   }
 
-  function copyLink(link: string) {
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    showNotice("Interview link copied to clipboard");
-    window.setTimeout(() => setCopied(false), 2000);
+  async function copyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      showNotice("Interview link copied to clipboard");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      showNotice(
+        "Couldn't copy automatically — please select the link and copy it manually.",
+        "error"
+      );
+    }
   }
 
   async function openDeleteModal(company: { id: string; name: string }) {

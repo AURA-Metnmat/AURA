@@ -39,7 +39,7 @@ export async function logAdminAudit(input: LogAdminAuditInput): Promise<void> {
   const ipAddress = input.request ? getClientIp(input.request) : null;
   const userAgent = input.request?.headers.get("user-agent")?.slice(0, 500) ?? null;
 
-  let metadata = input.metadata ? { ...input.metadata } : {};
+  const metadata = input.metadata ? { ...input.metadata } : {};
   if ("password" in metadata) delete metadata.password;
   if ("passwordHash" in metadata) delete metadata.passwordHash;
 

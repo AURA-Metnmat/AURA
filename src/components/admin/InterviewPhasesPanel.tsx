@@ -91,13 +91,19 @@ export default function InterviewPhasesPanel({ companyId, glassCard }: Interview
     setError(null);
     setSuccess(null);
     try {
+      // Clamp to a valid range so a cleared/NaN input can't be sent (which the
+      // server rejects) or skew the timeline math. Reflect it back in the UI.
+      const phase1 = Math.min(120, Math.max(1, Math.round(phase1Minutes) || 1));
+      const phase2 = Math.min(120, Math.max(1, Math.round(phase2Minutes) || 1));
+      if (phase1 !== phase1Minutes) setPhase1Minutes(phase1);
+      if (phase2 !== phase2Minutes) setPhase2Minutes(phase2);
       const res = await fetch(`/api/companies/${companyId}/interview-phases`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phase1DurationMinutes: phase1Minutes,
-          phase2DurationMinutes: phase2Minutes,
+          phase1DurationMinutes: phase1,
+          phase2DurationMinutes: phase2,
           phase2Enabled,
           phase1Title,
           phase2Title,

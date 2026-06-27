@@ -11,11 +11,13 @@ import type { RegistrationMode } from "@/lib/auth/employee-otp/types";
 interface RegistrationPolicyPanelProps {
   companyId: string;
   glassCard: string;
+  onSaved?: () => void;
 }
 
 export default function RegistrationPolicyPanel({
   companyId,
   glassCard,
+  onSaved,
 }: RegistrationPolicyPanelProps) {
   const [policy, setPolicy] = useState<RegistrationPolicyFields | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,8 @@ export default function RegistrationPolicyPanel({
       if (!res.ok) throw new Error(data.error ?? "Failed to save registration policy");
       setPolicy(data.company.registrationPolicy);
       setSaved(true);
+      onSaved?.();
+      window.setTimeout(() => setSaved(false), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save registration policy");
     } finally {
