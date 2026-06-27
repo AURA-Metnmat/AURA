@@ -920,12 +920,18 @@ export default function CompanyDetailView({
                                         className="text-xs rounded-lg border border-white/10 bg-slate-950/40 p-2.5"
                                       >
                                         <a
-                                          href={a.filePath}
+                                          href={`/api/attachments/${a.id}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-amber-400 hover:text-amber-300 font-medium truncate block"
+                                          className="text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1.5"
                                         >
-                                          {a.fileName}
+                                          <Download className="w-3 h-3 shrink-0" />
+                                          <span className="truncate">{a.fileName}</span>
+                                          {a.fileSize ? (
+                                            <span className="text-slate-500 font-normal shrink-0">
+                                              ({Math.max(1, Math.round(a.fileSize / 1024))} KB)
+                                            </span>
+                                          ) : null}
                                         </a>
                                         {a.extractedTextPreview && (
                                           <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
