@@ -40,8 +40,14 @@ export async function getDeleteCompanySummary(companyId: string): Promise<Delete
 }
 
 /**
- * Deletes a company and all related data without interactive transactions.
- * Interactive $transaction callbacks fail with Supabase PgBouncer (P2028).
+ * Deletes a company and all related data atomically.
+ *
+ * Uses the ARRAY form of $transaction (not the interactive callback form, which
+ * fails with Supabase PgBouncer / P2028). Storage-file deletes are external and
+ * run best-effort before the DB transaction. Slug-keyed tables are NOT covered
+ * by the company-delete cascade, so they are deleted explicitly here — including
+ * KnowledgeChunk, which was previously left behind and would leak a deleted
+ * tenant's RAG corpus to any company that later reused the same slug.
  */
 export async function deleteCompanyCompletely(companyId: string): Promise<DeleteCompanySummary> {
   const company = await db.company.findUnique({
@@ -82,19 +88,21 @@ export async function deleteCompanyCompletely(companyId: string): Promise<Delete
   });
   const referenceFileIds = referenceFiles.map((f) => f.id);
 
-  if (referenceFileIds.length > 0) {
-    await db.dataRecord.deleteMany({ where: { fileId: { in: referenceFileIds } } });
-    await db.dataSheet.deleteMany({ where: { fileId: { in: referenceFileIds } } });
-    await db.dataInsight.deleteMany({ where: { fileId: { in: referenceFileIds } } });
-  }
-
-  await db.dataFile.deleteMany({ where: { companySlug: company.slug } });
-  await db.furnaceSpec.deleteMany({ where: { companySlug: company.slug } });
-  await db.pdfDocument.deleteMany({ where: { companySlug: company.slug } });
-  await db.employeeOtp.deleteMany({ where: { companyId: company.id } });
-
-  // Company delete cascades to interview sessions (and their children) and employees.
-  await db.company.delete({ where: { id: company.id } });
+  // All DB deletes run atomically in one transaction (array form is
+  // PgBouncer-safe). deleteMany with an empty `in: []` is a safe no-op, so the
+  // reference-file child deletes don't need a length guard.
+  await db.$transaction([
+    db.dataRecord.deleteMany({ where: { fileId: { in: referenceFileIds } } }),
+    db.dataSheet.deleteMany({ where: { fileId: { in: referenceFileIds } } }),
+    db.dataInsight.deleteMany({ where: { fileId: { in: referenceFileIds } } }),
+    db.dataFile.deleteMany({ where: { companySlug: company.slug } }),
+    db.furnaceSpec.deleteMany({ where: { companySlug: company.slug } }),
+    db.pdfDocument.deleteMany({ where: { companySlug: company.slug } }),
+    db.knowledgeChunk.deleteMany({ where: { companySlug: company.slug } }),
+    db.employeeOtp.deleteMany({ where: { companyId: company.id } }),
+    // Cascades to interview sessions (and their children) and employees.
+    db.company.delete({ where: { id: company.id } }),
+  ]);
 
   return {
     companyName: company.name,
