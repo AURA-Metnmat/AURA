@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Sparkles, FileText, Loader2 } from "lucide-react";
+import { Sparkles, FileText, Loader2, Download } from "lucide-react";
 import NeuralBackground from "@/components/ui/flow-field-background";
 import { PLATFORM_NAME, DEFAULT_GAPS } from "@/lib/aura/config";
 import { COMPANY_CATEGORIES } from "@/lib/aura/company-utils";
@@ -76,6 +76,11 @@ interface SessionDetail {
     recommendations: string;
     actionItems: string;
   } | null;
+  attachments: {
+    id: string;
+    fileName: string;
+    fileSize: number;
+  }[];
 }
 
 const ONBOARD_STEPS = ["Company Info", "Business Context", "Interview Link"] as const;
@@ -919,6 +924,35 @@ export default function AdminPage() {
             </div>
           ) : (
             <p className="text-slate-500 text-sm">Interview in progress — report will appear when completed.</p>
+          )}
+
+          {sessionDetail.attachments?.length > 0 && (
+            <section>
+              <h3 className="text-lg font-semibold mb-3">Files shared by employee</h3>
+              <ul className="space-y-2">
+                {sessionDetail.attachments.map((a) => (
+                  <li
+                    key={a.id}
+                    className="rounded-xl border border-slate-800 bg-slate-900 p-3 text-sm"
+                  >
+                    <a
+                      href={`/api/attachments/${a.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-400 hover:text-amber-300 font-medium flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{a.fileName}</span>
+                      {a.fileSize ? (
+                        <span className="text-slate-500 font-normal shrink-0">
+                          ({Math.max(1, Math.round(a.fileSize / 1024))} KB)
+                        </span>
+                      ) : null}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           <section>
