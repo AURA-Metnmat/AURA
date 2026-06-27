@@ -11,6 +11,7 @@ import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
 import { findActiveSessionForEmployee } from "@/lib/employees/session-resume";
 import { reindexCompanyKnowledge } from "@/lib/knowledge/indexer";
 import { sanitizeUserInput, containsPromptInjectionSignals } from "@/lib/ai/safety";
+import { checkInterviewMessageRateLimit } from "@/lib/ai/ai-rate-limit";
 import { CONSENT_VERSION, type DeviceType } from "@/lib/interview/consent";
 import { captureUserAnswer, findLastAssistantMessageId } from "@/lib/interview/answer-capture";
 import type { StructuredAnswerPayload } from "@/lib/aura/interaction";
@@ -441,6 +442,19 @@ export async function POST(request: Request) {
 
     if (!("message" in body)) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
+    }
+
+    const msgRl = await checkInterviewMessageRateLimit(session.id);
+    if (!msgRl.allowed) {
+      return NextResponse.json(
+        { error: "You're sending messages too quickly. Please wait a moment." },
+        {
+          status: 429,
+          headers: msgRl.retryAfterSeconds
+            ? { "Retry-After": String(msgRl.retryAfterSeconds) }
+            : undefined,
+        }
+      );
     }
 
     const userMessage = sanitizeUserInput(body.message ?? "");

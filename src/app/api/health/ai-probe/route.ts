@@ -3,6 +3,8 @@ import { chatJson } from "@/lib/ai/chat";
 import { isDualModelActive } from "@/lib/ai/ai-config";
 import { hasClaudeProvider, hasOpenAIProvider } from "@/lib/ai/providers";
 import { CLAUDE_INTERVIEW_MODEL, OPENAI_CHAT_MODEL } from "@/lib/ai/models";
+import { getClientIp } from "@/lib/auth/client-ip";
+import { checkAiProbeRateLimit } from "@/lib/ai/ai-rate-limit";
 
 const PROBE_MESSAGE = [{ role: "user" as const, content: 'Return JSON: {"ok":true}' }];
 
@@ -30,7 +32,21 @@ async function probeProvider(preferClaude: boolean) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const ip = getClientIp(request);
+  const probeRl = await checkAiProbeRateLimit(ip);
+  if (!probeRl.allowed) {
+    return NextResponse.json(
+      { status: "rate_limited", error: "Too many requests" },
+      {
+        status: 429,
+        headers: probeRl.retryAfterSeconds
+          ? { "Retry-After": String(probeRl.retryAfterSeconds) }
+          : undefined,
+      }
+    );
+  }
+
   const configured = {
     claude: hasClaudeProvider(),
     openai: hasOpenAIProvider(),

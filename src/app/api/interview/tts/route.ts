@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { requireEmployeeSession } from "@/lib/auth/employee";
 import { assertEmployeeOwnsSession } from "@/lib/employees/session-access";
 import { sanitizeUserInput } from "@/lib/ai/safety";
+import { checkTtsRateLimit } from "@/lib/ai/ai-rate-limit";
 
 const VALID_LANGUAGES: Language[] = ["en", "hi", "or", "bn"];
 
@@ -33,6 +34,19 @@ export async function POST(request: Request) {
 
     const denied = await assertEmployeeOwnsSession(request, session);
     if (denied) return denied;
+
+    const rl = await checkTtsRateLimit(sessionId);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment." },
+        {
+          status: 429,
+          headers: rl.retryAfterSeconds
+            ? { "Retry-After": String(rl.retryAfterSeconds) }
+            : undefined,
+        }
+      );
+    }
 
     const text = sanitizeUserInput(body.text ?? "");
     const language = VALID_LANGUAGES.includes(body.language as Language)
