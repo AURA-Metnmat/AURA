@@ -100,16 +100,23 @@ export function InterviewDetailsForm({
           <div className="p-6 sm:p-8 space-y-4">
             {FIELDS.map(({ key, icon: Icon, required, type }) => (
               <div key={key}>
-                <label className="flex items-center gap-2 text-sm text-slate-300 mb-1.5">
+                <label
+                  htmlFor={`participant-${key}`}
+                  className="flex items-center gap-2 text-sm text-slate-300 mb-1.5"
+                >
                   <Icon className="w-3.5 h-3.5 text-amber-500/80" />
                   {t[LABELS[key]]}
                   {required && <span className="text-amber-500 text-xs">*</span>}
                 </label>
                 <input
+                  id={`participant-${key}`}
                   type={type}
                   value={form[key]}
                   onChange={(e) => onChange({ ...form, [key]: e.target.value })}
                   readOnly={locked.has(key)}
+                  aria-required={required}
+                  aria-invalid={formErrors[key] ? true : undefined}
+                  aria-describedby={formErrors[key] ? `participant-${key}-error` : undefined}
                   className={cn(
                     "w-full bg-slate-950/80 border rounded-xl px-4 py-3 text-sm transition-colors",
                     "focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/20",
@@ -118,7 +125,12 @@ export function InterviewDetailsForm({
                   )}
                 />
                 {formErrors[key] && (
-                  <p className="text-xs text-red-400 mt-1 flex items-center gap-1">{formErrors[key]}</p>
+                  <p
+                    id={`participant-${key}-error`}
+                    className="text-xs text-red-400 mt-1 flex items-center gap-1"
+                  >
+                    {formErrors[key]}
+                  </p>
                 )}
               </div>
             ))}
