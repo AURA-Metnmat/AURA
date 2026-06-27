@@ -27,6 +27,11 @@ import {
   validateEmployeePassword,
 } from "./password-policy";
 import { sendRegistrationCredentialsEmail } from "@/lib/notifications/registration-credentials";
+import { getClientIp } from "@/lib/auth/client-ip";
+import {
+  checkEmployeeLoginRateLimit,
+  checkEmployeeRegisterRateLimit,
+} from "@/lib/auth/employee-auth-rate-limit";
 import type { OtpVerifySuccess } from "./types";
 
 const INVALID_CREDENTIALS = "Invalid mobile, email, or password.";
@@ -100,6 +105,17 @@ export async function registerEmployee(
   const company = await findCompanyBySlug(body.companySlug);
   if (!company) {
     return { ok: false, status: 404, error: "Company not found." };
+  }
+
+  if (request) {
+    const rl = await checkEmployeeRegisterRateLimit(getClientIp(request));
+    if (!rl.allowed) {
+      return {
+        ok: false,
+        status: 429,
+        error: "Too many registration attempts. Please wait a few minutes and try again.",
+      };
+    }
   }
 
   if (!company.allowEmployeeSelfRegistration || company.registrationMode === "CLOSED") {
@@ -214,6 +230,17 @@ export async function signInEmployee(
   const company = await findCompanyBySlug(body.companySlug);
   if (!company) {
     return { ok: false, status: 404, error: "Company not found." };
+  }
+
+  if (request) {
+    const rl = await checkEmployeeLoginRateLimit(getClientIp(request));
+    if (!rl.allowed) {
+      return {
+        ok: false,
+        status: 429,
+        error: "Too many attempts. Please wait a few minutes and try again.",
+      };
+    }
   }
 
   const identifier = body.identifier?.trim() ?? "";

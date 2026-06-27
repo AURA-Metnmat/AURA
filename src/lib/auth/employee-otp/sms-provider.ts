@@ -19,8 +19,11 @@ export interface SendOtpResult {
 }
 
 function shouldUseDevFallback(): boolean {
-  if (process.env.NODE_ENV !== "production") return true;
-  return process.env.OTP_SMS_DEV_FALLBACK === "true";
+  // Dev fallback logs the OTP to the server console and reports it as
+  // "delivered". That is for local development ONLY. In production, an SMS
+  // delivery failure must surface as a real failure — never be masked by a
+  // logged code (which would also expose OTPs in production logs).
+  return process.env.NODE_ENV !== "production";
 }
 
 async function parseMsg91Response(res: Response): Promise<Msg91OtpResponse | null> {
