@@ -44,6 +44,7 @@ interface BilingualBodyProps {
   englishOnly: boolean;
   localeLabel: string;
   englishLabel: string;
+  localeLang: Language;
   isUser: boolean;
 }
 
@@ -53,6 +54,7 @@ function BilingualBody({
   englishOnly,
   localeLabel,
   englishLabel,
+  localeLang,
   isUser,
 }: BilingualBodyProps) {
   const localeText = contentLocale?.trim() || contentEn;
@@ -77,7 +79,7 @@ function BilingualBody({
         <p className="text-[10px] uppercase tracking-wider text-amber-400/90 font-medium mb-2">
           {localeLabel}
         </p>
-        <p className="text-[15px] leading-7 text-slate-100 whitespace-pre-wrap">{localeText}</p>
+        <p lang={localeLang} className="text-[15px] leading-7 text-slate-100 whitespace-pre-wrap">{localeText}</p>
       </div>
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 min-h-[4rem]">
         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium mb-2">
@@ -172,6 +174,7 @@ const ChatMessageRow = memo(function ChatMessageRow({
             englishOnly={englishOnly}
             localeLabel={engagement?.bilingualLocaleLabel ?? localeName}
             englishLabel={engagement?.bilingualEnglishLabel ?? "English"}
+            localeLang={preferredLanguage}
             isUser={!isAssistant}
           />
 
@@ -220,7 +223,13 @@ export function BilingualChat({
   const localeName = localeDisplayName(preferredLanguage);
 
   return (
-    <div className="flex flex-col">
+    <div
+      className="flex flex-col"
+      role="log"
+      aria-live="polite"
+      aria-atomic="false"
+      aria-relevant="additions"
+    >
       {!englishOnly && messages.length > 0 && (
         <div className="max-w-6xl mx-auto w-full px-1 pb-2 hidden md:grid grid-cols-2 gap-4">
           <p className="text-[10px] uppercase tracking-wider text-amber-400/70 pl-12">
@@ -259,7 +268,7 @@ export function BilingualChat({
             </div>
             <div className="space-y-1">
               <p className="text-[11px] text-slate-500">{engagement?.auraTyping ?? thinkingEn}</p>
-              <p className="text-sm text-slate-600">{englishOnly ? thinkingEn : thinkingLocale}</p>
+              <p lang={englishOnly ? undefined : preferredLanguage} className="text-sm text-slate-600">{englishOnly ? thinkingEn : thinkingLocale}</p>
             </div>
           </div>
         </div>
