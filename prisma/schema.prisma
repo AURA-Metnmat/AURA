@@ -661,6 +661,7 @@ model DataInsight {
   file      DataFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
 
   @@index([category])
+  @@index([fileId])
 }
 
 model PdfDocument {
