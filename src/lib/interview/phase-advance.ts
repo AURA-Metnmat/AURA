@@ -162,24 +162,25 @@ async function celebratePhase1Complete(
   const celebration = buildPhase1CompleteMessage(config, lang);
   const completionPct = Math.max(session.completionPct, 40);
 
-  await db.message.create({
-    data: {
-      sessionId: session.id,
-      role: "assistant",
-      content: celebration.en,
-      contentLocale: celebration.locale,
-      section: session.currentSection,
-    },
-  });
-
-  await db.interviewSession.update({
-    where: { id: session.id },
-    data: {
-      interviewPhase: INTERVIEW_PHASE.PHASE1_COMPLETE,
-      completionPct,
-      introStep: Math.max(session.introStep, 3),
-    },
-  });
+  await db.$transaction([
+    db.message.create({
+      data: {
+        sessionId: session.id,
+        role: "assistant",
+        content: celebration.en,
+        contentLocale: celebration.locale,
+        section: session.currentSection,
+      },
+    }),
+    db.interviewSession.update({
+      where: { id: session.id },
+      data: {
+        interviewPhase: INTERVIEW_PHASE.PHASE1_COMPLETE,
+        completionPct,
+        introStep: Math.max(session.introStep, 3),
+      },
+    }),
+  ]);
 
   const phaseProgress = getPhaseProgress({
     interviewPhase: INTERVIEW_PHASE.PHASE1_COMPLETE,
@@ -220,38 +221,38 @@ async function startPhase2Questions(
   const now = new Date();
   const completionPct = Math.max(session.completionPct, 45);
 
-  await db.message.create({
-    data: {
-      sessionId: session.id,
-      role: "assistant",
-      content: intro.en,
-      contentLocale: intro.locale,
-      section,
-    },
-  });
-
-  await db.message.create({
-    data: {
-      sessionId: session.id,
-      role: "assistant",
-      content: formatted.en,
-      contentLocale: formatted.locale,
-      metadata,
-      section,
-    },
-  });
-
-  await db.interviewSession.update({
-    where: { id: session.id },
-    data: {
-      interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
-      phase2StartedAt: now,
-      phase2QuestionIndex: 0,
-      currentSection: section,
-      completionPct,
-      introStep: Math.max(session.introStep, 3),
-    },
-  });
+  await db.$transaction([
+    db.message.create({
+      data: {
+        sessionId: session.id,
+        role: "assistant",
+        content: intro.en,
+        contentLocale: intro.locale,
+        section,
+      },
+    }),
+    db.message.create({
+      data: {
+        sessionId: session.id,
+        role: "assistant",
+        content: formatted.en,
+        contentLocale: formatted.locale,
+        metadata,
+        section,
+      },
+    }),
+    db.interviewSession.update({
+      where: { id: session.id },
+      data: {
+        interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
+        phase2StartedAt: now,
+        phase2QuestionIndex: 0,
+        currentSection: section,
+        completionPct,
+        introStep: Math.max(session.introStep, 3),
+      },
+    }),
+  ]);
 
   const phaseProgress = getPhaseProgress({
     interviewPhase: INTERVIEW_PHASE.PHASE2_FIXED,
