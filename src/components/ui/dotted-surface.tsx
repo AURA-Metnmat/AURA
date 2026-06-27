@@ -21,6 +21,9 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
     const container = containerRef.current;
     if (!container) return;
 
+    const prefersReducedMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
     const isDark = theme !== "light";
     const SEPARATION = 150;
     const AMOUNTX = 40;
@@ -105,7 +108,12 @@ export function DottedSurface({ className, ...props }: DottedSurfaceProps) {
     };
 
     updateSize();
-    animate();
+    if (prefersReducedMotion) {
+      // Render a single static frame; skip the continuous animation loop.
+      renderer.render(scene, camera);
+    } else {
+      animate();
+    }
 
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(container);

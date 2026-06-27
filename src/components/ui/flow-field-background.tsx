@@ -29,6 +29,9 @@ export default function NeuralBackground({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const prefersReducedMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+
     let width = container.clientWidth;
     let height = container.clientHeight;
     let particles: Particle[] = [];
@@ -146,7 +149,12 @@ export default function NeuralBackground({
     };
 
     init();
-    animate();
+    if (prefersReducedMotion) {
+      // Draw a single static frame; skip the continuous animation loop.
+      particles.forEach((p) => p.draw(ctx));
+    } else {
+      animate();
+    }
 
     window.addEventListener("resize", handleResize);
     container.addEventListener("mousemove", handleMouseMove);
