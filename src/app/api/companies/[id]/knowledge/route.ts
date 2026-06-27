@@ -9,6 +9,7 @@ import {
   parseChunkMetadata,
   REVIEW_STATUS,
 } from "@/lib/knowledge/review";
+import { parseIntParam } from "@/lib/http/query-params";
 
 export async function GET(
   request: Request,
@@ -28,8 +29,8 @@ export async function GET(
     const listExperience = searchParams.get("list") === "experience";
     const statusParam = searchParams.get("status");
     const categoryParam = searchParams.get("category");
-    const previewLimit = Math.min(Number(searchParams.get("preview") ?? 15), 50);
-    const listLimit = Math.min(Number(searchParams.get("limit") ?? 100), 500);
+    const previewLimit = parseIntParam(searchParams.get("preview"), 15, { min: 1, max: 50 });
+    const listLimit = parseIntParam(searchParams.get("limit"), 100, { min: 1, max: 500 });
 
     const experienceWhere: {
       companySlug: string;

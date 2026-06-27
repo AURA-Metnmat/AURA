@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseIntParam } from "@/lib/http/query-params";
 import { db } from "@/lib/db";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { PERMISSIONS } from "@/lib/auth/admin-rbac";
@@ -77,7 +78,7 @@ export async function PATCH(
     data.isActive = body.isActive;
   }
   if (body.sortOrder !== undefined) {
-    data.sortOrder = Math.max(0, Math.round(Number(body.sortOrder)));
+    data.sortOrder = parseIntParam(body.sortOrder, 0, { min: 0 });
   }
   if (typeof body.questionType === "string") {
     data.questionType = body.questionType.trim().toLowerCase();

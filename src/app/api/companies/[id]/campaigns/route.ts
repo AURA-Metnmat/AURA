@@ -8,6 +8,7 @@ import {
   generateCampaignInviteToken,
 } from "@/lib/campaigns/resolve";
 import { getEffectiveCampaignStatus } from "@/lib/campaigns/status";
+import { parseDateParam } from "@/lib/http/query-params";
 
 function formatCampaign(
   campaign: {
@@ -109,8 +110,8 @@ export async function POST(
       description: body.description?.trim() || null,
       status: "active",
       inviteToken,
-      startsAt: body.startsAt ? new Date(body.startsAt) : null,
-      expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+      startsAt: parseDateParam(body.startsAt),
+      expiresAt: parseDateParam(body.expiresAt),
       isDefault: false,
     },
     include: { _count: { select: { questions: true, sessions: true } } },

@@ -5,6 +5,7 @@ import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { getInterviewLink } from "@/lib/aura/company-utils";
 import { generateCampaignInviteToken } from "@/lib/campaigns/resolve";
 import { getEffectiveCampaignStatus } from "@/lib/campaigns/status";
+import { parseDateParam } from "@/lib/http/query-params";
 
 export async function PATCH(
   request: Request,
@@ -49,10 +50,10 @@ export async function PATCH(
       ...(body.description !== undefined && { description: body.description?.trim() || null }),
       ...(body.status && { status: body.status }),
       ...(body.expiresAt !== undefined && {
-        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+        expiresAt: parseDateParam(body.expiresAt),
       }),
       ...(body.startsAt !== undefined && {
-        startsAt: body.startsAt ? new Date(body.startsAt) : null,
+        startsAt: parseDateParam(body.startsAt),
       }),
       ...(body.regenerateInviteToken && !existing.isDefault && { inviteToken }),
     },

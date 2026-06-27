@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseIntParam } from "@/lib/http/query-params";
 import { db } from "@/lib/db";
 import { requireAdminSession } from "@/lib/auth/admin";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
@@ -159,10 +160,10 @@ export async function PATCH(
       ...(body.description !== undefined && { description: body.description }),
       ...(body.aiContext !== undefined && { aiContext: body.aiContext }),
       ...(body.interviewDurationMinutes !== undefined && {
-        interviewDurationMinutes: Math.min(
-          60,
-          Math.max(5, Math.round(body.interviewDurationMinutes))
-        ),
+        interviewDurationMinutes: parseIntParam(body.interviewDurationMinutes, 15, {
+          min: 5,
+          max: 60,
+        }),
       }),
       ...(body.contactName !== undefined && { contactName: body.contactName }),
       ...(body.contactEmail !== undefined && { contactEmail: body.contactEmail }),

@@ -8,6 +8,7 @@ import {
   buildAnswerExportJsonl,
   fetchAnswersForExport,
 } from "@/lib/companies/answer-export";
+import { parseIntParam } from "@/lib/http/query-params";
 
 export async function GET(
   request: Request,
@@ -37,7 +38,7 @@ export async function GET(
       status: searchParams.get("status"),
       confidenceMin: searchParams.get("confidenceMin"),
       confidenceMax: searchParams.get("confidenceMax"),
-      limit: Number(searchParams.get("limit") ?? 5000),
+      limit: parseIntParam(searchParams.get("limit"), 5000, { min: 1, max: 50000 }),
     });
 
     const slug = company.slug.replace(/[^a-z0-9-_]/gi, "-");

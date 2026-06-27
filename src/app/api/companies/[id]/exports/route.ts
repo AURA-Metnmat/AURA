@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCompanyAdmin } from "@/lib/auth/admin-company-guard";
 import { PERMISSIONS } from "@/lib/auth/admin-rbac";
 import { listCompanyExportLogs } from "@/lib/exports/record-export";
+import { parseIntParam } from "@/lib/http/query-params";
 
 export async function GET(
   request: Request,
@@ -13,7 +14,7 @@ export async function GET(
 
   try {
     const { searchParams } = new URL(request.url);
-    const limit = Number(searchParams.get("limit") ?? 50);
+    const limit = parseIntParam(searchParams.get("limit"), 50, { min: 1, max: 500 });
     const exports = await listCompanyExportLogs(id, limit);
     return NextResponse.json({ exports });
   } catch (error) {

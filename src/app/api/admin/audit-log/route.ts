@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdminSession } from "@/lib/auth/admin";
+import { parseIntParam } from "@/lib/http/query-params";
 import {
   assertCompanyAccess,
   canAccessCompany,
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const companyId = searchParams.get("companyId");
-  const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
+  const limit = parseIntParam(searchParams.get("limit"), 50, { min: 1, max: 200 });
 
   if (companyId) {
     const denied = assertCompanyAccess(session, companyId);

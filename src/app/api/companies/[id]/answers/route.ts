@@ -9,6 +9,7 @@ import {
   type ReviewStatus,
 } from "@/lib/knowledge/review";
 import { parseConfidenceFilter } from "@/lib/refinement/quality-stats";
+import { parseIntParam } from "@/lib/http/query-params";
 
 export async function GET(
   request: Request,
@@ -30,7 +31,7 @@ export async function GET(
   const employeeIdParam = searchParams.get("employeeId");
   const confidenceMin = searchParams.get("confidenceMin");
   const confidenceMax = searchParams.get("confidenceMax");
-  const limit = Math.min(Number(searchParams.get("limit") ?? 100), 500);
+  const limit = parseIntParam(searchParams.get("limit"), 100, { min: 1, max: 500 });
 
   const confidenceFilter = parseConfidenceFilter(confidenceMin, confidenceMax);
 
